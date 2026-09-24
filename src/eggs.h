@@ -46,9 +46,9 @@ enum options_hitbox_trails
     OPT_HITBOXTRAILS_COUNT
 };
 
-static const u8 HitboxTrailDecayConst[] = {15, 10, 30, 0};
-static const u8 HitboxTrailDecayFactor[] = {4, 8, 2, 0};
-static const char *HitboxTrailDecayText[] = {"Normal", "Fast", "Slow", "Off"};
+static const u8 HitboxTrailDecayConst[] = {15, 10, 5, 0, 30, 0};
+static const u8 HitboxTrailDecayFactor[] = {4, 8, 13, 200, 2, 0};
+static const char *HitboxTrailDecayText[] = {"Normal", "Fast", "Very Fast", "Instant", "Slow", "Off"};
 
 static EventOption Options_HitboxTrails[OPT_HITBOXTRAILS_COUNT] = {
     {
