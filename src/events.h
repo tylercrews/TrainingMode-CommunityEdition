@@ -7,7 +7,7 @@
 #include <stdint.h>
 
 #define TM_VERSSHORT "TM-Tyro v1.4.1 T1"
-#define TM_VERSLONG "TM Tyro Edition v1.4.1 T1"
+#define TM_VERSLONG "TrMo Tyro Edition v1.4.1 T1"
 #define EVENT_DATASIZE 512
 #define TM_FUNC -(50 * 4)
 
