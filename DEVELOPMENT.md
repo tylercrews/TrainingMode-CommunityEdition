@@ -8,7 +8,6 @@ Here are a few things you should know before contributing.
 - [Join the discord here](https://discord.gg/2Khb8CVP7A).
 - Ping me in the dev-discussion channel before starting a contribution, I will guide you in the right direction.
 - Keep contributions small and focused.
-- Do not contribute AI code.
 
 If you have any other questions, feel free to ping me (Aitch) in the dev-discussion channel.
 
