@@ -1747,11 +1747,15 @@ GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, 
     GOBJ *msg_gobj = GObj_Create(0, 7, 0);
     MsgData *msg_data = calloc(sizeof(MsgData));
     GObj_AddUserData(msg_gobj, 4, HSD_Free, msg_data);
-    GObj_AddGXLink(msg_gobj, GXLink_Common, MSG_GXLINK, MSG_GXPRI);
+    GObj_AddGXLink(msg_gobj, OSD_MessageGX, MSG_GXLINK, MSG_GXPRI);
     JOBJ *msg_jobj = JOBJ_LoadJoint(stc_event_vars.menu_assets->message);
     GObj_AddObject(msg_gobj, R13_U8(-0x3E55), msg_jobj);
     msg_data->lifetime = MSG_LIFETIME;
-    msg_data->kind = msg_kind;
+    msg_data->kind = OSD_MessageKind(msg_kind);
+    msg_data->settings_id = OSD_MessageSettings(msg_kind);
+    msg_data->timing_frame = -1;
+    msg_data->timing_subtext = OSD_MessageLine(msg_kind);
+    msg_data->timing_best = OSD_MessageBestFrame(msg_kind);
     msg_data->state = MSGSTATE_SHIFT;
     msg_data->anim_timer = MSGTIMER_SHIFT;
     msg_jobj->scale.X = MSGJOINT_SCALE;
@@ -1783,6 +1787,8 @@ GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, 
     // build string
     char buffer[MSG_LINEMAX * MSG_CHARMAX + 1];
     va_start(args, format);
+    unsigned timing_arg = OSD_MessageArgument(msg_kind);
+    msg_data->timing_frame = OSD_ReadTimingArgument(args, timing_arg);
     vsprintf(buffer, format, args);
     va_end(args);
     char *msg = buffer;
@@ -1834,6 +1840,15 @@ GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, 
         int y_delta = i * MSGTEXT_YOFFSET;
         Text_AddSubtext(msg_text, 0, y_base + y_delta, msg_line);
     }
+
+    if (OSD_MessageInline(msg_kind)) {
+        // Two positioned runs on the existing first row: no fourth message line.
+        int y = (line_num - 1) * (-MSGTEXT_YOFFSET / 2);
+        Text_SetText(msg_text, 0, "Wavedash");
+        Text_SetPosition(msg_text, 0, -55, y);
+        msg_data->timing_subtext = Text_AddSubtext(msg_text, 60, y, "Frame %d", msg_data->timing_frame);
+    }
+    OSD_ApplyMessageStyle(msg_data);
 
     // Add to queue
     Message_Add(msg_gobj, queue_num);
@@ -2020,6 +2035,19 @@ void Message_Manager(GOBJ *mngr_gobj)
         }
     }
 }
+void Message_EndCombo(int queue_num) {
+    if ((unsigned)queue_num >= MSGQUEUE_NUM) return;
+    MsgMngrData *manager = stc_msgmgr->userdata;
+    for (unsigned i = 0; i < MSGQUEUE_SIZE; ++i) {
+        GOBJ *gobj = manager->msg_queue[queue_num][i];
+        if (!gobj) continue;
+        MsgData *msg = gobj->userdata;
+        if (msg->settings_id != OSD_ComboCounter) continue;
+        msg->lifetime = 60;
+        msg->alive_timer = 0;
+        Text_SetColor(msg->text, 1, &stc_msg_colors[MSGCOLOR_GREEN]);
+    }
+}
 void Message_Destroy(GOBJ **msg_queue, int msg_num)
 {
     GOBJ *msg_gobj = msg_queue[msg_num];
@@ -2073,7 +2101,8 @@ void Message_Add(GOBJ *msg_gobj, int queue_num)
                 MsgData *this_msg_data = this_msg_gobj->userdata;
 
                 // Remove this message if its of the same kind
-                if (this_msg_data->kind == msg_data->kind)
+                if (OSD_SameReplacement(this_msg_data->kind, this_msg_data->settings_id,
+                                        msg_data->kind, msg_data->settings_id))
                 {
                     Message_Destroy(msg_queue, i); // remove the message and shift others
 

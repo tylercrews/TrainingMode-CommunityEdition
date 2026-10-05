@@ -191,7 +191,7 @@ StoreTextColor:
     li r5, MSGCOLOR_WHITE
     mr r6, OSDText
     mr r7, FramesSince
-    Message_Display
+    Message_DisplayOSD 16, 1, 1, 0
 
 ChangeColor:
     lwz r3, 0x2C(r3)

@@ -47,7 +47,7 @@ Throw:
     lhz r7, TM_FramesInPrevASStart(playerdata)
 
 Display:
-    Message_Display
+    Message_DisplayOSD 13, 1, 1, 0
     b Exit
 
 Text_ItemThrow:

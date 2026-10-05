@@ -62,7 +62,7 @@ PrintMessage:
     mflr r6
     lhz r7, TM_PostHitstunFrameCount(REG_FighterData)
     addi r7, r7, 1
-    Message_Display
+    Message_DisplayOSD 28, 1, 1, 0
 
     b Exit
 

@@ -121,7 +121,7 @@ RedText:
 DisplayText:
     mr r3, r10                  # message kind
     lbz r4, 0xC(playerdata)     # message queue
-    Message_Display
+    Message_DisplayOSD 18, 1, 1, 0
     b Exit
 
 

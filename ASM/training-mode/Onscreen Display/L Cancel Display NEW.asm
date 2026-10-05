@@ -75,7 +75,23 @@ PrintMessage:
     mr r6, REG_String
     lbz r8, 0x67F(REG_FighterData)  # get decimal to print
     addi r8, r8, 1
-    Message_Display
+    # Keep the actual cancel outcome separate from its input-timing color.
+    cmpwi REG_TextColor, MSGCOLOR_GREEN
+    bne LCancel_OutcomeMissed
+    bl LCancel_SuccessText
+    mflr r9
+    b LCancel_OutcomeReady
+LCancel_OutcomeMissed:
+    bl LCancel_MissedText
+    mflr r9
+LCancel_OutcomeReady:
+    cmpwi r8, 41
+    bgt LCancel_DisplayNoTiming
+    Message_DisplayOSD 1, 2, 1, 0
+    b LCancel_EndDisplay
+LCancel_DisplayNoTiming:
+    Message_DisplayOSD 1, 0, 1, 0
+LCancel_EndDisplay:
 
     # Make Top Line White
     lwz r3, 0x2C(r3)
@@ -164,12 +180,21 @@ GetLCRate:
 
 LCancel_Press:
     blrl
-    .string "L-Cancel %d%%\nFrame %d/7"
+    .string "L-Cancel %d%%\nFrame %d/7\n%s"
     .align 2
 
 LCancel_NoPress:
     blrl
-    .string "L-Cancel %d%%\nNo Press"
+    .string "L-Cancel %d%%\nNo Press\nMissed"
+    .align 2
+
+LCancel_SuccessText:
+    blrl
+    .string "Success"
+    .align 2
+LCancel_MissedText:
+    blrl
+    .string "Missed"
     .align 2
 
 Color_White:

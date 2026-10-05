@@ -52,7 +52,7 @@ CheckForFollower:
     bl Text
     mflr r6
     mr r7, ComboCount
-    Message_Display
+    Message_DisplayOSD 22, 0, 1, 0
 
     # Store Per Frame Function to Monitor When Hitstun Runs Out
     lwz r3, 0x2094(playerdata)
@@ -146,46 +146,10 @@ HitstunMonitor_CheckSpecialThrows:
     b HitstunMonitor_ContinueCombo
 
 HitstunMonitor_EndCombo:
-    # Find MessageBox Pointer
-    # Get Player's Message Struct in r29
-    load r3, 0x804a1f58
-    lwz r29, 0x4(r3)
+    # Complete the canonical Combo Counter in the shared C queue, not the old
+    # native text array (where kind 13 also belonged to unrelated ledge messages).
     lbz r3, 0xC(r28)
-    mulli r4, r3, PerPlayerMessageStructLength
-    add r29, r29, r4
-    # Init Search Loop
-    li r27, 0
-
-HitstunMonitor_SearchLoop:
-    mulli r3, r27, 8
-    add r3, r3, r29
-    lhz r4, 0x6(r3)                 # Get OSD ID
-    cmpwi r4, 13
-    beq HitstunMonitor_EditOSD
-    addi r27, r27, 1
-    cmpwi r27, 4
-    ble HitstunMonitor_SearchLoop
-
-    # OSD Not Found, Self Destruct
-    b HitstunMonitor_SelfDestruct
-
-HitstunMonitor_EditOSD:
-    mr r26, r3                      # Backup OSD Info
-    # Set Time To Expire
-    li r3, 60
-    sth r3, 0x4(r26)
-    # Get Green On Stack
-    load r3, 0x8dff6eff
-    stw r3, 0xF0(sp)
-    # Change Subtext's Colors
-    lwz r3, 0x0(r26)
-    li r4, 1
-    addi r5, sp, 0xF0
-    branchl r12, Text_ChangeTextColor # Text_SetColor
-    lwz r3, 0x0(r26)
-    li r4, 2
-    addi r5, sp, 0xF0
-    branchl r12, Text_ChangeTextColor
+    rtocbl r12, TM_MessageEndCombo
 
 HitstunMonitor_SelfDestruct:
     li r3, 0

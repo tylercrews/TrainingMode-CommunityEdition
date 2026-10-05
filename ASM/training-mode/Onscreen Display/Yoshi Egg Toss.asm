@@ -39,7 +39,7 @@ SkipMirrorAngle:
     mflr r6
     li r5, MSGCOLOR_WHITE
 
-    Message_Display
+    Message_DisplayOSD 8, 0, 1, 0
     b Exit
 
 Data:

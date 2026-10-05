@@ -86,7 +86,7 @@ mex_build() {
 # make build directory if necessary
 mkdir -p build
 tyro_write_build_metadata
-settings_abi_stamp="$(cksum src/settings.h src/trails.h src/events.h MexTK/tmFunction.txt MexTK/include/memcard.h ASM/Globals.s)"
+settings_abi_stamp="$(cksum src/settings.h src/trails.h src/osd_style.h src/events.h MexTK/tmFunction.txt MexTK/include/memcard.h ASM/Globals.s)"
 
 # A partial build must not pair a new version/identity with old eventMenu or ASM code.
 if [[ -n "${mode}" ]] && { [[ "$(cat build/version-stamp 2>/dev/null || true)" != "${tyro_metadata_stamp}" ]] || \
@@ -102,7 +102,7 @@ queue_mex_build() {
 }
 
 # compile code in parallel
-queue_mex_build "tmFunction" "build/eventMenu.dat" "src/events.c src/menu.c src/osds.c src/savestate_v1.c src/settings.c src/settings_game.c src/trails.c src/trails_game.c" "dats/eventMenu.dat"
+queue_mex_build "tmFunction" "build/eventMenu.dat" "src/events.c src/menu.c src/osds.c src/savestate_v1.c src/settings.c src/settings_game.c src/trails.c src/trails_game.c src/osd_style.c src/osd_style_game.c" "dats/eventMenu.dat"
 queue_mex_build "cssFunction" "build/labCSS.dat" "src/lab_css.c" "dats/labCSS.dat"
 queue_mex_build "evFunction" "build/lab.dat" "src/lab.c" "dats/lab.dat"
 queue_mex_build "evFunction" "build/lcancel.dat" "src/lcancel.c"

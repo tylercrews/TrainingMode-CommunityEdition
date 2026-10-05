@@ -56,7 +56,7 @@ MissedNIL:
     mflr r6
 
 Display:
-    Message_Display
+    Message_DisplayOSD 8, 0, 1, 0
     b Exit
 
 Text_SuccessfulNIL:

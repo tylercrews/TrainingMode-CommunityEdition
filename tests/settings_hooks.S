@@ -1,5 +1,11 @@
 .include "ASM/Globals.s"
 .text
+.global TestOSDTag
+TestOSDTag:
+    rlwinm r3, r3, 0, 24, 31
+    ori r3, r3, (20 << 8)
+    oris r3, r3, (0x4000 | 1 | (1 << 3))
+    blr
 .global TestSettingsRead
 TestSettingsRead:
     SettingsRead SettingsField_OSDMask, 4

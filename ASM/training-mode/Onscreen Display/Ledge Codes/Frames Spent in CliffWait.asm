@@ -46,7 +46,7 @@ EndSetColor:
     subi r7, r7, 1
     bl Text
     mflr r6
-    Message_Display
+    Message_DisplayOSD 26, 1, 1, 0
 
     b Exit
 

@@ -90,7 +90,7 @@ PrintMessage:
     li r5, MSGCOLOR_WHITE
     bl Wavedash_String
     mflr r6
-    Message_Display
+    Message_DisplayOSD 0, 1, 0, 1
     lwz r3, 0x2C(r3)
     lwz REG_Text, MsgData_Text(r3)
     b CheckSetHopTypeColor
@@ -101,7 +101,7 @@ PrintMessage_NoHopType:
     li r5, MSGCOLOR_WHITE
     bl Wavedash_String_NoHopType
     mflr r6
-    Message_Display
+    Message_DisplayOSD 0, 1, 0, 1
     lwz r3, 0x2C(r3)
     lwz REG_Text, MsgData_Text(r3)
     b SetTimingColor

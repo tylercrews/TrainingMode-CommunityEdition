@@ -78,6 +78,18 @@ bash tests/run_settings_tests.sh
 
 The tests compile a freestanding big-endian PowerPC image with devkitPro, then emulate it. They cover legacy/duplicate/invalid migration, all overlay slots, cross-byte palettes, flags/control nibbles, surrounding canaries, reserved bytes, future/foreign ownership, save-dirty behavior, and hook GPR/FPR/CR/CTR/XER preservation. This is independent of the native card's on-disk checksums; save/reload and downgrade behavior should also be checked in Dolphin on a test card before distributing the format change.
 
+## OSD Identities and Styling
+
+`src/osd_style.c` defines the pure message-tag decoder, palette, replacement-key rule and best-frame timing colors; `src/osd_style_game.c` applies the style at GX time after legacy callers recolor their subtexts. Configurable messages explicitly supply a settings identity. Untagged event feedback keeps its own colors and visibility. The GOBJ return contract stays valid when a category is Off; no caller is given a NULL pointer.
+
+Native producers use `Message_DisplayOSD id, arg, line, inline, best` in `ASM/Globals.s`. The original low-byte kind is retained for queue behavior; metadata separately identifies the setting, the first/second/third integer vararg to snapshot, its text line, an optional Wavedash first-line layout, and the best displayed frame (default 1). C producers use `OSD_MessageTag`. Queue replacement matches both kind and settings ID, preserving alternate IDs and the -1 always-new convention. Do not infer identities or timing semantics by parsing formatted strings.
+
+Timing color compares the unchanged displayed measurement with the declared best frame: best=Cyan, best+1=Green, best+2=White, earlier/later=Red. Instant double jump retains its original best interval of five and still displays five; it is not relabeled Frame 1. No-timing metadata leaves success rates, GALINT, advantage, SDI counts, angle/hop quality, early/late diagnostics, lockout state and shortening-window outcomes under their existing rules. L-cancel adds a separate outcome line so its input timing does not redefine whether the cancel succeeded.
+
+Wavedash uses two positioned first-row subtexts for its title and frame value, retaining Angle and optional Hop as rows two/three. The native combo-end callback finds the canonical Combo Counter in the shared C queue, rather than looking up an obsolete native kind-13 text array. MsgData's original prefix/text pointer offset and existing function-export indices are preserved; extensions are appended and ABI fingerprints force full builds.
+
+Lab's nineteen OSD rows select the eight saved palette choices and update only the selected category. The L-button editor still provides Boolean choices in this step; its full color editor and master-off control belong to step 5. This uses the existing packed palette bytes and leaves the four reserved bytes free. PowerPC tests cover tag/vararg ABI agreement, queue collisions/alternates, frame-5 baseline preservation, palette/timing mapping, draw-time overrides, separate result colors and safe category-Off/event-owned behavior. Font placement, native menu clicks and real save/reload require Dolphin verification.
+
 ## Project Structure
 ### Shared hitbox trails
 

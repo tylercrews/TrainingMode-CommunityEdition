@@ -57,7 +57,7 @@ EndSetColor:
     lbz r4, 0xC(playerdata)     # queue
     lhz r7, 0x2416(playerdata)
     subi r7, r7, 1
-    Message_Display
+    Message_DisplayOSD 26, 0, 1, 0
 
     b Exit
 

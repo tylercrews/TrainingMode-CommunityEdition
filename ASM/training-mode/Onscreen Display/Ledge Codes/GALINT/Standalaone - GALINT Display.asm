@@ -58,7 +58,7 @@ EndSetColor:
     lbz r4, 0xC(playerdata)     # queue
     bl Text
     mflr r6
-    Message_Display
+    Message_DisplayOSD 26, 0, 1, 0
 
     b Exit
 

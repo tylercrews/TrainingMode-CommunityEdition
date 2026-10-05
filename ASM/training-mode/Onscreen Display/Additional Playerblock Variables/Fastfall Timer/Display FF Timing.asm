@@ -49,7 +49,7 @@ PrintMessage:
     bl Fastfall_String
     mflr r6
     lhz r7, TM_CanFastfallFrameCount(REG_FighterData)
-    Message_Display
+    Message_DisplayOSD 20, 1, 1, 0
     lwz r3, 0x2C(r3)
     lwz REG_Text, MsgData_Text(r3)
 

@@ -31,7 +31,7 @@
     bl Text
     mflr r6
     lhz r7, TM_FramesinCurrentAS(playerdata)
-    Message_Display
+    Message_DisplayOSD 14, 1, 1, 0
 
     b Exit
 

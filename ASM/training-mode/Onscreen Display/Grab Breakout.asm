@@ -76,7 +76,7 @@ GrabUpdate:
     li r5, MSGCOLOR_WHITE
     bl Text
     mflr r6
-    Message_Display
+    Message_DisplayOSD 24, 0, 1, 0
     b Exit
 
 Text:

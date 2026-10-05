@@ -42,7 +42,7 @@ EndSetColor:
     lhz r7, 0x2408(playerdata)
     bl Text
     mflr r6
-    Message_Display
+    Message_DisplayOSD 19, 1, 1, 0
 
     b Exit
 

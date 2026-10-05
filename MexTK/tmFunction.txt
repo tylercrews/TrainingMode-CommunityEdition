@@ -27,3 +27,4 @@ GetEventCharList
 StartOSDs
 Settings_Get
 Settings_Set
+Message_EndCombo

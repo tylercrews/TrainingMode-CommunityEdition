@@ -76,7 +76,7 @@ MissedPowershield_Type2:
     b Display
 
 Display:
-    Message_Display
+    Message_DisplayOSD 9, 0, 1, 0
 
     # Set top text white
     lwz r3, 0x2C(r3)

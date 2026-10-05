@@ -186,6 +186,7 @@
     ENTRY TM_StartOSDs
     ENTRY TM_SettingsGet
     ENTRY TM_SettingsSet
+    ENTRY TM_MessageEndCombo
 
     # TmDt Data Pointers
     .set TM_Data, TM_tmFunction - 0x4
@@ -937,6 +938,15 @@
     .macro Message_Display
     crset 6
     rtocbl r12, TM_MessageDisplay
+    .endm
+
+    # Typed metadata, not text parsing. arg 1/2/3 means the first/second/third
+    # integer vararg already supplied by the caller (r7/r8/r9 in these hooks).
+    .macro Message_DisplayOSD id, arg=0, line=1, inline=0, best=1
+        rlwinm r3, r3, 0, 24, 31
+        ori r3, r3, (\id << 8)
+        oris r3, r3, (0x4000 | \arg | (\line << 3) | (\inline << 5) | ((\best - 1) << 7))
+        Message_Display
     .endm
 
     .set MsgData_Text, 0x0

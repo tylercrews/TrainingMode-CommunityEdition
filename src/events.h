@@ -9,6 +9,7 @@
 #include "../version.h"
 #include "settings.h"
 #include "trails.h"
+#include "osd_style.h"
 #define EVENT_DATASIZE 512
 #define TM_FUNC -(50 * 4)
 
@@ -329,6 +330,7 @@ void TM_CreateWatermark(void);
 void Message_Init(void);
 GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, ...);
 void Message_Manager(GOBJ *mngr_gobj);
+void Message_EndCombo(int queue_num);
 void Message_Destroy(GOBJ **msg_queue, int msg_num);
 void Message_Add(GOBJ *msg_gobj, int queue_num);
 void Message_CObjThink(GOBJ *gobj);
@@ -364,7 +366,13 @@ typedef struct MsgData
     int anim_timer;  // used to track animation frame
     int lifetime;    // amount of frames after spawning to kill this message
     int alive_timer; // amount of frames this message has been alive for
+    int settings_id; // independent of kind/queue replacement identity; -1 = event-owned text
+    int timing_frame; // displayed, one-based measurement; -1 = no timing rule
+    int timing_subtext;
+    unsigned timing_best;
 } MsgData;
+void OSD_ApplyMessageStyle(MsgData *msg);
+void OSD_MessageGX(GOBJ *gobj, int pass);
 typedef struct MsgMngrData
 {
     COBJ *cobj;

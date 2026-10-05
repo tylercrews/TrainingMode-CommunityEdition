@@ -316,10 +316,13 @@ void Lab_ChangeGlobalInstant(GOBJ *menu_gobj, int value) {
 }
 
 void Lab_ChangeOSDs(GOBJ *menu_gobj, int value) {
-    // Update only represented IDs; preserve unknown bits and existing title colors.
-    for (int i = 0; i < (int)countof(LabOSD_ID); i++)
-        TM_SetSetting(TM_SETTING_OSD_ENABLED, LabOSD_ID[i], LabOptions_OSDs[i].val);
-
+    MenuData *menu = menu_gobj->userdata;
+    unsigned row = menu->curr_menu->scroll + menu->curr_menu->cursor;
+    if (menu->curr_menu != &LabMenu_OSDs || row >= countof(LabOSD_ID)) return;
+    // Only the selected category changes; other editors' choices remain authoritative.
+    TM_SetSetting(TM_SETTING_OSD_COLOR, LabOSD_ID[row], value);
+    for (unsigned i = 0; i < countof(LabOSD_ID); ++i)
+        LabOptions_OSDs[i].val = TM_GetSetting(TM_SETTING_OSD_COLOR, LabOSD_ID[i]);
     Memcard_SaveIfChanged();
 }
 
@@ -6073,7 +6076,7 @@ void Event_Init(GOBJ *gobj)
         LabOptions_OverlaysCPU[group].val = TM_GetSetting(TM_SETTING_OVERLAY_CPU, group);
     }
     for (int i = 0; i < (int)countof(LabOSD_ID); i++)
-        LabOptions_OSDs[i].val = TM_GetSetting(TM_SETTING_OSD_ENABLED, LabOSD_ID[i]);
+        LabOptions_OSDs[i].val = TM_GetSetting(TM_SETTING_OSD_COLOR, LabOSD_ID[i]);
 
     LabOptions_OSDs[TM_SETTINGS_OSDS].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
     LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);

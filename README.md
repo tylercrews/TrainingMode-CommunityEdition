@@ -19,6 +19,9 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Added saved Off/White/Red/Green/Blue/Yellow/Cyan/Magenta title choices in Lab's OSD editor, with canonical identities across C/native messages.
+- Added best-frame-relative timing colors (Cyan/Green/White/Red) while retaining measured frame numbers and technique baselines, including Peach's frame-5 instant double jump.
+- Separated overlapping message queue identities, preserved outcome/angle colors, split Wavedash title/timing runs within the existing three lines, and added explicit L-cancel Success/Missed feedback.
 - Finalized shared global trail-row labels/bindings, independent edits, and an explicit Both On status in local trail menus; verified all four saved toggle combinations.
 - Added global Very Fast and Instant hitbox trails to the L-button OSD menu and Lab OSD menu, with a shared renderer across gameplay matches.
 - Added Very Very Fast decay to Lab and Eggs-ercise, softer historical trails, player/team-accent colors, and gray CPU trails.

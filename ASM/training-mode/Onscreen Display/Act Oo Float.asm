@@ -38,7 +38,7 @@
     li r5, MSGCOLOR_GREEN
 
 Display:
-    Message_Display
+    Message_DisplayOSD 8, 1, 1, 0
     b Exit
 
 Text:

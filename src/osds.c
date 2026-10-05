@@ -92,7 +92,7 @@ static void RunOSD_FrameAdvantage(GOBJ *ft, GOBJ *ft_sub) {
         }
 
         Message_Display(
-            OSD_FrameAdvantage, ft_data->ply,
+            OSD_MessageTag(OSD_FrameAdvantage, OSD_FrameAdvantage, 0, 1, 0), ft_data->ply,
             advantage > -7 ? MSGCOLOR_GREEN : MSGCOLOR_WHITE,
             "Frame Advantage\n%d Frames", advantage
         );
@@ -162,7 +162,7 @@ static void RunOsd_Handoff(GOBJ *thrower, GOBJ *grabber, GOBJ *enemy, HandoffSta
             int grab_to_throw_delta = state->first_grab_hitbox_frame - state->enemy_release_frame;
             bool grab_early = grab_to_throw_delta < 1;
             int color_timing = grab_to_throw_delta == -1 || grab_to_throw_delta == 0 ? MSGCOLOR_GREEN : MSGCOLOR_WHITE;
-            GOBJ *msg_gobj = Message_Display(OSD_FighterSpecificTech, thrower_data->ply, MSGCOLOR_WHITE,
+            GOBJ *msg_gobj = Message_Display(OSD_MessageTag(OSD_FighterSpecificTech, OSD_FighterSpecificTech, 0, 1, 0), thrower_data->ply, MSGCOLOR_WHITE,
                                              "Handoff Success\n %dF %s", abs(grab_to_throw_delta),
                                              grab_early ? "early" : "late");
 
@@ -177,10 +177,10 @@ static void RunOsd_Handoff(GOBJ *thrower, GOBJ *grabber, GOBJ *enemy, HandoffSta
             //if the timing was 'perfect', yet you missed, give a custom error message to avoid confusion.
             //'Handoff failed, timing perfect' was confusing to people in testing.
             if (grab_to_throw_delta == -1 || grab_to_throw_delta == 0) {
-                Message_Display(OSD_FighterSpecificTech, thrower_data->ply, MSGCOLOR_RED, "Handoff Failure\nConditions not Met");
+                Message_Display(OSD_MessageTag(OSD_FighterSpecificTech, OSD_FighterSpecificTech, 0, 1, 0), thrower_data->ply, MSGCOLOR_RED, "Handoff Failure\nConditions not Met");
             }
             else {
-                Message_Display(OSD_FighterSpecificTech, thrower_data->ply, MSGCOLOR_RED, "Handoff Failure\n %dF %s",
+                Message_Display(OSD_MessageTag(OSD_FighterSpecificTech, OSD_FighterSpecificTech, 0, 1, 0), thrower_data->ply, MSGCOLOR_RED, "Handoff Failure\n %dF %s",
                                 abs(grab_to_throw_delta), grab_early ? "early" : "late");
             }
             state->osd_start_frame = 0;
@@ -230,12 +230,12 @@ static void RunOsd_PnJ(GOBJ *ft, GOBJ *ft_sub) {
         //fail: popo jumped late.
         else if (ft_data->state_id == ASID_KNEEBEND && stc_match->time_frames - pivot_frames[ft_data->ply] <= late_pnj_window) {
             int delta = stc_match->time_frames - pivot_frames[ft_data->ply];
-            Message_Display(OSD_FighterSpecificTech, ft_data->ply, MSGCOLOR_RED, "PNJ Fail. %dF Late", delta);
+            Message_Display(OSD_MessageTag(OSD_FighterSpecificTech, OSD_FighterSpecificTech, 0, 1, 0), ft_data->ply, MSGCOLOR_RED, "PNJ\nFail. %dF Late", delta);
             pivot_frames[ft_data->ply] = 0;
         }
         //success: nana jumped 6f after the smash turn, and popo never jumped.
         else if (ft_sub_data->state_id == ASID_KNEEBEND && stc_match->time_frames - pivot_frames[ft_data->ply] == 6) {
-            Message_Display(OSD_FighterSpecificTech, ft_data->ply, MSGCOLOR_GREEN, "PNJ Success");
+            Message_Display(OSD_MessageTag(OSD_FighterSpecificTech, OSD_FighterSpecificTech, 0, 1, 0), ft_data->ply, MSGCOLOR_GREEN, "PNJ\nSuccess");
             pivot_frames[ft_data->ply] = 0;
         }
     }
@@ -257,7 +257,7 @@ static void RunOsd_PnJ(GOBJ *ft, GOBJ *ft_sub) {
         bool smash_turn_correct_direction = ft_data->input.lstick.X * ft_data->facing_direction < 0.0f; //to filter out fox trots.
 
         if (smash_input_this_frame && smash_turn_correct_direction && frames_early >= 1 && frames_early <= early_pnj_window) {
-            Message_Display(OSD_FighterSpecificTech, ft_data->ply, MSGCOLOR_RED, "PNJ Fail. %dF Early", frames_early);
+            Message_Display(OSD_MessageTag(OSD_FighterSpecificTech, OSD_FighterSpecificTech, 0, 1, 0), ft_data->ply, MSGCOLOR_RED, "PNJ\nFail. %dF Early", frames_early);
             jump_frames[ft_data->ply] = 0;
         }
         else if (frames_early > early_pnj_window) {
@@ -305,7 +305,7 @@ static void RunOsd_SquallHammer(GOBJ *ft) {
         if (height_gained > peak_height[ply])
             peak_height[ply] = height_gained;
     } else if (was_squall) {
-        Message_Display(OSD_FighterSpecificTech, ply, MSGCOLOR_WHITE,
+        Message_Display(OSD_MessageTag(OSD_FighterSpecificTech, OSD_FighterSpecificTech, 0, 1, 0), ply, MSGCOLOR_WHITE,
                         "Squall Hammer\nMax Height: %.2f", peak_height[ply]);
     }
 

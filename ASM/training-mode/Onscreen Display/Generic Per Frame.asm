@@ -151,7 +151,7 @@ FoxFalco_SideBStart:
     load r5, MSGCOLOR_RED
     bl FoxFalco_ShortenEarlyPressText
     mflr r6
-    Message_Display
+    Message_DisplayOSD 8, 0, 1, 0
 
     b FighterSpecificTech_End
 
@@ -175,7 +175,7 @@ FoxFalco_SideB:
     load r5, MSGCOLOR_GREEN
     bl FoxFalco_ShortenTypeText
     mflr r6
-    Message_Display
+    Message_DisplayOSD 8, 0, 1, 0
 
     b FighterSpecificTech_End
 
@@ -192,7 +192,7 @@ FoxFalco_SideBEnd:
     load r5, MSGCOLOR_RED
     bl FoxFalco_ShortenLatePressText
     mflr r6
-    Message_Display
+    Message_DisplayOSD 8, 0, 1, 0
 
     b FighterSpecificTech_End
 
@@ -217,7 +217,7 @@ FoxFalco_ShineGroundLoop_EndSetColor:
     bl FoxFalco_ActOOShineText
     mflr r6
     lhz r7, 0x23F8(playerdata)
-    Message_Display
+    Message_DisplayOSD 8, 1, 1, 0
 
     b FighterSpecificTech_End
 
@@ -249,7 +249,7 @@ FoxFalco_ShineAirLoop_EndSetColor:
     bl FoxFalco_ActOOShineText
     mflr r6
     lhz r7, 0x23F8(playerdata)
-    Message_Display
+    Message_DisplayOSD 8, 1, 1, 0
 
     b FighterSpecificTech_End
     
@@ -317,7 +317,7 @@ EndGetHopTypeText:
     bl FoxFalco_JCShineText
     mflr r6
     lhz r7, 0x2408(playerdata) # frames in JumpF / JumpB
-    Message_Display
+    Message_DisplayOSD 8, 1, 1, 0
     lwz r3, 0x2C(r3)
     lwz r20, MsgData_Text(r3)
     
@@ -368,7 +368,7 @@ Yoshi_PrintJumpOoParryText:
     bl Yoshi_JumpOoParryText
     mflr r6
     lhz r7, 0x23F8(playerdata)
-    Message_Display
+    Message_DisplayOSD 8, 1, 1, 0
     b FighterSpecificTech_End
 
 # /////////////////////////////////////////////////////////////////////////////
@@ -505,7 +505,7 @@ Lockout_InLockout:
 
     li r3, OSD.LockoutTimers        # ID
     lbz r4, 0xC(playerdata)         # queue
-    Message_Display
+    Message_DisplayOSD 12, 0, 1, 0
     b Lockout_End
 
 LockoutText:
@@ -583,7 +583,7 @@ DJL_EndColor:
 
     bl DJL_Text
     mflr r6
-    Message_Display
+    Message_DisplayOSD 8, 1, 1, 0, 5 # Preserve the original best interval: five frames.
     b DJL_End
     
 DJL_Text:

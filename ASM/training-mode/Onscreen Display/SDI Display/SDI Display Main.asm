@@ -91,7 +91,7 @@ PrintMessage:
     mflr r6
     lhz r7, TM_SuccessfulSDIInputs(REG_FighterData)
     lhz r8, TM_TotalSDIInputs(REG_FighterData)
-    Message_Display
+    Message_DisplayOSD 10, 0, 1, 0
 
     b Exit
 

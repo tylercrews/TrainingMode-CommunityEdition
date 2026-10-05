@@ -348,5 +348,83 @@ class TrailTests(unittest.TestCase):
         self.assertEqual(self.next_index(), 12)
 
 
+class OSDStyleTests(unittest.TestCase):
+    def setUp(self):
+        self.m = Machine()
+
+    def test_message_identity_and_legacy_contract(self):
+        for raw, owner in [(7, 20), (5, 16), (5, 28), (-1, 10), (13, 22), (13, 26), (64, 8)]:
+            tag = self.m.call("OSD_MessageTag", raw, owner, 1, 1, 0)
+            self.assertEqual(self.m.call("OSD_MessageKind", tag), raw & 0xFFFFFFFF)
+            self.assertEqual(self.m.call("OSD_MessageSettings", tag), owner)
+            self.assertEqual(self.m.call("OSD_MessageArgument", tag), 1)
+        self.assertEqual(self.m.call("OSD_MessageSettings", -1), 0xFFFFFFFF)
+        self.assertEqual(self.m.call("OSD_MessageSettings", 5), 0xFFFFFFFF)
+        self.assertEqual(self.m.call("OSD_SameReplacement", 5, 16, 5, 28), 0)
+        self.assertEqual(self.m.call("OSD_SameReplacement", 13, 22, 13, 26), 0)
+        self.assertEqual(self.m.call("OSD_SameReplacement", 64, 8, 8, 8), 0)
+        self.assertEqual(self.m.call("OSD_SameReplacement", 5, 16, 5, 16), 1)
+        self.assertEqual(self.m.call("OSD_SameReplacement", -1, 10, -1, 10), 0)
+
+    def test_timing_and_palette_colors(self):
+        for frame, expected in [(0, 0xFFA2BAFF), (1, 0x00FFFFFF), (2, 0x8DFF6EFF), (3, 0xFFFFFFFF), (4, 0xFFA2BAFF), (99, 0xFFA2BAFF)]:
+            self.assertEqual(self.m.call("OSD_TimingColor", frame), expected)
+        expected = [0, 0xFFFFFFFF, 0xFF4646FF, 0x8DFF6EFF, 0x4691FFFF, 0xFFF000FF, 0x00FFFFFF, 0xFF50FFFF]
+        for index, rgba in enumerate(expected):
+            self.assertEqual(self.m.call("OSD_PaletteColor", index), rgba)
+        self.assertEqual(self.m.call("OSD_PaletteColor", 99), 0xFFFFFFFF)
+
+    def test_non_one_best_frame_does_not_change_measurement(self):
+        tag = self.m.call("OSD_MessageTag", 8, 8, 1, 1, 0) | (4 << 23)
+        self.assertEqual(self.m.call("OSD_MessageBestFrame", tag), 5)
+        self.assertEqual(self.m.call("TestTimingArgument", tag, 0, 0, 0, 5), 5)
+        for frame, color in [(4, 0xFFA2BAFF), (5, 0x00FFFFFF), (6, 0x8DFF6EFF), (7, 0xFFFFFFFF), (8, 0xFFA2BAFF)]:
+            self.assertEqual(self.m.call("OSD_TimingColorFor", frame, 5), color)
+
+    def test_draw_applies_late_title_and_best_frame_colors(self):
+        m = self.m
+        m.init()
+        m.write(14, 8, 7)
+        m.call("TestStyleInit", 8, 5, 1, 5)
+        m.call("TestStyleCallerColor", 0, 0x8DFF6EFF)
+        m.call("TestStyleCallerColor", 1, 0xFFA2BAFF)
+        m.call("TestStyleCallerColor", 2, 0x123456FF)
+        m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleColor", 0), 0xFF50FFFF)
+        self.assertEqual(m.call("TestStyleColor", 1), 0x00FFFFFF)
+        self.assertEqual(m.call("TestStyleColor", 2), 0x123456FF)
+        self.assertEqual(m.call("TestStyleHidden"), 0)
+
+    def test_off_and_event_owned_messages_keep_safe_objects(self):
+        m = self.m
+        m.init()
+        m.call("TestStyleInit", 20, 2, 1, 1)
+        m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleHidden"), 1)
+        self.assertEqual(m.call("TestStyleBackgrounds"), 0)
+        m.write(14, 20, 4)
+        m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleHidden"), 0)
+        self.assertEqual(m.call("TestStyleBackgrounds"), 1)
+        m.call("TestStyleInit", -1, -1, 1, 1)
+        m.call("TestStyleCallerColor", 0, 0x112233FF)
+        m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleHidden"), 0)
+        self.assertEqual(m.call("TestStyleColor", 0), 0x112233FF)
+
+    def test_native_tag_and_vararg_snapshot(self):
+        native_tag = self.m.call("TestOSDTag", 7)
+        c_tag = self.m.call("OSD_MessageTag", 7, 20, 1, 1, 0)
+        self.assertEqual(native_tag, c_tag)
+        self.assertEqual(self.m.call("TestTimingArgument", native_tag, 0, 0, 0, 3), 3)
+        lc = self.m.call("OSD_MessageTag", 1, 1, 2, 1, 0)
+        self.assertEqual(self.m.call("TestTimingArgument", lc, 0, 0, 0, 75, 2), 2)
+        no_time = self.m.call("OSD_MessageTag", 9, 9, 0, 1, 0)
+        self.assertEqual(self.m.call("TestTimingArgument", no_time, 0, 0, 0, 123), 0xFFFFFFFF)
+        wave = self.m.call("OSD_MessageTag", 0, 0, 1, 0, 1)
+        self.assertEqual(self.m.call("OSD_MessageInline", wave), 1)
+        self.assertEqual(self.m.call("OSD_MessageLine", wave), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
