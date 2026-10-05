@@ -96,7 +96,7 @@ IncLoopLeft:
     bl OSDPositionText
     mflr r4
     lwz r5, MemcardData(r13)
-    lbz r5, 0x1F28(r5)
+    SettingsRead SettingsField_Position, 5
 
     # Fix value if invalid from removed max osd setting
     cmpwi r5, 4

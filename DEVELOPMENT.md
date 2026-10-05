@@ -59,6 +59,25 @@ Outputs use `TM-Tyro-${TM_VERSION}.iso` and, for releases, `TM-Tyro-${TM_VERSION
 
 Changing version/identity metadata forces a full rebuild even when a single-module build was requested. Assembly identity constants and the save caption are generated in `build/tyro-identity.s` before compilation; use the build script to generate this include before invoking `hgecko` manually. `clean.sh` removes build scratch and the current Tyro version's ISO/ZIP, preserving legacy `TM-CE.iso` and other versioned outputs.
 
+## Saved Settings and Migration
+
+`src/settings.c` is the portable byte codec; `src/settings_game.c` owns the shared runtime service. Event modules use `TM_GetSetting` / `TM_SetSetting` through `EventVars.settings`. Native hooks use the register-preserving `SettingsRead`, `SettingsWrite`, and `SettingsToggle` macros in `ASM/Globals.s`; macro register arguments are numeric register indices (or absolute numeric aliases), not `r3`-style register tokens. Do not write the saved fields directly.
+
+The record stays at `0x1F24..0x1F4F`. It uses explicit big-endian mask bytes, control/actor nibbles, three-bit OSD palette slots, `TY` signature bytes at `0x1F4A`, and version 1 in the high two bits of `0x1F2E`. Four bytes at `0x1F4C..0x1F4F` remain reserved. `src/settings.h` defines the stable fields/IDs and counts; C/assembly ABI-header changes invalidate partial builds.
+
+Validation runs lazily after data is available. Only the exact running Tyro game/maker ID may migrate the record. Missing-signature legacy Tyro lists are copied before repacking; disabled/invalid pairs are skipped and duplicate valid groups retain the last value. Existing enable bits and valid controls are preserved, enabled OSDs receive White, and new flags default Off. Changes mark the native save as dirty and use its existing serialization/checksum path. Future format versions must retain the `TY` signature. An unsupported version or foreign identity leaves all 44 persisted bytes untouched and uses mutable in-memory defaults instead.
+
+Earlier unversioned `TYRE01` builds from step 0 cannot understand this packed record. Once migrated, avoid using those builds with the same Tyro save; the separate upstream/T1 `GTME01` namespace remains unaffected. Version-aware newer builds preserve unsupported settings, but this does not make arbitrary older game executables or recording formats compatible. No automatic upstream-save copy/import is implemented.
+
+Run the actual PowerPC codec, runtime bridge and native-hook tests from the repository root:
+
+```sh
+python -m pip install --target build/test-deps unicorn==2.1.4
+bash tests/run_settings_tests.sh
+```
+
+The tests compile a freestanding big-endian PowerPC image with devkitPro, then emulate it. They cover legacy/duplicate/invalid migration, all overlay slots, cross-byte palettes, flags/control nibbles, surrounding canaries, reserved bytes, future/foreign ownership, save-dirty behavior, and hook GPR/FPR/CR/CTR/XER preservation. This is independent of the native card's on-disk checksums; save/reload and downgrade behavior should also be checked in Dolphin on a test card before distributing the format change.
+
 ## Project Structure
 There are a few important directories to know about:
 1. `src/`: this directory contains the source for the C events, as well as some setup code for the event in `events.c`.

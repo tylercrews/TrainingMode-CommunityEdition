@@ -313,7 +313,7 @@ static void RunOsd_SquallHammer(GOBJ *ft) {
 }
 
 void OSD_Think(GOBJ *event) {
-    u32 osd_enabled = stc_memcard->TM_OSDEnabled;
+    u32 osd_enabled = Settings_Get(TM_SETTING_OSD_MASK, 0);
 
     for (int ply = 0; ply < 6; ++ply) {
         GOBJ *ft = Fighter_GetSubcharGObj(ply, 0);

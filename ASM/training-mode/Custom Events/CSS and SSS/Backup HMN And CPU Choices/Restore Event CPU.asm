@@ -23,7 +23,7 @@
     # load allowed cpu characters
     lwz r4, MemcardData(r13)
     lbz r3, 0x0535(r4)
-    lbz r4, CurrentEventPage(r4)
+    SettingsRead SettingsField_Page, 4
     rtocbl r12, TM_GetEventCharList
     lwz r6, 0x4(r3)
         

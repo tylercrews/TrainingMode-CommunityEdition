@@ -19,6 +19,10 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Added shared C/native settings accessors, explicit 44-byte packing, validation, and migration of Tyro's existing settings.
+- Saved every Lab overlay condition instead of limiting each actor to eight enabled conditions; reserved space for global flags and OSD title colors.
+- Preserved unrepresented OSD enable bits and existing colors when using the current Boolean menus; added in-memory defaults for unsupported/foreign settings without rewriting their record.
+- Corrected Ledgedash's frame-advance button lookup to read its own nibble independently of the decrement button.
 - Centralized version and identity metadata in root-level `version.h` and incremented the version to V1.4.1T2.
 - Separated Tyro's disc/save identity (`TYRE01`) from upstream (`GTME01`), with a Tyro save caption and banner selection.
 - Added versioned ISO and release ZIP names, including `TM-Tyro-V1.4.1T2.iso`, and matching Windows/Linux/macOS release patchers.

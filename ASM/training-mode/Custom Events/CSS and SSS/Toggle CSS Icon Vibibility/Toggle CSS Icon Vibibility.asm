@@ -44,7 +44,7 @@
     lwz r4, MemcardData(r13)
     lbz r3, 0x0535(r4)
     # Get Current Page
-    lbz r4, CurrentEventPage(r4)
+    SettingsRead SettingsField_Page, 4
     rtocbl r12, TM_GetEventCharList
     stw r3, 0x0(REG_Data)
     lwz REG_HmnWhitelist, 0x0(r3)

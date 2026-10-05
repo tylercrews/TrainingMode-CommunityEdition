@@ -12,7 +12,7 @@
     add r4, r3, r4
     # Get page number
     lwz r3, MemcardData(r13)
-    lbz r3, CurrentEventPage(r3)
+    SettingsRead SettingsField_Page, 3
     # Get Event Description ASCII
     rtocbl r12, TM_GetEventDescription
 

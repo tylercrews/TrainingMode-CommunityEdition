@@ -3,6 +3,10 @@
 
 #include <stddef.h>
 
+typedef char settings_overlay_capacity[(OVERLAY_COUNT <= TM_SETTINGS_OVERLAYS) ? 1 : -1];
+typedef char settings_overlay_effects[(countof(LabValues_OverlayColours) == TM_SETTINGS_OVERLAY_CHOICES) ? 1 : -1];
+typedef char settings_osd_capacity[(countof(LabOSD_ID) == TM_SETTINGS_OSDS) ? 1 : -1];
+
 // Static Variables
 static DIDraw didraws[6];
 static SDIDraw sdidraws[6];
@@ -267,7 +271,7 @@ void Lab_ChangeStadiumTransformation(GOBJ *menu_gobj, int value) {
 }
 
 void Lab_ChangeInputDisplay(GOBJ *menu_gobj, int value) {
-    stc_memcard->TM_LabCPUInputDisplay = value;
+    TM_SetSetting(TM_SETTING_INPUT_DISPLAY, 0, value);
 }
 
 void Lab_ChangeDPadOption(GOBJ *menu_gobj, int value) {
@@ -275,42 +279,24 @@ void Lab_ChangeDPadOption(GOBJ *menu_gobj, int value) {
     u8 d = LabOptions_Controls[OPTCTRL_DPAD_DOWN].val;
     u8 l = LabOptions_Controls[OPTCTRL_DPAD_LEFT].val;
     u8 r = LabOptions_Controls[OPTCTRL_DPAD_RIGHT].val;
-    stc_memcard->TM_LabDPadUD = u | (d << 4);
-    stc_memcard->TM_LabDPadLR = l | (r << 4);
+    TM_SetSetting(TM_SETTING_DPAD_UP, 0, u);
+    TM_SetSetting(TM_SETTING_DPAD_DOWN, 0, d);
+    TM_SetSetting(TM_SETTING_DPAD_LEFT, 0, l);
+    TM_SetSetting(TM_SETTING_DPAD_RIGHT, 0, r);
 }
 
 void Lab_ChangeOverlays(GOBJ *menu_gobj, int value) {
-    Memcard *memcard = stc_memcard;
-
-    memset(&memcard->TM_LabSavedOverlays_HMN, 0, sizeof(memcard->TM_LabSavedOverlays_HMN));
-    memset(&memcard->TM_LabSavedOverlays_CPU, 0, sizeof(memcard->TM_LabSavedOverlays_CPU));
-
-    int overlay_save_count = sizeof(memcard->TM_LabSavedOverlays_HMN) / sizeof(OverlaySave);
-    int overlay_save_idx_hmn = 0;
-    int overlay_save_idx_cpu = 0;
-    for (u8 group = 0; group < OVERLAY_COUNT; ++group) {
-        u8 overlay_hmn = LabOptions_OverlaysHMN[group].val;
-        u8 overlay_cpu = LabOptions_OverlaysCPU[group].val;
-
-        if (overlay_hmn != 0 && overlay_save_idx_hmn < overlay_save_count) {
-            memcard->TM_LabSavedOverlays_HMN[overlay_save_idx_hmn] = (OverlaySave) { group, overlay_hmn };
-            overlay_save_idx_hmn += 1;
-        }
-
-        if (overlay_cpu != 0 && overlay_save_idx_cpu < overlay_save_count) {
-            memcard->TM_LabSavedOverlays_CPU[overlay_save_idx_cpu] = (OverlaySave) { group, overlay_cpu };
-            overlay_save_idx_cpu += 1;
-        }
+    for (unsigned group = 0; group < OVERLAY_COUNT; ++group) {
+        TM_SetSetting(TM_SETTING_OVERLAY_HMN, group, LabOptions_OverlaysHMN[group].val);
+        TM_SetSetting(TM_SETTING_OVERLAY_CPU, group, LabOptions_OverlaysCPU[group].val);
     }
 }
 
 void Lab_ChangeOSDs(GOBJ *menu_gobj, int value) {
-    u32 enabled_osds = 0;
+    // Update only represented IDs; preserve unknown bits and existing title colors.
     for (int i = 0; i < LabMenu_OSDs.option_num; i++)
-        enabled_osds |= (u32)LabOptions_OSDs[i].val << LabOSD_ID[i];
-    stc_memcard->TM_OSDEnabled = enabled_osds;
+        TM_SetSetting(TM_SETTING_OSD_ENABLED, LabOSD_ID[i], LabOptions_OSDs[i].val);
 
-    stc_memcard_state->memcard_changed = true;
     Memcard_SaveIfChanged();
 }
 
@@ -384,13 +370,11 @@ void Lab_FreezeCPU(GOBJ *menu_gobj) {
 }
 
 void Lab_ChangeFrameAdvanceButton(GOBJ *menu_gobj, int value) {
-    stc_memcard->TM_LabFrameAdvanceButton &= 0xF0;
-    stc_memcard->TM_LabFrameAdvanceButton |= (u8)value;
+    TM_SetSetting(TM_SETTING_ADVANCE, 0, value);
 }
 
 void Lab_ChangeFrameDecrementButton(GOBJ *menu_gobj, int value) {
-    stc_memcard->TM_LabFrameAdvanceButton &= 0x0F;
-    stc_memcard->TM_LabFrameAdvanceButton |= (u8)value << 4;
+    TM_SetSetting(TM_SETTING_DECREMENT, 0, value);
 }
 
 void Lab_ChangeCPUPercent(GOBJ *menu_gobj, int value)
@@ -6056,105 +6040,20 @@ void Event_Init(GOBJ *gobj)
     LabOptions_InfoDisplayHMN[OPTINF_PRESET].OnChange = Lab_ChangeInfoPresetHMN;
     LabOptions_InfoDisplayCPU[OPTINF_PRESET].OnChange = Lab_ChangeInfoPresetCPU;
 
-    // saved options
-    Memcard *memcard = stc_memcard;
-
-    // load input display option, resetting if invalid
-    if (memcard->TM_LabCPUInputDisplay < LabOptions_General[OPTGEN_INPUT].value_num)
-        LabOptions_General[OPTGEN_INPUT].val = memcard->TM_LabCPUInputDisplay;
-    else
-        memcard->TM_LabCPUInputDisplay = LabOptions_General[OPTGEN_INPUT].val;
-
-    // load frame advance option, resetting if invalid
-    u8 advance_btn = memcard->TM_LabFrameAdvanceButton & 0xF;
-    u8 decrement_btn = memcard->TM_LabFrameAdvanceButton >> 4;
-    
-    if (advance_btn < LabOptions_Controls[OPTCTRL_FRAME_ADVANCE].value_num) {
-        LabOptions_Controls[OPTCTRL_FRAME_ADVANCE].val = advance_btn;
-    } else {
-        memcard->TM_LabFrameAdvanceButton &= 0xF0;
-        memcard->TM_LabFrameAdvanceButton |= LabOptions_Controls[OPTCTRL_FRAME_ADVANCE].val;
+    // The shared service validates/migrates before returning any preferences.
+    LabOptions_General[OPTGEN_INPUT].val = TM_GetSetting(TM_SETTING_INPUT_DISPLAY, 0);
+    LabOptions_Controls[OPTCTRL_FRAME_ADVANCE].val = TM_GetSetting(TM_SETTING_ADVANCE, 0);
+    LabOptions_Controls[OPTCTRL_FRAME_DECREMENT].val = TM_GetSetting(TM_SETTING_DECREMENT, 0);
+    LabOptions_Controls[OPTCTRL_DPAD_UP].val = TM_GetSetting(TM_SETTING_DPAD_UP, 0);
+    LabOptions_Controls[OPTCTRL_DPAD_DOWN].val = TM_GetSetting(TM_SETTING_DPAD_DOWN, 0);
+    LabOptions_Controls[OPTCTRL_DPAD_LEFT].val = TM_GetSetting(TM_SETTING_DPAD_LEFT, 0);
+    LabOptions_Controls[OPTCTRL_DPAD_RIGHT].val = TM_GetSetting(TM_SETTING_DPAD_RIGHT, 0);
+    for (unsigned group = 0; group < OVERLAY_COUNT; ++group) {
+        LabOptions_OverlaysHMN[group].val = TM_GetSetting(TM_SETTING_OVERLAY_HMN, group);
+        LabOptions_OverlaysCPU[group].val = TM_GetSetting(TM_SETTING_OVERLAY_CPU, group);
     }
-
-    // load frame decrement option, resetting if invalid
-    if (decrement_btn < LabOptions_Controls[OPTCTRL_FRAME_DECREMENT].value_num) {
-        LabOptions_Controls[OPTCTRL_FRAME_DECREMENT].val = decrement_btn;
-    } else {
-        memcard->TM_LabFrameAdvanceButton &= 0x0F;
-        memcard->TM_LabFrameAdvanceButton |= LabOptions_Controls[OPTCTRL_FRAME_DECREMENT].val << 4;
-    }
-
-    u8 dpad_u = memcard->TM_LabDPadUD & 0xF;
-    u8 dpad_d = memcard->TM_LabDPadUD >> 4;
-
-    // load dpad up option, resetting if invalid
-    if (dpad_u < LabOptions_Controls[OPTCTRL_DPAD_UP].value_num) {
-        LabOptions_Controls[OPTCTRL_DPAD_UP].val = dpad_u;
-    } else {
-        memcard->TM_LabDPadUD &= 0xF0;
-        memcard->TM_LabDPadUD |= LabOptions_Controls[OPTCTRL_DPAD_UP].val;
-    }
-
-    // load dpad down option, resetting if invalid
-    if (dpad_d < LabOptions_Controls[OPTCTRL_DPAD_DOWN].value_num) {
-        LabOptions_Controls[OPTCTRL_DPAD_DOWN].val = dpad_d;
-    } else {
-        memcard->TM_LabDPadUD &= 0x0F;
-        memcard->TM_LabDPadUD |= LabOptions_Controls[OPTCTRL_DPAD_DOWN].val << 4;
-    }
-
-    u8 dpad_l = memcard->TM_LabDPadLR & 0xF;
-    u8 dpad_r = memcard->TM_LabDPadLR >> 4;
-
-    // load dpad left option, resetting if invalid
-    if (dpad_l < LabOptions_Controls[OPTCTRL_DPAD_LEFT].value_num) {
-        LabOptions_Controls[OPTCTRL_DPAD_LEFT].val = dpad_l;
-    } else {
-        memcard->TM_LabDPadLR &= 0xF0;
-        memcard->TM_LabDPadLR |= LabOptions_Controls[OPTCTRL_DPAD_LEFT].val;
-    }
-
-    // load dpad right option, resetting if invalid
-    if (dpad_r < LabOptions_Controls[OPTCTRL_DPAD_RIGHT].value_num) {
-        LabOptions_Controls[OPTCTRL_DPAD_RIGHT].val = dpad_r;
-    } else {
-        memcard->TM_LabDPadLR &= 0x0F;
-        memcard->TM_LabDPadLR |= LabOptions_Controls[OPTCTRL_DPAD_RIGHT].val << 4;
-    }
-
-    // load overlays, resetting if invalid
-    int overlay_save_count = sizeof(memcard->TM_LabSavedOverlays_HMN) / sizeof(OverlaySave);
-    for (int i = 0; i < overlay_save_count; ++i) {
-        OverlaySave save_hmn = memcard->TM_LabSavedOverlays_HMN[i];
-        if (save_hmn.overlay != 0) {
-            // ensure valid
-            if (
-                save_hmn.group < countof(LabOptions_OverlaysHMN)
-                && save_hmn.overlay < countof(LabValues_OverlayColours)
-            ) {
-                LabOptions_OverlaysHMN[save_hmn.group].val = save_hmn.overlay;
-            } else {
-                memcard->TM_LabSavedOverlays_HMN[i] = (OverlaySave){0};
-            }
-        }
-
-        OverlaySave save_cpu = memcard->TM_LabSavedOverlays_CPU[i];
-        if (save_cpu.overlay != 0) {
-            // ensure valid
-            if (
-                save_cpu.group < countof(LabOptions_OverlaysCPU)
-                && save_cpu.overlay < countof(LabValues_OverlayColours)
-            ) {
-                LabOptions_OverlaysCPU[save_cpu.group].val = save_cpu.overlay;
-            } else {
-                memcard->TM_LabSavedOverlays_CPU[i] = (OverlaySave){0};
-            }
-        }
-    }
-
-    u32 enabled_osds = memcard->TM_OSDEnabled;
     for (int i = 0; i < LabMenu_OSDs.option_num; i++)
-        LabOptions_OSDs[i].val = (enabled_osds >> LabOSD_ID[i]) & 1;
+        LabOptions_OSDs[i].val = TM_GetSetting(TM_SETTING_OSD_ENABLED, LabOSD_ID[i]);
 
     // character rng options
     {

@@ -21,7 +21,7 @@
     add EventID, r3, r4
     # Check if first page
     lwz r3, MemcardData(r13)
-    lbz PageID, CurrentEventPage(r3)
+    SettingsRead SettingsField_Page, PageID
     cmpwi PageID, 0
     bne ShowFirstPage
     # Hide left arrow

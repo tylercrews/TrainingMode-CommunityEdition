@@ -2044,12 +2044,14 @@ struct Memcard
     u8 TM_LabFrameAdvanceButton;    // 0x1F2B - advance idx in low half, decrement idx in high half
     u8 TM_LabDPadUD;       // 0x1F2C - Up in low half, Down in high half
     u8 TM_LabDPadLR;       // 0x1F2D - Left in low half, Right in high half
-    u8 unused1F2E;         // 0x1F2E
+    u8 TM_SettingsFlagsVersion; // 0x1F2E: six flags, two version bits
     u8 TM_LabCPUInputDisplay;       // 0x1F2F
 
-    // We only save a max of 8 overlays.
-    OverlaySave TM_LabSavedOverlays_HMN[8]; // 0x1F30
-    OverlaySave TM_LabSavedOverlays_CPU[8]; // 0x1F40
+    // Explicit byte format managed by src/settings.c; do not store C enums/bitfields here.
+    u8 TM_PackedOverlays[18];     // 0x1F30: HMN low nibble, CPU high nibble per condition
+    u8 TM_PackedOSDColors[8];     // 0x1F42: stable sparse-ID slots, three bits each
+    u8 TM_SettingsSignature[2];  // 0x1F4A
+    u8 TM_SettingsReserved[4];   // 0x1F4C: preserved for future preferences
     int unk2004;           // 0x1F50
     int unk2005;           // 0x1F54
     int unk2006;           // 0x1F58

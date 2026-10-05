@@ -1255,8 +1255,7 @@ int Update_CheckAdvance(void)
 
     // get their advance input
     static int stc_advance_btns[] = {HSD_TRIGGER_L, HSD_TRIGGER_Z, HSD_BUTTON_X, HSD_BUTTON_Y, HSD_TRIGGER_R};
-    Memcard *memcard = stc_memcard;
-    u32 btn_idx = memcard->TM_LabFrameAdvanceButton;
+    u32 btn_idx = TM_GetSetting(TM_SETTING_ADVANCE, 0);
     if (btn_idx >= countof(stc_advance_btns))
         btn_idx = 0;
     int advance_btn = stc_advance_btns[btn_idx];

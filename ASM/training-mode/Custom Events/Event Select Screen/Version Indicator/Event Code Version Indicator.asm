@@ -53,7 +53,7 @@
 
     # Get Current Page
     lwz r3, MemcardData(r13)
-    lbz r3, CurrentEventPage(r3)
+    SettingsRead SettingsField_Page, 3
     rtocbl r12, TM_GetPageName
     # Initialize Subtext
     mr r4, r3

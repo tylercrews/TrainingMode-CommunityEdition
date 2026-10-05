@@ -15,7 +15,7 @@
 
     # Get Current Page
     lwz r3, MemcardData(r13)
-    lbz PageID, CurrentEventPage(r3)
+    SettingsRead SettingsField_Page, PageID
     # Get pointer page's string array
     bl SkipJumpTable
 

@@ -28,7 +28,7 @@ CheckY:
     beq CheckX
 
     # Increase Number
-    lbz r3, 0x1f28(r20)
+    SettingsRead SettingsField_Position, 3
     addi r3, r3, 1
     # Check If Over Max
     cmpwi r3, OptionCount
@@ -37,7 +37,7 @@ CheckY:
     li r3, 0
 
 CheckY_Store:
-    stb r3, 0x1f28(r20)
+    SettingsWrite SettingsField_Position, 3
 
     b UpdateText
 
@@ -48,7 +48,7 @@ CheckX:
     beq exit
 
     # Decrease Number
-    lbz r3, 0x1f28(r20)
+    SettingsRead SettingsField_Position, 3
     subi r3, r3, 1
     # Check If Over Max
     cmpwi r3, 0
@@ -57,7 +57,7 @@ CheckX:
     li r3, OptionCount-1
 
 CheckX_Store:
-    stb r3, 0x1f28(r20)
+    SettingsWrite SettingsField_Position, 3
 
     b UpdateText
 
@@ -69,7 +69,7 @@ UpdateText:
     bl OSDPositionText
     mflr r5
 
-    lbz r6, 0x1f28(r20)
+    SettingsRead SettingsField_Position, 6
     cmpwi r6, 0
     beql OSDPositionTextHUD
     cmpwi r6, 1

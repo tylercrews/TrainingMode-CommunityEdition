@@ -766,6 +766,8 @@ EventPage *EventPages[] = {
 
 RNGControl rng;
 
+static const TMSettingsAPI settings_api = { Settings_Get, Settings_Set, Settings_Status };
+
 EventVars stc_event_vars = {
     .event_desc = 0,
     .menu_assets = 0,
@@ -786,6 +788,7 @@ EventVars stc_event_vars = {
     .HUD_DrawActionLogBar = HUD_DrawActionLogBar,
     .HUD_DrawActionLogKey = HUD_DrawActionLogKey,
     .HUD_DrawInfoPanel = HUD_DrawInfoPanel,
+    .settings = &settings_api,
 };
 
 static GOBJ *stc_msgmgr;
@@ -1270,7 +1273,7 @@ void EventLoad(void)
     StartOSDs();
 
     // get this event
-    int page = stc_memcard->TM_EventPage;
+    int page = Settings_Get(TM_SETTING_EVENT_PAGE, 0);
     int eventID = stc_memcard->EventBackup.event;
     EventDesc *event_desc = GetEventDesc(page, eventID);
     evFunction *evFunction = &stc_event_vars.evFunction;
@@ -1474,6 +1477,7 @@ void OnBoot(void)
 
 void OnStartMelee(void)
 {
+    Settings_Status();
     Message_Init();
     Tip_Init();
 }
@@ -1917,7 +1921,7 @@ void Message_Manager(GOBJ *mngr_gobj)
                 Text *this_msg_text = this_msg_data->text;
                 JOBJ *this_msg_jobj = this_msg_gobj->hsd_object;
 
-                int osd_pos_type = stc_memcard->TM_OSDPosition;
+                int osd_pos_type = Settings_Get(TM_SETTING_OSD_POSITION, 0);
                 if (osd_pos_type > 3)
                     osd_pos_type = 0;
 

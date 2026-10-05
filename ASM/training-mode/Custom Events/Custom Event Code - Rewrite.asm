@@ -4,7 +4,7 @@
 
     # Check if event is legacy (no file)
     lwz r3, MemcardData(r13)
-    lbz r3, CurrentEventPage(r3)
+    SettingsRead SettingsField_Page, 3
     mr r4, r25                                          # event
     mr r5, r26                                          # match struct
     rtocbl r12, TM_GetEventFile
@@ -13,7 +13,7 @@
 
     # Branch to C function to initialize the event
     lwz r3, MemcardData(r13)
-    lbz r3, CurrentEventPage(r3)
+    SettingsRead SettingsField_Page, 3
     mr r4, r25                                          # event
     mr r5, r26                                          # match struct
     rtocbl r12, TM_EventInit
@@ -105,7 +105,7 @@ SkipPageList:
 
     # Get Current Page
     lwz r3, MemcardData(r13)
-    lbz r3, CurrentEventPage(r3)
+    SettingsRead SettingsField_Page, 3
     mr r4, r25
     rtocbl r12, TM_GetJumpTableOffset
     mr r4, r14
@@ -11817,13 +11817,13 @@ InitializeMatch:
 
     # Check to override OSD Toggles
     lwz r4, MemcardData(r13)
-    lbz r3, 0x1f2A(r4)
+    SettingsRead SettingsField_Recommended, 3
     cmpwi r3, 1
     beq InitializeMatch_SkipOSDOverride
     # Store Events FDD Toggles
-    lwz r3, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 3
     or r3, r3, REG_EventOSDs
-    stw r3, 0x1F24(r4)
+    SettingsWrite SettingsField_OSDMask, 3
 
 InitializeMatch_SkipOSDOverride:
     # SPAWN 2 PLAYERS

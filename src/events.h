@@ -7,6 +7,7 @@
 #include <stdint.h>
 
 #include "../version.h"
+#include "settings.h"
 #define EVENT_DATASIZE 512
 #define TM_FUNC -(50 * 4)
 
@@ -279,9 +280,17 @@ typedef struct EventVars
     Rect (*HUD_DrawActionLogBar)(u8 *action_log, GXColor *color_lookup, int log_count);
     void (*HUD_DrawActionLogKey)(char **action_names, GXColor *action_colors, int action_count);
     void (*HUD_DrawInfoPanel)(const char **label, const char **info, int count);
+    const TMSettingsAPI *settings;
 } EventVars;
 #define event_vars_ptr_loc ((EventVars**)0x803d7054)
 #define event_vars (*event_vars_ptr_loc)
+
+static inline u32 TM_GetSetting(unsigned field, unsigned index) {
+    return event_vars->settings->get(field, index);
+}
+static inline void TM_SetSetting(unsigned field, unsigned index, u32 value) {
+    event_vars->settings->set(field, index, value);
+}
 
 // Function prototypes
 EventDesc *GetEventDesc(int page, int event);
