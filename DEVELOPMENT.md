@@ -79,6 +79,18 @@ bash tests/run_settings_tests.sh
 The tests compile a freestanding big-endian PowerPC image with devkitPro, then emulate it. They cover legacy/duplicate/invalid migration, all overlay slots, cross-byte palettes, flags/control nibbles, surrounding canaries, reserved bytes, future/foreign ownership, save-dirty behavior, and hook GPR/FPR/CR/CTR/XER preservation. This is independent of the native card's on-disk checksums; save/reload and downgrade behavior should also be checked in Dolphin on a test card before distributing the format change.
 
 ## Project Structure
+### Shared hitbox trails
+
+`src/trails.c` owns the bounded trail model, fade curves, profile priority and player palette. `src/trails_game.c` captures/draws once through the common match-start service; Lab and Eggs-ercise configure it through `EventVars.trails`. The bank holds 128 forty-byte samples (5,120 bytes), plus twelve bytes of indices/clock state. This is runtime RAM; the two global preferences use their existing flag bits, with no save-format change or consumption of the four reserved bytes.
+
+The global Very Fast/Instant toggles override event-local Enable/Decay; both On selects the Very Fast union once. Local menus display the active global override. Very Very Fast holds one tick and fades by 50 per tick, for five nominal visible ticks. Current alpha is 200; history is capped at 72 and normalized to retain the preset's lifetime. Off under Decay means no fading, not disabled trails. A dense match can overwrite samples before their full nominal lifetime.
+
+Colors use player-block accent indices (including teams), with CPU kind explicitly gray. Item ownership is checked against live fighter objects; unmatched owners are neutral gray. Lab body overlays no longer replace trail colors. The shared callback collects all six slots and both subfighter indices, after fighter/item/event updates, and uses a simulation tick with the native match-frame key for pause/double-capture/rewind detection. Native DOL inspection confirms the frame-key field and its pause/frame-advance gates. Scene changes, successful common savestate loads and Ledgedash repositioning clear the bank. Stationary identical samples are refreshed instead of repeatedly blended.
+
+Native L-menu row IDs 2 and 4 now map explicitly to the Very Fast/Instant flags through `TM_SETTING_NATIVE_ROW`; other rows still map to ordinary OSD enables. The two rows do not use bits 2/4 of the enable mask. `SettingsReadIndexed` preserves the hook register context while supplying the native row index. The existing PowerPC test runner now also covers profile union/priority, alpha endpoints, palette mapping, pause/deduplication/rewind, ring bounds and native row mapping.
+
+Runtime checks should cover both global toggles, all local decays, paused/frame-advanced/slowed play, recordings and restores, Nana, owned/reflected/neutral items, team colors, dense projectile loads, and native hitbox/body-overlay combinations. The model tests and build do not verify visual brightness or callback timing in Dolphin.
+
 There are a few important directories to know about:
 1. `src/`: this directory contains the source for the C events, as well as some setup code for the event in `events.c`.
 2. `MexTK/`:

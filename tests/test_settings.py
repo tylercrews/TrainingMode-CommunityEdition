@@ -110,6 +110,8 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(m.read(11, 1), 1)
         self.assertEqual(m.read(11, 2), 1)
         self.assertEqual(m.read(0), (1 << 2) | (1 << 4))
+        self.assertEqual(m.call("TestSettingsRow", 2), 1)
+        self.assertEqual(m.call("TestSettingsRow", 4), 1)
         m.write(16, 2, 0)
         self.assertEqual(m.read(16, 4), 1)
 

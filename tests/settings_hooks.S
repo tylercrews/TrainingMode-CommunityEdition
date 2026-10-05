@@ -8,6 +8,10 @@ TestSettingsRead:
 TestSettingsWrite:
     SettingsToggle 3, 4
     blr
+.global TestSettingsRow
+TestSettingsRow:
+    SettingsReadIndexed SettingsField_Row, 3, 3
+    blr
 .global TestSeedXER
 TestSeedXER:
     lis r3, 0xa000

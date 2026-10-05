@@ -5,13 +5,17 @@ typedef char trail_sample_size[(sizeof(TMTrailSample) == 40) ? 1 : -1];
 static TMTrailBank bank;
 static GOBJ *manager;
 static unsigned local_enabled, local_mode, active_mode = TM_TRAIL_DISABLED;
+static u32 native_frame;
+static int native_frame_seen;
 static int live;
+static unsigned effective_mode(void);
 
-void Trails_Clear(void) { TMTrail_Clear(&bank); }
+void Trails_Clear(void) { TMTrail_Clear(&bank); native_frame_seen = 0; }
 void Trails_Configure(unsigned enabled, unsigned mode) {
-    if (local_enabled != !!enabled || local_mode != mode) Trails_Clear();
+    unsigned before = effective_mode();
     local_enabled = !!enabled;
     local_mode = mode < TM_TRAIL_DISABLED ? mode : TM_TRAIL_NORMAL;
+    if (before != effective_mode()) Trails_Clear();
 }
 static unsigned effective_mode(void) {
     return TMTrail_Effective(Settings_Get(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST),
@@ -30,7 +34,13 @@ static void add_hit(const Vec3 *a, const Vec3 *b, float size, uint32_t color, co
 }
 static void Trails_Think(GOBJ *gobj) {
     if (!live || update_mode() == TM_TRAIL_DISABLED) return;
-    if (!TMTrail_BeginFrame(&bank, (u32)stc_match->time_frames)) return;
+    u32 frame = stc_match->time_frames;
+    if (native_frame_seen && frame == native_frame) return;
+    if (native_frame_seen && frame < native_frame) Trails_Clear();
+    native_frame = frame;
+    native_frame_seen = 1;
+    /* Age by simulation callbacks, not skipped video frames at slower game speeds. */
+    TMTrail_BeginFrame(&bank, bank.has_frame ? bank.frame + 1 : 0);
     GOBJ *fighters[12];
     uint32_t colors[12];
     unsigned count = 0;
@@ -87,6 +97,7 @@ void Trails_MatchStart(void) {
     Trails_Clear();
     live = 1;
     manager = GObj_Create(0, 7, 0);
+    if (!manager) { live = 0; return; }
     GObj_AddProc(manager, Trails_Think, 22); /* After fighters, items and event overlay callbacks. */
     GObj_AddGXLink(manager, Trails_GX, 5, 0);
 }

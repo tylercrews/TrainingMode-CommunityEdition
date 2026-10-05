@@ -19,6 +19,10 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Added global Very Fast and Instant hitbox trails to the L-button OSD menu and Lab OSD menu, with a shared renderer across gameplay matches.
+- Added Very Very Fast decay to Lab and Eggs-ercise, softer historical trails, player/team-accent colors, and gray CPU trails.
+- Included subfighters and owner-colored projectiles; removed duplicate event renderers and cleared shared history on scene/retry/restore/rewind boundaries.
+- Prevented duplicate drawing when both global modes are enabled and repeated translucent samples during stationary hitlag.
 - Added shared C/native settings accessors, explicit 44-byte packing, validation, and migration of Tyro's existing settings.
 - Saved every Lab overlay condition instead of limiting each actor to eight enabled conditions; reserved space for global flags and OSD title colors.
 - Preserved unrepresented OSD enable bits and existing colors when using the current Boolean menus; added in-memory defaults for unsupported/foreign settings without rewriting their record.
