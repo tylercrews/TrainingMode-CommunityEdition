@@ -41,6 +41,24 @@ Examples:
 - `build.sh iso build/codes.gct`: only rebuild asm.
 - `build.sh iso build/edgeguard.dat`: only rebuild edgeguard event. You can use any dat file here.
 
+## Tyro Version and Save Identity
+
+Edit **[version.h](version.h)** at the repository root to update `TM_VERSION`, for example `V1.4.1T2`. This one value supplies the in-game short/long labels, disc/banner titles, memory-card caption, ISO filename, release folder/ZIP, and packaged patchers. Keep the newest version's implemented changes in the [README changelog](README.md#tyro-branch-changelog).
+
+`TM_GAME_ID` is Tyro's stable identity, **`TYRE01`**. Keep it unchanged between releases. Its `TYRE` game code differs from upstream's `GTME`, so Tyro uses its own native save namespace. Tyro starts with a fresh save by default; there is no automatic overwrite, retagging, or migration of the legacy upstream save. Existing `GTME` recordings also remain in their old namespace until an explicit compatible importer is implemented. Per-game Dolphin settings associated with the old ID may need deliberate copying.
+
+Run builds from the repository root:
+
+```sh
+./build.sh --version
+./build.sh melee.iso
+./build.sh melee.iso release
+```
+
+Outputs use `TM-Tyro-${TM_VERSION}.iso` and, for releases, `TM-Tyro-${TM_VERSION}.zip`. Release contents are staged under `build/releases/` and include patchers with generated filename configuration and the Tyro symbol map. Windows packaging uses `zip` when installed, or built-in PowerShell compression otherwise. Generated banner metadata is written to `build/opening.bnr`; root `opening.bnr` remains the source artwork/credits.
+
+Changing version/identity metadata forces a full rebuild even when a single-module build was requested. Assembly identity constants and the save caption are generated in `build/tyro-identity.s` before compilation; use the build script to generate this include before invoking `hgecko` manually. `clean.sh` removes build scratch and the current Tyro version's ISO/ZIP, preserving legacy `TM-CE.iso` and other versioned outputs.
+
 ## Project Structure
 There are a few important directories to know about:
 1. `src/`: this directory contains the source for the C events, as well as some setup code for the event in `events.c`.
@@ -125,4 +143,4 @@ The powershield event is the simplest and easiest to learn from.
 - Development builds enable logging! Call `TMLOG(...)` to print to the dolphin console and the onscreen console. L/R+Z toggles console visibility.
 - **Use the dolphin debugger!** Make sure you have the latest version of dolphin for debugging.
     - To set a breakpoint, use the `bp()` fn call in C or the `SetBreakpoint` macro in ASM (which will clobber r3). Then when you boot up dolphin, put a breakpoint on the `bp` symbol.
-    - **Be sure to load GTME01.map with Symbols->Load Other Map File!**. Or copy it to the Maps/ directory in the dolphin data directory.
+    - **For Tyro, load `build/TYRE01.map` with Symbols->Load Other Map File.** Or copy it to the Maps/ directory in the Dolphin data directory. The release ZIP includes this map; `GTME01.map` remains its source symbol map in the repository.

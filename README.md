@@ -11,12 +11,19 @@ Join [the discord](https://discord.gg/2Khb8CVP7A) to discuss changes, new featur
 ## Development
 Please read [DEVELOPMENT.md](DEVELOPMENT.md).
 
+The Tyro version and stable game/save identity live in [version.h](version.h). Update `TM_VERSION` for a new release; keep `TM_GAME_ID` stable. Run `./build.sh --version` to see the version, game ID, and output filename.
+
 ## Tyro branch changelog
 
 This section records Tyro-specific changes. Add a bullet under the matching Tyro version whenever a change is implemented; keep the newest version first. Proposed gameplay changes stay in the [investigation and implementation plan](OSD-GLOBAL-SETTINGS-INVESTIGATION.md) until implemented.
 
-### T2 (unreleased)
+### T2 (V1.4.1T2, unreleased)
 
+- Centralized version and identity metadata in root-level `version.h` and incremented the version to V1.4.1T2.
+- Separated Tyro's disc/save identity (`TYRE01`) from upstream (`GTME01`), with a Tyro save caption and banner selection.
+- Added versioned ISO and release ZIP names, including `TM-Tyro-V1.4.1T2.iso`, and matching Windows/Linux/macOS release patchers.
+- Added generated banner titles and a Tyro-named Dolphin symbol map while preserving the existing banner artwork and credits.
+- Made partial builds rebuild all modules when version/identity metadata changes, and stop before updating the ISO if any C module fails to compile.
 - Added the investigation and implementation plan for global OSD settings, hitbox trails, Ledgedash improvements, save capacity, and a separate Tyro save identity.
 - Expanded the plan with versioned ISO filenames, selectable Ledgedash success criteria, Falling-start reset investigation, hitlag-aware OSD timing, and recovery-state labels for Act OoWait.
 - Initialized this Tyro branch changelog.

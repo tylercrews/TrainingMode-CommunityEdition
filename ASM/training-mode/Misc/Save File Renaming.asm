@@ -1,11 +1,12 @@
     # To be inserted at 8001c800
     .include "../../Globals.s"
     .include "../../m-ex/Header.s"
+    .include "../../../build/tyro-identity.s"
 
-    # Check For Game ID GTME(ISO)
+    # Check for Tyro's stable disc/save identity (generated from version.h).
     lis r11, 0x8000
     lwz r11, 0x0(r11)
-    load r12, 0x47544d45    # GTME
+    load r12, TyroGameCode
     cmpw r11, r12
     beq ISO
     b Memcard
@@ -24,20 +25,7 @@ Memcard:
 
 ISOSaveName:
     blrl
-    .long 0x54726169
-    .long 0x6e696e67
-    .long 0x204d6f64
-    .long 0x65206279
-    .long 0x20556e63
-    .long 0x6c655075
-    .long 0x6e636820
-    .long 0x20202020
-
-ISOSaveDesc:
-    # blrl
-    .long 0x47616D65
-    .long 0x20446174
-    .long 0x61000000
+    TyroSaveCaption
 
 MemcardSaveName:
     blrl
