@@ -113,7 +113,8 @@ void Lab_SetActionLogState(GOBJ *menu_gobj);
 void ActionLog_GX(GOBJ *gobj, int pass);
 void ActionLog_Think(void);
 void Lab_ChangeHitboxTrails(GOBJ *menu_gobj, int value);
-void Lab_ChangeGlobalTrails(GOBJ *menu_gobj, int value);
+void Lab_ChangeGlobalVeryFast(GOBJ *menu_gobj, int value);
+void Lab_ChangeGlobalInstant(GOBJ *menu_gobj, int value);
 void DIDraw_Init(void);
 void DIDraw_Reset(int ply);
 void DIDraw_Update(void);
@@ -1796,15 +1797,15 @@ static EventOption LabOptions_OSDs[] = {
     },
     {
         .kind = OPTKIND_TOGGLE,
-        .name = "Hitbox Trails Very Fast",
+        .name = TM_GLOBAL_TRAIL_VERY_FAST_NAME,
         .desc = {"Enable Very Fast trails in every gameplay match."},
-        .OnChange = Lab_ChangeGlobalTrails,
+        .OnChange = Lab_ChangeGlobalVeryFast,
     },
     {
         .kind = OPTKIND_TOGGLE,
-        .name = "Hitbox Trails Instant",
+        .name = TM_GLOBAL_TRAIL_INSTANT_NAME,
         .desc = {"Show only current-frame hitboxes in every match.", "Very Fast takes precedence when both are On."},
-        .OnChange = Lab_ChangeGlobalTrails,
+        .OnChange = Lab_ChangeGlobalInstant,
     },
 };
 
@@ -1961,7 +1962,7 @@ static EventOption LabOptions_HitboxTrails[OPTHITBOXTRAILS_COUNT] = {
     {
         .kind = OPTKIND_INFO,
         .name = "Global: Off",
-        .desc = {"Global Very Fast/Instant override local controls.", "Change global trails in the OSD menu."},
+        .desc = {"Global Very Fast/Instant override local controls.", "Both On draws the Very Fast union once.", "Change global trails in the OSD menu."},
     },
 };
 

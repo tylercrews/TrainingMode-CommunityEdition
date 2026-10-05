@@ -198,7 +198,8 @@ void Eggs_ChangeHitboxTrails(GOBJ *menu_gobj, int value) {
                                   Options_HitboxTrails[OPT_HITBOXTRAILS_DECAY].val);
     int vf = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
     int instant = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
-    Options_HitboxTrails[OPT_HITBOXTRAILS_INFO].name = vf ? "Global: Very Fast" : instant ? "Global: Instant" : "Global: Off";
+    static char *names[] = { TM_GLOBAL_TRAIL_STATE_NAMES };
+    Options_HitboxTrails[OPT_HITBOXTRAILS_INFO].name = names[vf | (instant << 1)];
 }
 
 void Event_Think(GOBJ *event)

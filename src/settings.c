@@ -125,8 +125,8 @@ uint32_t TMSettings_Read(const uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsi
     }
     case TM_SETTING_OSD_ENABLED: return index < 32 ? (read_mask(r) >> index) & 1 : 0;
     case TM_SETTING_NATIVE_ROW:
-        if (index == 2) return TMSettings_Read(r, TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
-        if (index == 4) return TMSettings_Read(r, TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
+        if (index == TM_GLOBAL_TRAIL_VERY_FAST_ROW) return TMSettings_Read(r, TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
+        if (index == TM_GLOBAL_TRAIL_INSTANT_ROW) return TMSettings_Read(r, TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
         return TMSettings_Read(r, TM_SETTING_OSD_ENABLED, index);
     default: return 0;
     }
@@ -135,8 +135,8 @@ uint32_t TMSettings_Read(const uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsi
 int TMSettings_Write(uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsigned index, uint32_t value) {
     if (r[38] != 'T' || r[39] != 'Y' || (r[10] >> 6) != TM_SETTINGS_VERSION) return 0;
     if (field == TM_SETTING_NATIVE_ROW) {
-        if (index == 2) return TMSettings_Write(r, TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST, value);
-        if (index == 4) return TMSettings_Write(r, TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT, value);
+        if (index == TM_GLOBAL_TRAIL_VERY_FAST_ROW) return TMSettings_Write(r, TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST, value);
+        if (index == TM_GLOBAL_TRAIL_INSTANT_ROW) return TMSettings_Write(r, TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT, value);
         return TMSettings_Write(r, TM_SETTING_OSD_ENABLED, index, value);
     }
     if (field == TM_SETTING_OSD_MASK) {

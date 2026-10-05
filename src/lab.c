@@ -297,13 +297,22 @@ void Lab_ChangeHitboxTrails(GOBJ *menu_gobj, int value) {
                                   LabOptions_HitboxTrails[OPTHITBOXTRAILS_DECAY].val);
     int vf = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
     int instant = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
-    LabOptions_HitboxTrails[OPTHITBOXTRAILS_INFO].name = vf ? "Global: Very Fast" : instant ? "Global: Instant" : "Global: Off";
+    static char *names[] = { TM_GLOBAL_TRAIL_STATE_NAMES };
+    LabOptions_HitboxTrails[OPTHITBOXTRAILS_INFO].name = names[vf | (instant << 1)];
 }
-void Lab_ChangeGlobalTrails(GOBJ *menu_gobj, int value) {
-    TM_SetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST, LabOptions_OSDs[TM_SETTINGS_OSDS].val);
-    TM_SetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT, LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val);
+static void Lab_SetGlobalTrail(unsigned flag, int value) {
+    // Change only the selected preference; another editor may have changed its sibling.
+    TM_SetSetting(TM_SETTING_FLAG, flag, value);
+    LabOptions_OSDs[TM_SETTINGS_OSDS].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
     Lab_ChangeHitboxTrails(0, 0);
     Memcard_SaveIfChanged();
+}
+void Lab_ChangeGlobalVeryFast(GOBJ *menu_gobj, int value) {
+    Lab_SetGlobalTrail(TM_FLAG_TRAILS_VERY_FAST, value);
+}
+void Lab_ChangeGlobalInstant(GOBJ *menu_gobj, int value) {
+    Lab_SetGlobalTrail(TM_FLAG_TRAILS_INSTANT, value);
 }
 
 void Lab_ChangeOSDs(GOBJ *menu_gobj, int value) {

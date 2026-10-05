@@ -65,7 +65,7 @@ static EventOption Options_HitboxTrails[OPT_HITBOXTRAILS_COUNT] = {
     {
         .kind = OPTKIND_INFO,
         .name = "Global: Off",
-        .desc = {"Global Very Fast/Instant override local controls.", "Change global trails in the L-button OSD menu."},
+        .desc = {"Global Very Fast/Instant override local controls.", "Both On draws the Very Fast union once.", "Change global trails in the L-button OSD menu."},
     },
 };
 

@@ -1,6 +1,7 @@
     # To be inserted at 80236b40
     .include "../../../Globals.s"
     .include "../../../m-ex/Header.s"
+    .include "../../../../build/tyro-identity.s"
 
     .set Text, 30
     .set TextProp, 28
@@ -314,9 +315,9 @@ TextASCIILeft:
     .string ""
     .string "Wavedash Info"
     .string "L-Cancel"
-    .string "Hitbox Trails Very Fast" # Global flag; native row ID 2
+    TyroTrailLabel_VERY_FAST # Global flag; native row ID 2
     .string "Act OoS Frame"
-    .string "Hitbox Trails Instant" # Global flag; native row ID 4
+    TyroTrailLabel_INSTANT # Global flag; native row ID 4
     .string "Dashback"
     .string "" # OSD ID 6
     .string "" # OSD ID 7

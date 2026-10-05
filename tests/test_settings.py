@@ -115,6 +115,43 @@ class SettingsTests(unittest.TestCase):
         m.write(16, 2, 0)
         self.assertEqual(m.read(16, 4), 1)
 
+    def test_global_rows_round_trip_all_four_states(self):
+        for vf in (0, 1):
+            for instant in (0, 1):
+                saved = Machine()
+                saved.init()
+                saved.write(14, IDS[4], 7)
+                saved.write(0, 0, saved.read(0) | (1 << 31))
+                saved.write(16, 2, vf)
+                saved.write(16, 4, instant)
+                restored = Machine()
+                restored.put(saved.record())
+                self.assertEqual(restored.call("TestSettingsRow", 2), vf)
+                self.assertEqual(restored.call("TestSettingsRow", 4), instant)
+                self.assertEqual(restored.record(), saved.record())
+                self.assertEqual(restored.read(14, IDS[4]), 7)
+                self.assertEqual(restored.read(15, 31), 1)
+                self.assertEqual(restored.call("TestDirty"), 0)
+
+    def test_editing_one_global_row_preserves_sibling_and_other_settings(self):
+        m = self.m
+        m.init()
+        m.write(14, IDS[4], 7)
+        m.write(12, 16, 10)
+        m.write(11, 5, 1)
+        m.call("Settings_Set", 16, 4, 1)
+        before = m.record()
+        m.call("Settings_Set", 16, 2, 1)
+        changed = m.record()
+        self.assertEqual(changed[:10] + changed[11:], before[:10] + before[11:])
+        self.assertEqual(m.read(16, 4), 1)
+        self.assertEqual(m.read(11, 5), 1)
+        m.call("Settings_Set", 15, IDS[2], 1)
+        self.assertEqual(m.read(16, 2), 1)
+        self.assertEqual(m.read(16, 4), 1)
+        self.assertEqual(m.read(14, IDS[4]), 7)
+        self.assertEqual(m.read(12, 16), 10)
+
     def test_colors_flags_controls_and_unknown_mask_bits(self):
         m = self.m
         m.init()

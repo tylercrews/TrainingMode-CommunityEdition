@@ -5,7 +5,7 @@ tyro_project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 tyro_read_define() {
     sed -nE "s/^#define[[:space:]]+${1}[[:space:]]+\"([^\"]*)\"[[:space:]]*$/\1/p" \
-        "${tyro_project_root}/version.h"
+        "${2:-${tyro_project_root}/version.h}"
 }
 
 tyro_version="$(tyro_read_define TM_VERSION)"
@@ -52,6 +52,16 @@ tyro_write_build_metadata() {
         printf '    .ascii "%-32s"\n' "${tyro_game_name}"
         printf '    .asciz "Game Data %s"\n' "${tyro_version}"
         printf '    .balign 4\n.endm\n'
+        # Generate native row labels from the same definitions used by Lab.
+        local label preset
+        for preset in VERY_FAST INSTANT; do
+            label="$(tyro_read_define "TM_GLOBAL_TRAIL_${preset}_NAME" "${tyro_project_root}/src/settings.h")"
+            if [[ ! "${label}" =~ ^[A-Za-z0-9\ ._-]+$ ]] || [[ ${#label} -gt 31 ]]; then
+                echo "Error: invalid global trail label in src/settings.h." >&2
+                return 1
+            fi
+            printf '.macro TyroTrailLabel_%s\n    .string "%s"\n.endm\n' "${preset}" "${label}"
+        done
     } > "${tyro_project_root}/build/tyro-identity.s"
 
     # Change only banner text; preserve the existing RGB5A3 artwork and author credits.

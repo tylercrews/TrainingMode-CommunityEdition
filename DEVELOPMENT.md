@@ -89,6 +89,8 @@ Colors use player-block accent indices (including teams), with CPU kind explicit
 
 Native L-menu row IDs 2 and 4 now map explicitly to the Very Fast/Instant flags through `TM_SETTING_NATIVE_ROW`; other rows still map to ordinary OSD enables. The two rows do not use bits 2/4 of the enable mask. `SettingsReadIndexed` preserves the hook register context while supplying the native row index. The existing PowerPC test runner now also covers profile union/priority, alpha endpoints, palette mapping, pause/deduplication/rewind, ring bounds and native row mapping.
 
+Native row constants and both labels live in `src/settings.h`. The build generates their ASM label macros alongside the identity include, so L-menu and Lab labels stay consistent. Lab's two change callbacks update only the selected flag, then refresh both menu values from the shared service. Local menus distinguish Off, Very Fast, Instant and Both On; Both On retains Very Fast's single-render union. Tests round-trip every combination into a new emulated service instance and verify that row edits preserve the sibling flag, OSD colors/mask, overlays and other global flags.
+
 Runtime checks should cover both global toggles, all local decays, paused/frame-advanced/slowed play, recordings and restores, Nana, owned/reflected/neutral items, team colors, dense projectile loads, and native hitbox/body-overlay combinations. The model tests and build do not verify visual brightness or callback timing in Dolphin.
 
 There are a few important directories to know about:

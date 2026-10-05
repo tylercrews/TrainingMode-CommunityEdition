@@ -17,6 +17,13 @@
 #define TM_SETTINGS_SIGNATURE_OFFSET 38
 #define TM_SETTINGS_RESERVED_OFFSET 40
 
+/* Shared labels and native L-menu row bindings. Build-generated ASM uses these names too. */
+#define TM_GLOBAL_TRAIL_VERY_FAST_ROW 2
+#define TM_GLOBAL_TRAIL_INSTANT_ROW 4
+#define TM_GLOBAL_TRAIL_VERY_FAST_NAME "Hitbox Trails Very Fast"
+#define TM_GLOBAL_TRAIL_INSTANT_NAME "Hitbox Trails Instant"
+#define TM_GLOBAL_TRAIL_STATE_NAMES "Global: Off", "Global: Very Fast", "Global: Instant", "Global: Both On"
+
 enum TMSettingsStatus {
     TM_SETTINGS_READY,
     TM_SETTINGS_MIGRATED,
