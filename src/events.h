@@ -8,6 +8,7 @@
 
 #include "../version.h"
 #include "settings.h"
+#include "trails.h"
 #define EVENT_DATASIZE 512
 #define TM_FUNC -(50 * 4)
 
@@ -281,6 +282,7 @@ typedef struct EventVars
     void (*HUD_DrawActionLogKey)(char **action_names, GXColor *action_colors, int action_count);
     void (*HUD_DrawInfoPanel)(const char **label, const char **info, int count);
     const TMSettingsAPI *settings;
+    const TMTrailAPI *trails;
 } EventVars;
 #define event_vars_ptr_loc ((EventVars**)0x803d7054)
 #define event_vars (*event_vars_ptr_loc)

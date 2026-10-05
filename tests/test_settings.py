@@ -99,6 +99,20 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(m.read(13, group), (group + 3) % 11)
         self.assertEqual(m.record()[40:44], b"\0" * 4)
 
+    def test_global_trail_rows_do_not_use_enable_mask_bits(self):
+        m = self.m
+        m.init()
+        m.write(0, 0, (1 << 2) | (1 << 4))
+        self.assertEqual(m.read(16, 2), 0)
+        self.assertEqual(m.read(16, 4), 0)
+        m.write(16, 2, 1)
+        m.write(16, 4, 1)
+        self.assertEqual(m.read(11, 1), 1)
+        self.assertEqual(m.read(11, 2), 1)
+        self.assertEqual(m.read(0), (1 << 2) | (1 << 4))
+        m.write(16, 2, 0)
+        self.assertEqual(m.read(16, 4), 1)
+
     def test_colors_flags_controls_and_unknown_mask_bits(self):
         m = self.m
         m.init()
@@ -229,6 +243,70 @@ class SettingsTests(unittest.TestCase):
         m.call("TestSettingsWrite", IDS[5], 1)
         self.assertEqual(m.call("Settings_Get", 15, IDS[5]), 1)
         self.assertEqual(m.call("TestDirty"), 1)
+
+
+class TrailTests(unittest.TestCase):
+    def setUp(self):
+        self.m = Machine()
+        self.bank = 0x80401000
+        self.sample = 0x80403000
+        self.m.cpu.mem_write(self.bank - 8, b"\xA5" * (5132 + 16))
+        self.m.call("TMTrail_Clear", self.bank)
+
+    def tearDown(self):
+        self.assertEqual(bytes(self.m.cpu.mem_read(self.bank - 8, 8)), b"\xA5" * 8)
+        self.assertEqual(bytes(self.m.cpu.mem_read(self.bank + 5132, 8)), b"\xA5" * 8)
+
+    def test_decay_lifetimes_and_soft_history(self):
+        for mode, lifetime in enumerate([65, 35, 21, 5, 1, 130]):
+            self.assertEqual(self.m.call("TMTrail_Alpha", mode, 0), 200)
+            for age in range(1, lifetime):
+                alpha = self.m.call("TMTrail_Alpha", mode, age)
+                self.assertGreater(alpha, 0)
+                self.assertLessEqual(alpha, 72)
+            self.assertEqual(self.m.call("TMTrail_Alpha", mode, lifetime), 0)
+        self.assertEqual(self.m.call("TMTrail_Alpha", 6, 0xFFFFFFFF), 72)
+        self.assertEqual(self.m.call("TMTrail_Alpha", 99, 0), 0)
+
+    def test_union_global_priority_and_player_palette(self):
+        self.assertEqual(self.m.call("TMTrail_Effective", 1, 1, 1, 5), 2)
+        self.assertEqual(self.m.call("TMTrail_Effective", 0, 1, 1, 5), 4)
+        self.assertEqual(self.m.call("TMTrail_Effective", 0, 0, 1, 3), 3)
+        self.assertEqual(self.m.call("TMTrail_Effective", 0, 0, 0, 0), 7)
+        self.assertEqual(self.m.call("TMTrail_Effective", 0, 0, 1, 99), 7)
+        for index, color in enumerate([0xFF4646C8, 0x4691FFC8, 0xFFE141C8, 0x4BE164C8]):
+            self.assertEqual(self.m.call("TMTrail_PlayerColor", index, 0), color)
+            self.assertEqual(self.m.call("TMTrail_PlayerColor", index, 1), 0xB4B4B4C8)
+        self.assertEqual(self.m.call("TMTrail_PlayerColor", 99, 0), 0xB4B4B4C8)
+
+    def add(self, frame, source=1, x=1.0):
+        sample = struct.pack(">7f3I", x, 2, 3, 4, 5, 6, 2, 0xFF4646C8, frame, source)
+        self.m.cpu.mem_write(self.sample, sample)
+        self.m.call("TMTrail_Add", self.bank, self.sample)
+
+    def next_index(self):
+        return struct.unpack(">I", self.m.cpu.mem_read(self.bank + 5120, 4))[0]
+
+    def test_pause_duplicate_capture_and_timeline_reset(self):
+        self.assertEqual(self.m.call("TMTrail_BeginFrame", self.bank, 10), 1)
+        self.add(10)
+        self.assertEqual(self.m.call("TMTrail_BeginFrame", self.bank, 10), 0)
+        self.assertEqual(self.next_index(), 1)
+        self.assertEqual(self.m.call("TMTrail_BeginFrame", self.bank, 11), 1)
+        self.add(11)
+        self.assertEqual(self.next_index(), 1)  # Stationary/hitlag sample is refreshed, not stacked.
+        self.add(11, source=2)
+        self.assertEqual(self.next_index(), 2)
+        self.m.call("TMTrail_BeginFrame", self.bank, 5)
+        self.assertEqual(self.next_index(), 0)
+        self.add(5)
+        self.m.call("TMTrail_BeginFrame", self.bank, 20)
+        self.assertEqual(self.next_index(), 0)
+
+    def test_ring_wrap_is_bounded(self):
+        for source in range(140):
+            self.add(1, source)
+        self.assertEqual(self.next_index(), 12)
 
 
 if __name__ == "__main__":

@@ -8,23 +8,9 @@
     cmpwi r0, 0x2
     blt original
 
-    # CUSTOM CODE
-    rlwinm r0, r3, 0, 16, 31
-    # lwz r4, -0xdbc(rtoc) #get frame data toggle bits
-    lwz r4, MemcardData(r13)
-    SettingsRead SettingsField_OSDMask, 4
-
-    li r3, 1
-    slw r0, r3, r0
-    and. r0, r0, r4
-    beq Off
-
-On:
-    li r3, 0x1
-    b exit
-
-Off:
-    li r3, 0x0
+    # Native row mapping keeps global trail flags separate from the OSD mask.
+    rlwinm r3, r3, 0, 16, 31
+    SettingsReadIndexed SettingsField_Row, 3, 3
     b exit
 
 original:

@@ -28,9 +28,7 @@ void Event_Init(GOBJ *gobj);
 float RandomRange(float low, float high);
 int Egg_OnTakeDamage(GOBJ *gobj);
 void Event_Think(GOBJ *event);
-void Event_PostThink(GOBJ *event);
-void HitboxTrails_GX(GOBJ *gobj, int pass);
-void HitboxTrails_Think(void);
+void Eggs_ChangeHitboxTrails(GOBJ *menu_gobj, int value);
 
 static GXColor text_gold = {255, 211, 0, 255};
 static GXColor text_white = {255, 255, 255, 255};
@@ -42,19 +40,19 @@ enum options_hitbox_trails
 {
     OPT_HITBOXTRAILS_ENABLED,
     OPT_HITBOXTRAILS_DECAY,
+    OPT_HITBOXTRAILS_INFO,
 
     OPT_HITBOXTRAILS_COUNT
 };
 
-static const u8 HitboxTrailDecayConst[] = {15, 10, 5, 0, 30, 0};
-static const u8 HitboxTrailDecayFactor[] = {4, 8, 13, 200, 2, 0};
-static const char *HitboxTrailDecayText[] = {"Normal", "Fast", "Very Fast", "Instant", "Slow", "Off"};
+static const char *HitboxTrailDecayText[] = { TM_TRAIL_DECAY_LABELS };
 
 static EventOption Options_HitboxTrails[OPT_HITBOXTRAILS_COUNT] = {
     {
         .kind = OPTKIND_TOGGLE,
-        .name = "Enable",
-        .desc = {"Enable hitbox trails."},
+        .name = "Enable (local)",
+        .desc = {"Enable trails when both global profiles are Off."},
+        .OnChange = Eggs_ChangeHitboxTrails,
     },
     {
         .kind = OPTKIND_STRING,
@@ -62,6 +60,12 @@ static EventOption Options_HitboxTrails[OPT_HITBOXTRAILS_COUNT] = {
         .name = "Decay",
         .desc = {"How quickly the hitbox will fade away."},
         .values = HitboxTrailDecayText,
+        .OnChange = Eggs_ChangeHitboxTrails,
+    },
+    {
+        .kind = OPTKIND_INFO,
+        .name = "Global: Off",
+        .desc = {"Global Very Fast/Instant override local controls.", "Change global trails in the L-button OSD menu."},
     },
 };
 

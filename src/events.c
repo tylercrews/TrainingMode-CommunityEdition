@@ -767,6 +767,7 @@ EventPage *EventPages[] = {
 RNGControl rng;
 
 static const TMSettingsAPI settings_api = { Settings_Get, Settings_Set, Settings_Status };
+static const TMTrailAPI trails_api = { Trails_Configure, Trails_Clear };
 
 EventVars stc_event_vars = {
     .event_desc = 0,
@@ -789,6 +790,7 @@ EventVars stc_event_vars = {
     .HUD_DrawActionLogKey = HUD_DrawActionLogKey,
     .HUD_DrawInfoPanel = HUD_DrawInfoPanel,
     .settings = &settings_api,
+    .trails = &trails_api,
 };
 
 static GOBJ *stc_msgmgr;
@@ -1462,6 +1464,7 @@ void OnFileLoad(HSD_Archive *archive) // this function is run right after TmDt i
 
 void OnSceneChange(void)
 {
+    Trails_SceneChange();
     // Hook exists at 801a4c94
     TM_CreateWatermark();
 
@@ -1478,6 +1481,7 @@ void OnBoot(void)
 void OnStartMelee(void)
 {
     Settings_Status();
+    Trails_MatchStart();
     Message_Init();
     Tip_Init();
 }

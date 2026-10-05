@@ -292,9 +292,23 @@ void Lab_ChangeOverlays(GOBJ *menu_gobj, int value) {
     }
 }
 
+void Lab_ChangeHitboxTrails(GOBJ *menu_gobj, int value) {
+    event_vars->trails->configure(LabOptions_HitboxTrails[OPTHITBOXTRAILS_ENABLED].val,
+                                  LabOptions_HitboxTrails[OPTHITBOXTRAILS_DECAY].val);
+    int vf = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
+    int instant = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
+    LabOptions_HitboxTrails[OPTHITBOXTRAILS_INFO].name = vf ? "Global: Very Fast" : instant ? "Global: Instant" : "Global: Off";
+}
+void Lab_ChangeGlobalTrails(GOBJ *menu_gobj, int value) {
+    TM_SetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST, LabOptions_OSDs[TM_SETTINGS_OSDS].val);
+    TM_SetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT, LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val);
+    Lab_ChangeHitboxTrails(0, 0);
+    Memcard_SaveIfChanged();
+}
+
 void Lab_ChangeOSDs(GOBJ *menu_gobj, int value) {
     // Update only represented IDs; preserve unknown bits and existing title colors.
-    for (int i = 0; i < LabMenu_OSDs.option_num; i++)
+    for (int i = 0; i < (int)countof(LabOSD_ID); i++)
         TM_SetSetting(TM_SETTING_OSD_ENABLED, LabOSD_ID[i], LabOptions_OSDs[i].val);
 
     Memcard_SaveIfChanged();
@@ -4683,8 +4697,6 @@ void Record_Restart(Savestate_v1 *savestate, int flags) {
 
     CPUResetVars();
 
-    hitbox_trail_i = 0;
-    memset(hitbox_trails, 0, sizeof(hitbox_trails));
 
     stc_playback_cancelled_hmn = false;
     stc_playback_cancelled_cpu = false;
@@ -5978,7 +5990,6 @@ void Event_PostThink(GOBJ *gobj)
     UpdateOverlays(cpu, LabOptions_OverlaysCPU);
 
     ActionLog_Think();
-    HitboxTrails_Think();
     Stage_Think();
 }
 
@@ -5990,7 +6001,7 @@ void Event_Init(GOBJ *gobj)
     GOBJ *cpu = Fighter_GetGObj(1);
     FighterData *cpu_data = cpu->userdata;
     GObj_AddProc(gobj, Event_PostThink, 20);
-    GObj_AddGXLink(gobj, HitboxTrails_GX, 5, 0);
+    Lab_ChangeHitboxTrails(0, 0);
 
     // Init runtime options...
     
@@ -6052,8 +6063,12 @@ void Event_Init(GOBJ *gobj)
         LabOptions_OverlaysHMN[group].val = TM_GetSetting(TM_SETTING_OVERLAY_HMN, group);
         LabOptions_OverlaysCPU[group].val = TM_GetSetting(TM_SETTING_OVERLAY_CPU, group);
     }
-    for (int i = 0; i < LabMenu_OSDs.option_num; i++)
+    for (int i = 0; i < (int)countof(LabOSD_ID); i++)
         LabOptions_OSDs[i].val = TM_GetSetting(TM_SETTING_OSD_ENABLED, LabOSD_ID[i]);
+
+    LabOptions_OSDs[TM_SETTINGS_OSDS].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
+    Lab_ChangeHitboxTrails(0, 0);
 
     // character rng options
     {
@@ -6715,99 +6730,6 @@ void ActionLog_GX(GOBJ *gobj, int pass) {
 
         event_vars->HUD_DrawActionLogBar(action_log, action_colors, countof(action_log));
         event_vars->HUD_DrawActionLogKey(key_names, key_colours, key_count);
-    }
-}
-
-static HitboxTrail *HitboxTrails_Add(void) {
-    HitboxTrail *trail = &hitbox_trails[hitbox_trail_i];
-    hitbox_trail_i = (hitbox_trail_i + 1) % countof(hitbox_trails);
-    return trail;
-}
-
-static GXColor HitboxTrails_Color(int dmg) {
-    u8 r = 255;
-    u8 g = 128 - (u8)(dmg * 10) / 2;
-    u8 b = g;
-    return (GXColor) { r, g, b, 200 };
-}
-
-void HitboxTrails_Think(void) {
-    if (!LabOptions_HitboxTrails[OPTHITBOXTRAILS_ENABLED].val)
-        return;
-
-    for (int ply = 0; ply < 4; ++ply) {
-        GOBJ *ft = Fighter_GetGObj(ply);
-        if (!ft) continue;
-
-        FighterData *ft_data = ft->userdata;
-        for (u32 hit_i = 0; hit_i < countof(ft_data->hitbox); ++hit_i) {
-            ftHit *hit = &ft_data->hitbox[hit_i];
-            if (!hit->active) continue;
-            
-            GXColor color = HitboxTrails_Color(hit->dmg);
-
-            int overlay_idx = stc_overlays_running[ply];
-            if (overlay_idx >= 0) {
-                if (ply == 0)
-                    color = LabValues_OverlayColours[LabOptions_OverlaysHMN[overlay_idx].val].color;
-                else if (ply == 1)
-                    color = LabValues_OverlayColours[LabOptions_OverlaysCPU[overlay_idx].val].color;
-            }
-
-            *HitboxTrails_Add() = (HitboxTrail) {
-                .a = hit->pos_prev,
-                .b = hit->pos,
-                .size = hit->size,
-                .color = color,
-                .frame_created = event_vars->game_timer,
-            };
-        }
-    }
-
-    for (GOBJ *gobj = (*stc_gobj_lookup)[MATCHPLINK_ITEM]; gobj; gobj = gobj->next) {
-        ItemData *item = gobj->userdata;
-
-        for (u32 hit_i = 0; hit_i < countof(item->hitbox); ++hit_i) {
-            itHit *hit = &item->hitbox[hit_i];
-            if (!hit->active) continue;
-
-            *HitboxTrails_Add() = (HitboxTrail) {
-                .a = hit->pos_prev,
-                .b = hit->pos,
-                .size = hit->size,
-                .color = HitboxTrails_Color(hit->dmg),
-                .frame_created = event_vars->game_timer,
-            };
-        }
-    }
-}
-
-void HitboxTrails_GX(GOBJ *gobj, int pass) {
-    if (!LabOptions_HitboxTrails[OPTHITBOXTRAILS_ENABLED].val)
-        return;
-
-    int decay_const = LabValues_HitboxTrailDecayConst[LabOptions_HitboxTrails[OPTHITBOXTRAILS_DECAY].val];
-    int decay_factor = LabValues_HitboxTrailDecayFactor[LabOptions_HitboxTrails[OPTHITBOXTRAILS_DECAY].val];
-
-    if (pass == 2) {
-        int game_timer = event_vars->game_timer;
-
-        for (u32 i = 0; i < countof(hitbox_trails); ++i) {
-            HitboxTrail *hit = &hitbox_trails[i];
-            if (hit->size == 0) continue;
-            if (hit->frame_created > event_vars->game_timer) continue;
-
-            static GXColor hit_ambient = {0, 0, 0, 0};
-            GXColor hit_diffuse = hit->color;
-
-            int elapsed = game_timer - hit->frame_created;
-            int fade = (elapsed - decay_const) * decay_factor;
-            if (fade < 0) fade = 0;
-            if (fade >= hit_diffuse.a) continue;
-            hit_diffuse.a -= fade;
-
-            Develop_DrawSphere(hit->size, &hit->a, &hit->b, &hit_diffuse, &hit_ambient);
-        }
     }
 }
 

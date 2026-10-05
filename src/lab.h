@@ -112,8 +112,8 @@ void Lab_ChangeActionNumber(GOBJ *menu_gobj, int value);
 void Lab_SetActionLogState(GOBJ *menu_gobj);
 void ActionLog_GX(GOBJ *gobj, int pass);
 void ActionLog_Think(void);
-void HitboxTrails_GX(GOBJ *gobj, int pass);
-void HitboxTrails_Think(void);
+void Lab_ChangeHitboxTrails(GOBJ *menu_gobj, int value);
+void Lab_ChangeGlobalTrails(GOBJ *menu_gobj, int value);
 void DIDraw_Init(void);
 void DIDraw_Reset(int ply);
 void DIDraw_Update(void);
@@ -1794,6 +1794,18 @@ static EventOption LabOptions_OSDs[] = {
         .name = "Act OoHitstun",
         .OnChange = Lab_ChangeOSDs,
     },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = "Hitbox Trails Very Fast",
+        .desc = {"Enable Very Fast trails in every gameplay match."},
+        .OnChange = Lab_ChangeGlobalTrails,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = "Hitbox Trails Instant",
+        .desc = {"Show only current-frame hitboxes in every match.", "Very Fast takes precedence when both are On."},
+        .OnChange = Lab_ChangeGlobalTrails,
+    },
 };
 
 static EventMenu LabMenu_OSDs = {
@@ -1920,34 +1932,23 @@ static EventMenu LabMenu_ActionLog = {
 
 // HITBOX TRAILS --------------------------------------------------------------
 
-typedef struct HitboxTrail {
-    Vec3 a;
-    Vec3 b;
-    float size;
-    GXColor color;
-    int frame_created;
-} HitboxTrail;
-
-static u32 hitbox_trail_i;
-static HitboxTrail hitbox_trails[64];
-
 enum hitbox_trails_option
 {
     OPTHITBOXTRAILS_ENABLED,
     OPTHITBOXTRAILS_DECAY,
+    OPTHITBOXTRAILS_INFO,
 
     OPTHITBOXTRAILS_COUNT
 };
 
-const u8 LabValues_HitboxTrailDecayConst[] = { 15, 10, 5, 0, 30, 0 };
-const u8 LabValues_HitboxTrailDecayFactor[] = { 4, 8, 13, 200, 2, 0 };
-const char *LabOptions_HitboxTrailDecay[] = { "Normal", "Fast", "Very Fast", "Instant", "Slow", "Off" };
+static const char *LabOptions_HitboxTrailDecay[] = { TM_TRAIL_DECAY_LABELS };
 
 static EventOption LabOptions_HitboxTrails[OPTHITBOXTRAILS_COUNT] = {
     {
         .kind = OPTKIND_TOGGLE,
-        .name = "Enable",
-        .desc = {"Enable hitbox trails."},
+        .name = "Enable (local)",
+        .desc = {"Enable trails when both global profiles are Off."},
+        .OnChange = Lab_ChangeHitboxTrails,
     },
     {
         .kind = OPTKIND_STRING,
@@ -1955,6 +1956,12 @@ static EventOption LabOptions_HitboxTrails[OPTHITBOXTRAILS_COUNT] = {
         .name = "Decay",
         .desc = {"How quickly the hitbox will fade away."},
         .values = LabOptions_HitboxTrailDecay,
+        .OnChange = Lab_ChangeHitboxTrails,
+    },
+    {
+        .kind = OPTKIND_INFO,
+        .name = "Global: Off",
+        .desc = {"Global Very Fast/Instant override local controls.", "Change global trails in the OSD menu."},
     },
 };
 

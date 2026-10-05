@@ -314,9 +314,9 @@ TextASCIILeft:
     .string ""
     .string "Wavedash Info"
     .string "L-Cancel"
-    .string "" # OSD ID 2
+    .string "Hitbox Trails Very Fast" # Global flag; native row ID 2
     .string "Act OoS Frame"
-    .string "" # OSD ID 4
+    .string "Hitbox Trails Instant" # Global flag; native row ID 4
     .string "Dashback"
     .string "" # OSD ID 6
     .string "" # OSD ID 7
