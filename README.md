@@ -11,6 +11,24 @@ Join [the discord](https://discord.gg/2Khb8CVP7A) to discuss changes, new featur
 ## Development
 Please read [DEVELOPMENT.md](DEVELOPMENT.md).
 
+## Tyro branch changelog
+
+This section records Tyro-specific changes. Add a bullet under the matching Tyro version whenever a change is implemented; keep the newest version first. Proposed gameplay changes stay in the [investigation and implementation plan](OSD-GLOBAL-SETTINGS-INVESTIGATION.md) until implemented.
+
+### T2 (unreleased)
+
+- Added the investigation and implementation plan for global OSD settings, hitbox trails, Ledgedash improvements, save capacity, and a separate Tyro save identity.
+- Expanded the plan with versioned ISO filenames, selectable Ledgedash success criteria, Falling-start reset investigation, hitlag-aware OSD timing, and recovery-state labels for Act OoWait.
+- Initialized this Tyro branch changelog.
+
+### T1 (v1.4.1 T1)
+
+- Added hitbox trails to Eggs-ercise.
+- Added Very Fast and Instant hitbox-trail decay options to Training Lab and Eggs-ercise.
+- Added Tyro Edition names and version labels.
+- Added Tyro banners and corrected the in-game banner colors.
+- Removed the restriction on AI-assisted contributions from the development guidelines.
+
 ## Changes From the Original
 - New Training Lab Features:
     - Recording:
