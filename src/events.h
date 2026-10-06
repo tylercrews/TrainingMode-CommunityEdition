@@ -375,6 +375,8 @@ typedef struct MsgData
     int timing_frame; // displayed, one-based measurement; -1 = no timing rule
     int timing_subtext;
     unsigned timing_best;
+    unsigned timing_hitlag; // snapshot at creation; never read later match context while drawing
+    int timing_prefix; // separate neutral-colored prefix; -1 when absent
 } MsgData;
 void OSD_ApplyMessageStyle(MsgData *msg);
 void OSD_MessageGX(GOBJ *gobj, int pass);
@@ -385,6 +387,12 @@ int ActionCues_Remaining(GOBJ *gobj);
 int ActionCues_CommonState(int kind, int state);
 void ActionCues_SetLocalOverlay(GOBJ *gobj, const GXColor *color);
 int ActionCues_IsProtected(GOBJ *gobj);
+void OSDContext_Clear(void);
+void OSDContext_Tick(FighterData *fighter);
+void OSDContext_LCancel(GOBJ *fighter);
+unsigned OSDContext_MessageHitlag(int queue, unsigned category);
+void OSD_ActOutWait(GOBJ *fighter);
+void OSD_FormatTiming(MsgData *message, int inline_layout, int y);
 void Events_NotifyRestore(void);
 typedef struct MsgMngrData
 {

@@ -17,4 +17,6 @@ typedef struct LdshSurface { float x1, y1, x2, y2; int drop, enabled; } LdshSurf
 int LdshSurface_Target(const LdshSurface *surface, float desired_x, float ledge_y,
                        int platform, float *x, float *y);
 int Ldsh_IsAttackDash(int attack_kind, int state);
+int Ldsh_LegacyResetFailure(int state, int state_frame, int dead, int grounded, int released, int pending_hard);
+int Ldsh_RandomDistance(int low, int high, unsigned roll);
 #endif

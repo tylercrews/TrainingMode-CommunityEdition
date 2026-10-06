@@ -190,6 +190,8 @@
     ENTRY TM_OSDEditorInit
     ENTRY TM_OSDEditorInput
     ENTRY TM_ActionCuesLCancel
+    ENTRY TM_OSDContextTick
+    ENTRY TM_ActOutWait
 
     # TmDt Data Pointers
     .set TM_Data, TM_tmFunction - 0x4

@@ -31,3 +31,5 @@ Message_EndCombo
 OSD_EditorInit
 OSD_EditorInput
 ActionCues_LCancel
+OSDContext_Tick
+OSD_ActOutWait

@@ -28,6 +28,8 @@ class Machine:
         self.cpu = Uc(UC_ARCH_PPC, UC_MODE_32 | UC_MODE_BIG_ENDIAN)
         self.cpu.mem_map(0x100000, 0x100000)
         self.cpu.mem_map(0x80000000, 0x500000)
+        # Verified against the local native DOL, function 0x800C0658.
+        self.cpu.mem_write(0x800C0658, bytes.fromhex("800304302c0000004182000c386304084e800020386304884e800020"))
         self.cpu.reg_write(reg.UC_PPC_REG_MSR, 1 << 13)  # Enable FPR saves in native hooks.
         elf = (ROOT / "build/settings-test.elf").read_bytes()
         shoff = struct.unpack_from(">I", elf, 0x20)[0]
@@ -440,39 +442,167 @@ class TrailTests(unittest.TestCase):
             self.add(1, source)
         self.assertEqual(self.next_index(), 12)
 
-    def test_damage_opacity_preserves_player_rgb_and_phase_history(self):
+    def test_damage_hue_keeps_equal_opacity_and_distinct_phase_history(self):
         m = self.m
+        palettes = [(0xFF4646C8,0xFF00FFC8), (0xFFE141C8,0xFF8800C8),
+                    (0x4691FFC8,0x00FFFFC8), (0x4BE164C8,0x39FF14C8), (0xB4B4B4C8,0xFFFFFFC8)]
+        for base, accent in palettes:
+            self.assertEqual(m.call("TMTrail_DamageColor", base, 0), base)
+            self.assertEqual(m.call("TMTrail_DamageColor", base, 3), base)
+            self.assertEqual(m.call("TMTrail_DamageColor", base, 15), accent)
+            self.assertEqual(m.call("TMTrail_DamageColor", base, 100), accent)
+            colors = [m.call("TMTrail_DamageColor", base, d) for d in [2,3,9,12,15]]
+            self.assertNotEqual(colors[2], colors[3])  # Fox nair early/late phases remain distinct.
+            for color in colors:
+                self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 0, color), 200)
+                self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 1, color), 72)
+                self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 21, color), 0)
+                self.assertEqual(m.call("TMTrail_SampleAlpha", 3, 1, color), 0)
         strong = m.call("TMTrail_DamageColor", 0x4691FFC8, 12)
         weak = m.call("TMTrail_DamageColor", 0x4691FFC8, 9)
-        self.assertEqual(strong, 0x4691FFFF)
-        self.assertEqual(weak, 0x4691FFB9)
-        self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 0, strong), 255)
-        self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 0, weak), 185)
-        self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 1, strong), 128)
-        self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 1, weak), 93)
-        for age in range(1, 21):
-            self.assertGreaterEqual(m.call("TMTrail_SampleAlpha", 2, age, strong),
-                                    m.call("TMTrail_SampleAlpha", 2, age, weak))
-        self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 21, strong), 0)
-        self.assertEqual(m.call("TMTrail_SampleAlpha", 3, 1, strong), 0)
-        self.assertEqual(m.call("TMTrail_DamageColor", 0xFF4646C8, 0), 0xFF464660)
-        self.assertEqual(m.call("TMTrail_DamageColor", 0xFF4646C8, 100), 0xFF4646FF)
         for frame, color in [(0, strong), (1, weak)]:
             sample = struct.pack(">7f3I", 1,2,3,4,5,6,2,color,frame,1)
             m.cpu.mem_write(self.sample, sample)
             m.call("TMTrail_Add", self.bank, self.sample)
-        self.assertEqual(self.next_index(), 2)  # Damage changes do not overwrite the strong sample.
+        self.assertEqual(self.next_index(), 2)
         self.assertEqual(struct.unpack(">I", m.cpu.mem_read(self.bank + 28, 4))[0], strong)
         self.assertEqual(struct.unpack(">I", m.cpu.mem_read(self.bank + 40 + 28, 4))[0], weak)
-        for damage, alpha, history in [(2, 100, 50), (3, 106, 53), (9, 185, 93), (12, 255, 128)]:
-            color = m.call("TMTrail_DamageColor", 0xFF4646C8, damage)
-            self.assertEqual(color & 255, alpha)
-            self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 1, color), history)
+
+
+class OSDContextTests(unittest.TestCase):
+    def setUp(self):
+        self.m = Machine()
+        self.context, self.sample = 0x80401000, 0x80401100
+        self.m.cpu.mem_write(self.context, bytes(64))
+
+    def tick(self, frame, state=361, attack=1, air=1, shine=1, shield=0, victim=0, hitlag=0, dead=0):
+        self.m.cpu.mem_write(self.sample, struct.pack(">8i", state,attack,air,shine,shield,victim,hitlag,dead))
+        self.m.call("TestContextStep", self.context, frame, self.sample)
+
+    def hl(self, category):
+        return self.m.call("TMOSDContext_Hitlag", self.context, category)
+
+    def test_shine_fastfall_lcancel_freeze_counts_and_episode_retirement(self):
+        self.tick(1, state=360, hitlag=1)
+        self.tick(1, state=360, hitlag=1)  # Duplicate/frame advance redraw does not add time.
+        self.tick(2, state=360, hitlag=1)
+        self.tick(3, state=360, hitlag=1)
+        self.tick(4, state=361)
+        self.assertEqual(self.hl(8), 3)
+        self.assertEqual(self.hl(20), 3)
+        self.tick(5, state=70, air=0, shine=0)
+        self.assertEqual(self.hl(1), 3)
+        self.tick(6, state=70, air=0, shine=0, hitlag=1)
+        self.assertEqual(self.hl(1), 4)
+        self.tick(7, state=14, air=0, shine=0)
+        self.assertEqual(self.hl(16), 4)
+        self.tick(8, state=25, air=1, shine=0)
+        self.assertEqual(self.hl(20), 0)
+        self.tick(9, state=360, hitlag=1)
+        self.assertEqual(self.hl(8), 1)  # New shine excludes an old contact.
+        self.tick(10, state=0, dead=1)
+        self.assertEqual(self.hl(20), 0)
+        self.tick(11, state=361, hitlag=1)
+        self.tick(2, state=361)
+        self.assertEqual(self.hl(8), 0)  # Rewind clears transient counters.
+
+    def test_shield_victim_and_other_timing_categories_use_own_episode(self):
+        self.tick(1, state=179, air=0, shine=0, shield=1, hitlag=1)
+        self.tick(2, state=180, air=0, shine=0, shield=1, hitlag=1)
+        self.tick(3, state=178, air=0, shine=0, shield=1)
+        self.assertEqual(self.hl(3), 2)
+        self.tick(4, state=75, air=1, shine=0, victim=1, hitlag=1)
+        self.tick(5, state=76, air=1, shine=0, victim=1, hitlag=1)
+        self.tick(6, state=29, air=1, shine=0)
+        self.assertEqual(self.hl(28), 2)
+        self.tick(7, state=65, attack=2, shine=0, hitlag=1)
+        self.tick(8, state=65, attack=2, shine=0, hitlag=1)
+        self.assertEqual(self.hl(19), 2)
+        self.tick(9, state=44, attack=3, air=0, shine=0)
+        self.assertEqual(self.hl(19), 0)
+
+    def test_regular_landing_actual_lag_direct_exits_and_intermediate_wait(self):
+        def measure(states, frames, lag=4):
+            self.m.cpu.mem_write(self.sample, struct.pack(">6H", *(states + [0] * (6-len(states)))))
+            self.m.cpu.mem_write(self.sample+12, struct.pack(">6H", *(frames + [0] * (6-len(frames)))))
+            result = self.m.call("TMOSD_WaitFrames", self.sample,self.sample+12,6,lag,self.sample+24,self.sample+28)
+            return result, struct.unpack(">2i", self.m.cpu.mem_read(self.sample+24,8))
+        self.assertEqual(measure([42,25],[4,20]), (1,(0,0)))  # Ordinary jump landing now qualifies.
+        self.assertEqual(measure([42,25],[6,20],6)[0], 1)
+        self.assertEqual(measure([42,65],[7,20],4)[0], 4)
+        self.assertEqual(measure([14,42,25],[3,4,20])[0], 3)
+        self.assertEqual(measure([18,14,70],[1,2,10])[0], 2)
+        self.assertEqual(measure([70,65],[20,20])[0], 1)  # Direct aerial lag exit.
+        self.assertEqual(measure([43,236],[10,20])[0], 1)  # Direct waveland exit.
+        self.assertEqual(measure([42,25],[17,20])[0], 0)  # Retain existing 13-opportunity display policy.
+
+    def test_native_adapter_player_subfighter_lifetimes_freeze_and_wait_source(self):
+        m = self.m
+        m.init(); m.call("TestCueInit")
+        m.call("TestCueKind", 0, 2)
+        m.call("TestCueState", 0, 360, 0, 40, 100)
+        data = m.call("TestCueData", 0)
+        # phys.air_state is not needed for ground-shine episode.
+        m.call("TestCueFrozen", 0, 1)
+        for frame in range(1,4): m.call("TestContextTick", 0, frame)
+        self.assertEqual(m.call("OSDContext_MessageHitlag", 0, 8), 3)
+        self.assertEqual(m.call("OSDContext_MessageHitlag", 6, 8), 0)
+        m.call("TestCueSpawn", 0, 2, 0)
+        self.assertEqual(m.call("OSDContext_MessageHitlag", 0, 8), 0)
+        m.call("TestCueFrozen", 0, 0)
+        m.call("TestCueState", 0, 44, 0, 40, 100)
+        m.cpu.mem_write(data+0x23F8, b"\0\0")
+        m.cpu.mem_write(data+0x23FC, struct.pack(">6H",42,25,0,0,0,0))
+        m.cpu.mem_write(data+0x2408, struct.pack(">6H",4,20,0,0,0,0))
+        m.call("TestCueLanding", 0, 4, 1)
+        m.call("TestWaitDisplay", 0)
+        self.assertEqual(m.call("TestWaitFrame"), 1)
+        self.assertEqual(bytes(m.call("TestWaitLabelChar", i) for i in range(7)), b"Landing")
+        self.assertEqual(m.call("OSD_MessageSettings", m.call("TestWaitTag")), 16)
+        m.call("TestCueState", 0, 70, 0, 40, 100)
+        m.call("TestCueMissed", 0, 6)
+        m.call("TestCueState", 0, 44, 0, 40, 100)
+        m.cpu.mem_write(data+0x23FC, struct.pack(">6H",14,70,65,0,0,0))
+        m.cpu.mem_write(data+0x2408, struct.pack(">6H",1,10,20,0,0,0))
+        m.call("TestWaitDisplay", 0)
+        self.assertEqual(bytes(m.call("TestWaitLabelChar", i) for i in range(8)), b"L-cancel")
+        m.call("ActionCues_Clear")
+        self.assertEqual(m.call("OSDContext_MessageHitlag", 0, 8), 0)
 
 
 class OSDStyleTests(unittest.TestCase):
     def setUp(self):
         self.m = Machine()
+
+    def test_wavedash_compact_top_row_and_neutral_hitlag_prefix(self):
+        m = self.m; m.init()
+        m.write(14, 0, 1)
+        m.call("TestStyleInit", 0, 2, 0, 1)
+        m.call("TestStyleFormat", 0, 1, -30)
+        self.assertEqual(m.call("TestStyleScale100", 0), 70)
+        self.assertEqual(m.call("TestStyleScale100", 3), 70)
+        self.assertEqual(m.call("TestStyleX",0), 0xFFFFFFBA)
+        self.assertEqual(m.call("TestStyleX",3), 55)
+        m.call("TestStyleInit", 0, 2, 0, 1)
+        m.call("TestStyleFormat", 3, 1, -30)
+        self.assertEqual(m.call("TestStyleScale100", 3), 55)
+        self.assertEqual(m.call("TestStyleY", 3), 0xFFFFFFE2)
+        self.assertEqual(m.call("TestStyleY", 4), 0xFFFFFFE2)
+        m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleColor", 3), 0x8DFF6EFF)
+        self.assertEqual(m.call("TestStyleColor", 4), 0xFFFFFFFF)
+
+    def test_lcancel_prefixed_result_keeps_window_outcome_and_measurement(self):
+        m = self.m; m.init()
+        m.write(14, 1, 1)
+        m.call("TestStyleInit", 1, 4, 1, 1)
+        m.call("TestStyleFormat", 7, 0, -30)
+        self.assertEqual(bytes(m.call("TestStyleStringChar",1,i) for i in range(10)), b"Frame %d/7")
+        self.assertEqual(bytes(m.call("TestStyleStringChar",3,i) for i in range(7)), b"%dhl ->")
+        self.assertEqual(m.call("TestStyleTimingLine"), 1)
+        m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleColor", 1), 0xFFA2BAFF)
+        self.assertEqual(m.call("TestStyleColor", 3), 0xFFFFFFFF)
 
     def test_message_identity_and_legacy_contract(self):
         for raw, owner in [(7, 20), (5, 16), (5, 28), (-1, 10), (13, 22), (13, 26), (64, 8)]:
@@ -682,7 +812,7 @@ class OSDEditorTests(unittest.TestCase):
             self.assertEqual(m.call("TestEditorHidden", row), int(row in [19, 21]))
             self.assertEqual(m.read(17, native), m.call("TestEditorCache", row))
             self.assertEqual(m.call("TestSettingsEditorRow", native), m.call("TestEditorCache", row))
-        label = "OVERRIDE: OSDS OFF"
+        label = "OVERRIDE OSDS OFF"
         self.assertEqual(''.join(chr(m.call("TestEditorLabelChar", 20, i)) for i in range(len(label))), label)
         m.call("TestEditorInput", 0x200, 7)  # Lockout Timers palette.
         m.call("TestEditorAnimate", 7)
@@ -727,6 +857,26 @@ class ActionCueTests(unittest.TestCase):
         self.assertEqual(self.show(10, 14, 0), self.GREEN)
         self.assertEqual(self.show(11, 14, 1), self.GREEN)
         self.assertEqual(self.show(12, 14, 2), 0)
+
+    def test_protected_perfect_waveland_and_local_highlight_use_native_selected_slot(self):
+        m = self.m
+        data = m.call("TestCueData",0)
+        m.cpu.mem_write(data+0x430, struct.pack(">I",9))  # Native protected colanim selects slot 0.
+        m.call("TestCueProtection",0,0,2,0)
+        m.call("Settings_Set",11,7,1)
+        m.call("TestCueLanding",0,4,0)
+        self.assertEqual(self.show(1,43,8,10),self.YELLOW)
+        self.assertEqual(self.show(2,43,9,10),self.YELLOW)
+        self.assertEqual(self.show(3,14,0),self.GREEN)
+        self.assertEqual(self.show(4,14,1),self.GREEN)
+        self.assertEqual(self.show(5,14,2),0xFF464670)
+        self.assertEqual(struct.unpack(">I",m.cpu.mem_read(data+0x430,4))[0],9)
+        for flag in range(8): m.call("Settings_Set",11,flag,0)
+        m.call("TestCueLocal",0,0xEEBB44E6)
+        m.call("TestCueDraw",0)
+        self.assertEqual(m.call("TestCueDrawColor",0),0xEEBB44E6)
+        self.assertEqual(m.call("TestCueDrawFlags",0),4)
+        self.assertEqual(struct.unpack(">I",m.cpu.mem_read(data+0x430,4))[0],9)
 
     def test_all_five_landing_lags_cancelled_and_uncancelled(self):
         for state in range(70, 75):
@@ -774,7 +924,7 @@ class ActionCueTests(unittest.TestCase):
         m.call("TestCueState", 0, 70, 6, 8, 100)
         m.call("TestCueMissed", 0, 7)
         self.assertEqual(self.show(1, 70, 6, 8), self.YELLOW)
-        self.assertEqual(m.call("TestCueDrawFlags", 0), 2)
+        self.assertEqual(m.call("TestCueDrawFlags", 0), 4)
         self.assertEqual(bytes(m.cpu.mem_read(ptr, 0x180)), bytes(native))
         self.assertEqual(self.show(2, 70, 7, 8), self.YELLOW)
         self.assertEqual(self.show(3, 14, 0), self.GREEN)
@@ -1179,6 +1329,28 @@ class LedgedashLogicTests(unittest.TestCase):
         self.assertEqual(m.call("Ldsh_IsAttackDash", 1, 21), 0)  # Sustained run is distinct.
         self.assertEqual(m.call("Ldsh_IsAttackDash", 1, 14), 0)
         self.assertEqual(m.call("Ldsh_IsAttackDash", 2, 44), 1)
+
+    def test_original_reset_checks_and_harder_criterion_opportunity(self):
+        m=self.m
+        # Original falling-start airdodge, actual failures and grounded cutoff.
+        self.assertEqual(m.call("Ldsh_LegacyResetFailure",236,8,0,0,0,0),0)
+        self.assertEqual(m.call("Ldsh_LegacyResetFailure",236,9,0,0,0,0),1)
+        self.assertEqual(m.call("Ldsh_LegacyResetFailure",14,12,0,1,1,0),1)
+        self.assertEqual(m.call("Ldsh_LegacyResetFailure",14,12,0,1,1,1),0)
+        for state in [42,43,13]:
+            self.assertEqual(m.call("Ldsh_LegacyResetFailure",state,20,0,1,1,0),0)
+        self.assertEqual(m.call("Ldsh_LegacyResetFailure",0,0,1,0,0,1),1)
+
+    def test_first_recovered_jump_still_counts_default_galint(self):
+        self.begin(0)
+        self.assertEqual(self.step(0, airdodge=1, grounded=1, galint=8),0)
+        self.assertEqual(self.step(0, grounded=0, actionable=1, galint=4),1)
+
+    def test_random_egg_distance_inclusive_bounds_and_reversed_limits(self):
+        m=self.m
+        for low,high in [(10,35),(35,10),(20,20)]:
+            distances=[m.call("Ldsh_RandomDistance",low,high,roll) for roll in range(abs(high-low)+1)]
+            self.assertEqual(distances,list(range(min(low,high),max(low,high)+1)))
 
 
 if __name__ == "__main__":

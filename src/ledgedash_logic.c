@@ -1,5 +1,15 @@
 #include "ledgedash_logic.h"
 #include "../MexTK/mex.h"
+int Ldsh_LegacyResetFailure(int state, int state_frame, int dead, int grounded, int released, int pending_hard) {
+    return dead || (state == ASID_ESCAPEAIR && state_frame >= 9) ||
+        (state >= ASID_CLIFFCLIMBSLOW && state <= ASID_CLIFFJUMPQUICK2) ||
+        (!pending_hard && grounded && released && state != ASID_LANDING &&
+         state != ASID_LANDINGFALLSPECIAL && state != ASID_REBIRTHWAIT && state_frame >= 12);
+}
+int Ldsh_RandomDistance(int low, int high, unsigned roll) {
+    if (low > high) { int temp = low; low = high; high = temp; }
+    return low + roll % (unsigned)(high - low + 1);
+}
 int Ldsh_IsAttackDash(int attack_kind, int state) {
     return state == ASID_DASH || attack_kind != 1 || state == ASID_CATCH || state == ASID_CATCHDASH;
 }
@@ -33,10 +43,12 @@ int LdshAttempt_Step(LdshAttempt *a, const LdshSample *s, unsigned criterion) {
     if (s->grounded) {
         a->phase = LDSH_LANDED;
         if (a->airdodged) a->wavelanded = 1;
-        if (s->actionable && !a->landing_complete) {
-            a->landing_complete = 1;
-            a->galint_at_landing = s->galint;
-        }
+    }
+    /* An immediate jump on the first recovered frame must still resolve the
+     * original GALINT criterion after observed ground contact. */
+    if (a->phase == LDSH_LANDED && s->actionable && !a->landing_complete) {
+        a->landing_complete = 1;
+        a->galint_at_landing = s->galint;
     }
     if (criterion == LDSH_WAVELAND && a->wavelanded) return resolve(a, LDSH_SUCCESS);
     if (!a->landing_complete) return LDSH_PENDING;

@@ -1,6 +1,7 @@
 /* Freestanding memory routines and observability for the PowerPC test image. */
 #include "../src/events.h"
 #include "../src/ledgedash_logic.h"
+#include "../src/osd_context.h"
 #include <stddef.h>
 
 void memcpy(void *dst, const void *src, int size) {
@@ -25,7 +26,29 @@ int TestTimingArgument(int tag, int queue, int color, const char *format, ...) {
 static Text style_text;
 static MsgData style_message;
 static GOBJ style_object;
-static uint32_t style_colors[4];
+static uint32_t style_colors[8];
+static float style_scales[8][2], style_positions[8][2];
+static char style_strings[8][40];
+static int style_count, wait_frame, wait_tag;
+static const char *wait_label;
+static GOBJ wait_object;
+GOBJ *Message_Display(int tag, int queue, int color, char *format, ...) {
+    va_list args; va_start(args, format);
+    wait_frame = va_arg(args, int); wait_label = va_arg(args, const char *);
+    va_end(args); wait_tag = tag;
+    return &wait_object;
+}
+int TestWaitFrame(void) { return wait_frame; }
+unsigned TestWaitLabelChar(unsigned i) { return wait_label ? wait_label[i] : 0; }
+void TestWaitClear(void) { wait_frame = wait_tag = 0; wait_label = 0; }
+void TestWaitDisplay(unsigned slot) { OSD_ActOutWait(Fighter_GetSubcharGObj(slot / 2, slot & 1)); }
+int TestWaitTag(void) { return wait_tag; }
+void TestContextStep(TMOSDContext *context, unsigned frame, int *sample) {
+    TMOSDContext_Step(context, frame, sample[0],sample[1],sample[2],sample[3],sample[4],sample[5],sample[6],sample[7]);
+}
+void TestContextTick(unsigned slot, unsigned frame) {
+    stc_match->time_frames = frame; OSDContext_Tick(Fighter_GetSubcharGObj(slot / 2, slot & 1)->userdata);
+}
 static unsigned backgrounds;
 static Text editor_left, editor_right;
 static uint8_t editor_data[0x50];
@@ -41,6 +64,11 @@ static int editor_row(Text *text, int subtext) {
 }
 void Text_SetText(Text *text, int subtext, const char *format, ...) {
     int row = editor_row(text, subtext);
+    if (text == &style_text && (unsigned)subtext < 8) {
+        /* Capture format and integer args without depending on a host libc. */
+        unsigned i = 0; while (format[i] && i < 39) { style_strings[subtext][i] = format[i]; ++i; }
+        style_strings[subtext][i] = 0;
+    }
     if (row < 0) return;
     if (!format[0]) { editor_choices[row] = ""; editor_labels[row] = ""; return; }
     va_list args;
@@ -49,13 +77,32 @@ void Text_SetText(Text *text, int subtext, const char *format, ...) {
     editor_choices[row] = va_arg(args, const char *);
     va_end(args);
 }
-void Text_SetScale(Text *text, int subtext, float x, float y) {}
+void Text_SetScale(Text *text, int subtext, float x, float y) {
+    if (text == &style_text && (unsigned)subtext < 8) { style_scales[subtext][0] = x; style_scales[subtext][1] = y; }
+}
+void Text_SetPosition(Text *text, int subtext, float x, float y) {
+    if (text == &style_text && (unsigned)subtext < 8) { style_positions[subtext][0] = x; style_positions[subtext][1] = y; }
+}
+int Text_AddSubtext(Text *text, float x, float y, char *format, ...) {
+    int subtext = style_count++;
+    Text_SetPosition(text, subtext, x, y); Text_SetText(text, subtext, format);
+    return subtext;
+}
+void TestStyleFormat(unsigned hitlag, int inline_layout, int y) {
+    style_message.timing_hitlag = hitlag; OSD_FormatTiming(&style_message, inline_layout, y);
+}
+unsigned TestStyleStringChar(unsigned line, unsigned index) { return style_strings[line][index]; }
+int TestStyleScale100(unsigned line) { return style_scales[line][0] * 100 + 0.5f; }
+int TestStylePrefix(void) { return style_message.timing_prefix; }
+int TestStyleTimingLine(void) { return style_message.timing_subtext; }
+int TestStyleX(unsigned line) { return style_positions[line][0]; }
+int TestStyleY(unsigned line) { return style_positions[line][1]; }
 void Text_SetColor(Text *text, int subtext, GXColor *color) {
     int row = editor_row(text, subtext);
     if (row >= 0)
         editor_colors[row] = ((uint32_t)color->r << 24) | ((uint32_t)color->g << 16) |
                              ((uint32_t)color->b << 8) | color->a;
-    if ((unsigned)subtext < 4)
+    if ((unsigned)subtext < 8)
         style_colors[subtext] = ((uint32_t)color->r << 24) | ((uint32_t)color->g << 16) |
                                 ((uint32_t)color->b << 8) | color->a;
 }
@@ -64,6 +111,8 @@ void TestStyleInit(int id, int frame, int line, int best) {
     memset(&style_text, 0, sizeof(style_text));
     memset(&style_message, 0, sizeof(style_message));
     memset(style_colors, 0, sizeof(style_colors));
+    memset(style_scales, 0, sizeof(style_scales)); memset(style_strings, 0, sizeof(style_strings));
+    style_count = 3; style_message.timing_prefix = -1;
     backgrounds = 0;
     style_message.text = &style_text;
     style_message.settings_id = id;
@@ -133,7 +182,10 @@ static void TestCueNativeDraw(GOBJ *gobj, int pass) {
     unsigned slot = gobj - cue_objects;
     cue_draw_count[slot]++;
     FighterData *data = gobj->userdata;
-    GXColor color = data->color[1].hex;
+    /* Execute the actual native chooser (installed by the PPC test machine),
+     * rather than assuming the slot that the adapter is supposed to select. */
+    ColorOverlay *selected = ((ColorOverlay *(*)(FighterData *))0x800C0658)(data);
+    GXColor color = selected->hex;
     cue_draw_colors[slot] = ((u32)color.r << 24) | ((u32)color.g << 16) | ((u32)color.b << 8) | color.a;
     cue_draw_flags[slot] = (data->color[0].color_enable << 2) | (data->color[1].color_enable << 1) | data->color[2].color_enable;
 }

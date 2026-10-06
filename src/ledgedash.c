@@ -27,8 +27,6 @@ enum menu_options
     OPT_CRITERION,
     OPT_PROTECTION,
     OPT_EGG,
-    OPT_EGG_DISTANCE,
-    OPT_EGG_DAMAGE,
     OPT_ABOUT,
     OPT_EXIT,
 };
@@ -74,7 +72,7 @@ typedef char ldsh_event_fits[(sizeof(LedgedashData) <= EVENT_DATASIZE) ? 1 : -1]
 static struct {
     GOBJ *object, *retiring;
     int (*original_damage)(GOBJ *);
-    int line, available, popped;
+    int line, available, popped, prepared_ledge;
     float accumulated, fraction;
 } egg_target;
 
@@ -88,7 +86,27 @@ static const char *LdshOptions_ResetDelay[] = {"Slow", "Normal", "Fast", "Instan
 static const char *LdshOptions_Ledge[] = {"Left", "Right"};
 static const char *LdshOptions_Criteria[] = {"GALINT", "Waveland", "Attack/Dash in GALINT", "Pop Egg in GALINT"};
 static const char *LdshCriterionLabels[] = {"GALINT", "Waveland", "Act GALINT", "Pop Egg"};
-static const char *LdshOptions_Egg[] = {"Off", "Ground", "Platform"};
+static const char *LdshOptions_Egg[] = {"Ground", "Platform", "Random"};
+enum { EGG_ENABLE, EGG_TARGET, EGG_DISTANCE, EGG_RANDOM_DISTANCE, EGG_MIN_DISTANCE,
+       EGG_MAX_DISTANCE, EGG_DAMAGE };
+static EventOption LdshOptions_EggMenu[] = {
+    {.kind = OPTKIND_TOGGLE, .name = "Enable Eggs",
+     .desc = {"Place one ready-to-hit target each attempt.", "Pop Egg criteria requires this to be On."}, .OnChange = Ledgedash_ChangeEgg},
+    {.kind = OPTKIND_STRING, .value_num = 3, .name = "Egg Target", .values = LdshOptions_Egg,
+     .desc = {"Ground, Platform, or a random choice each attempt.", "Uses ground if no safe platform exists."}, .OnChange = Ledgedash_ChangeEgg},
+    {.kind = OPTKIND_INT, .value_min = 5, .value_num = 76, .val = 20,
+     .name = "Egg Distance", .format = "%d", .desc = {"Fixed distance inward from the ledge, in stage units."}, .OnChange = Ledgedash_ChangeEgg},
+    {.kind = OPTKIND_TOGGLE, .name = "Randomize Distance",
+     .desc = {"Choose a new distance between Min and Max each attempt."}, .OnChange = Ledgedash_ChangeEgg},
+    {.kind = OPTKIND_INT, .value_min = 5, .value_num = 76, .val = 10,
+     .name = "Min Distance", .format = "%d", .desc = {"Lower random distance bound. Reversed bounds are swapped."}, .OnChange = Ledgedash_ChangeEgg},
+    {.kind = OPTKIND_INT, .value_min = 5, .value_num = 76, .val = 35,
+     .name = "Max Distance", .format = "%d", .desc = {"Upper random distance bound, inclusive."}, .OnChange = Ledgedash_ChangeEgg},
+    {.kind = OPTKIND_INT, .value_min = 1, .value_num = 50, .val = 10,
+     .name = "Egg Pop Damage", .format = "%d", .desc = {"Accumulated damage needed to pop the target egg."}, .OnChange = Ledgedash_ChangeEgg},
+};
+static EventMenu LdshMenu_Eggs = {.name = "Egg Targets", .option_num = countof(LdshOptions_EggMenu),
+    .options = LdshOptions_EggMenu};
 static int LdshOptions_ResetDelaySuccess[] = { 120, 60, 30, 1 };
 static int LdshOptions_ResetDelayFailure[] = { 60, 20, 1, 1 };
 
@@ -178,21 +196,8 @@ static EventOption LdshOptions_Main[] = {
         .desc = {"Brighten the action color while invincible/intangible.", "Works independently of Color Overlays."},
     },
     {
-        .kind = OPTKIND_STRING, .value_num = 3, .name = "Egg Target",
-        .desc = {"Place a target egg on ground or a nearby platform.", "Platform uses ground when no safe platform exists.", "Pop Egg criteria automatically enables a target."},
-        .values = LdshOptions_Egg, .OnChange = Ledgedash_ChangeEgg,
-    },
-    {
-        .kind = OPTKIND_INT, .value_min = 5, .value_num = 76, .val = 20,
-        .name = "Egg Distance", .format = "%d",
-        .desc = {"Desired distance inward from the ledge, in stage units."},
-        .OnChange = Ledgedash_ChangeEgg,
-    },
-    {
-        .kind = OPTKIND_INT, .value_min = 1, .value_num = 50, .val = 10,
-        .name = "Egg Pop Damage", .format = "%d",
-        .desc = {"Accumulated damage needed to pop the target egg."},
-        .OnChange = Ledgedash_ChangeEgg,
+        .kind = OPTKIND_MENU, .name = "Egg Targets", .menu = &LdshMenu_Eggs,
+        .desc = {"Enable eggs and choose target, distance, randomization and damage."},
     },
     {
         .kind = OPTKIND_INFO,
@@ -305,8 +310,8 @@ void Event_Think(GOBJ *event)
     if (!event_data->seen_frame || frame != event_data->native_frame) {
         event_data->seen_frame = 1; event_data->native_frame = frame;
         Ledgedash_EggThink(event_data);
-        Ledgedash_HUDThink(event_data, hmn_data);
         Ledgedash_ResetThink(event_data, hmn);
+        Ledgedash_HUDThink(event_data, hmn_data);
         Ledgedash_HitLogThink(event_data, hmn);
     }
 
@@ -332,9 +337,11 @@ void Ledgedash_HUDThink(LedgedashData *event_data, FighterData *hmn_data)
     if (hmn_data->state_id == ASID_CLIFFWAIT &&
         (!event_data->action_state.is_ledgegrab || event_data->action_state.is_release))
     {
+        int prepared = egg_target.prepared_ledge;
         Ledgedash_InitVariables(event_data);
         event_data->reset_timer = 0;
-        Ledgedash_EggReset(event_data);
+        if (!prepared) Ledgedash_EggReset(event_data);
+        egg_target.prepared_ledge = 0; // Do not reroll a target already placed by this reset.
         event_data->tip.refresh_num++;
     }
 
@@ -412,7 +419,6 @@ void Ledgedash_ResetThink(LedgedashData *event_data, GOBJ *hmn)
 {
     FighterData *hmn_data = hmn->userdata;
 
-    if (hmn_data->flags.hitlag || hmn_data->flags.freeze) return;
     int reset_mode = LdshOptions_Main[OPT_RESET].val;
 
     if (reset_mode == OPTRESET_NONE)
@@ -446,13 +452,28 @@ void Ledgedash_ResetThink(LedgedashData *event_data, GOBJ *hmn)
     } else if (event_data->action_state.is_finished) {
         
         int reset_idx = LdshOptions_Main[OPT_RESETDELAY].val;
-        event_data->reset_timer = event_data->was_successful ? LdshOptions_ResetDelaySuccess[reset_idx] :
-            LdshOptions_ResetDelayFailure[reset_idx];
-    } else if (event_data->attempt.phase == LDSH_APPROACH && hmn_data->flags.dead) {
-        // Approach deaths reset the setup without counting a failed ledgedash.
-        int reset_idx = LdshOptions_Main[OPT_RESETDELAY].val;
-        event_data->reset_timer = LdshOptions_ResetDelayFailure[reset_idx];
-        event_data->was_successful = false;
+        event_data->reset_timer = LdshOptions_ResetDelaySuccess[reset_idx];
+    } else {
+        /* Original reset checks and failure delay, including the frame-9
+         * airdodge check during a Falling start. Hard criteria alone keep their
+         * grounded GALINT opportunity open until the verdict is resolved. */
+        int pending_hard = event_data->attempt.phase == LDSH_LANDED &&
+            LdshOptions_Main[OPT_CRITERION].val >= LDSH_ACT_GALINT && hmn_data->hurt.intang_frames.ledge > 0;
+        if (Ldsh_LegacyResetFailure(hmn_data->state_id, hmn_data->TM.state_frame,
+                hmn_data->flags.dead, !hmn_data->phys.air_state,
+                event_data->action_state.is_release, pending_hard)) {
+            int reset_idx = LdshOptions_Main[OPT_RESETDELAY].val;
+            event_data->reset_timer = LdshOptions_ResetDelayFailure[reset_idx];
+            event_data->was_successful = false;
+            if (!event_data->attempt.counted) {
+                event_data->attempt.phase = LDSH_RESOLVED;
+                event_data->attempt.result = LDSH_FAILURE;
+                event_data->attempt.counted = 1;
+                if (event_data->hud.total_count < 999999) event_data->hud.total_count++;
+                Ledgedash_UpdateRate(event_data);
+                SFX_PlayCommon(3);
+            }
+        }
     }
 
 }
@@ -573,7 +594,7 @@ void Ledgedash_HitLogGX(GOBJ *gobj, int pass)
     
     // panel info
     event_vars->HUD_DrawInfoPanel((const char**)panel_labels, (const char**)panel_info,
-        LdshOptions_Main[OPT_EGG].val ? countof(panel_labels) : countof(panel_labels) - 1);
+        LdshOptions_EggMenu[EGG_ENABLE].val ? countof(panel_labels) : countof(panel_labels) - 1);
 
     // action log
     LedgedashData *event_data = event_vars->event_gobj->userdata;
@@ -583,7 +604,7 @@ void Ledgedash_HitLogGX(GOBJ *gobj, int pass)
         "Fastfall",
         "Jump",
         "Airdodge",
-        "Attack/Dash",
+        "Act",
         "Landing",
         "GALINT",
     };
@@ -1032,6 +1053,7 @@ SWITCH_START_POS:
         gobj = gobj_next;
     }
     Ledgedash_EggReset(event_data);
+    egg_target.prepared_ledge = hmn_data->state_id == ASID_CLIFFWAIT;
 }
 void Fighter_UpdatePosition(GOBJ *fighter)
 {
@@ -1311,9 +1333,10 @@ static void Ledgedash_UpdateAttempt(LedgedashData *data, FighterData *ft) {
     int landing = state == ASID_LANDING || state == ASID_LANDINGFALLSPECIAL ||
         (state >= ASID_LANDINGAIRN && state <= ASID_LANDINGAIRLW);
     int grounded = !ft->phys.air_state && (ft->coll_data.envFlags & ECB_GROUND);
-    int actionable = state == ASID_LANDING ? ft->state.frame >= ft->attr.normal_landing_lag :
+    int actionable = state == ASID_LANDING ? ft->TM.state_frame >= ft->attr.normal_landing_lag :
         !landing && (state == ASID_WAIT || (state >= ASID_WALKSLOW && state <= ASID_RUN) ||
             ft->TM.state_prev[0] == ASID_LANDING || ft->TM.state_prev[0] == ASID_LANDINGFALLSPECIAL ||
+            ft->TM.state_prev[1] == ASID_LANDING || ft->TM.state_prev[1] == ASID_LANDINGFALLSPECIAL ||
             Ledgedash_AttackDash(ft));
     LdshSample sample = {
         .on_ledge = state == ASID_CLIFFWAIT,
@@ -1380,14 +1403,14 @@ static void Ledgedash_ChangeLedge(GOBJ *menu, int value) {
 static void Ledgedash_ChangeCriterion(GOBJ *menu, int value) {
     LedgedashData *data = event_vars->event_gobj->userdata;
     data->hud.total_count = 0; data->hud.successful_count = 0;
-    if (value == LDSH_POP_EGG && !LdshOptions_Main[OPT_EGG].val) LdshOptions_Main[OPT_EGG].val = 1;
+    if (value == LDSH_POP_EGG && !LdshOptions_EggMenu[EGG_ENABLE].val) LdshOptions_EggMenu[EGG_ENABLE].val = 1;
     sprintf(criterion_text, "%s", LdshCriterionLabels[value]);
     Ledgedash_UpdateRate(data);
     Fighter_PlaceOnLedge();
 }
 static void Ledgedash_ChangeEgg(GOBJ *menu, int value) {
-    if (LdshOptions_Main[OPT_CRITERION].val == LDSH_POP_EGG && !LdshOptions_Main[OPT_EGG].val)
-        LdshOptions_Main[OPT_EGG].val = 1;
+    if (LdshOptions_Main[OPT_CRITERION].val == LDSH_POP_EGG && !LdshOptions_EggMenu[EGG_ENABLE].val)
+        LdshOptions_EggMenu[EGG_ENABLE].val = 1;
     Fighter_PlaceOnLedge();
 }
 static int Ledgedash_ItemLive(GOBJ *object) {
@@ -1408,12 +1431,12 @@ static void Ledgedash_EggCleanup(void) {
     sprintf(egg_text, "Off");
 }
 static void Ledgedash_CleanupScene(void *unused) { Ledgedash_EggCleanup(); }
-static int Ledgedash_FindEggSurface(LedgedashData *data, int platform, Vec3 *position) {
+static int Ledgedash_FindEggSurface(LedgedashData *data, int platform, int distance, Vec3 *position) {
     CollDataStage *stage = *stc_colldata;
     CollLine *lines = *stc_collline;
     CollVert *verts = *stc_collvert;
     if (!stage || !lines || !verts) return -1;
-    float desired = data->ledge_pos.X + data->ledge_dir * LdshOptions_Main[OPT_EGG_DISTANCE].val;
+    float desired = data->ledge_pos.X + data->ledge_dir * distance;
     float best = 100000;
     int found = -1;
     for (int i = 0; i < stage->line_num; ++i) {
@@ -1433,12 +1456,20 @@ static int Ledgedash_FindEggSurface(LedgedashData *data, int platform, Vec3 *pos
 }
 static void Ledgedash_EggReset(LedgedashData *data) {
     Ledgedash_EggCleanup();
-    int mode = LdshOptions_Main[OPT_EGG].val;
-    if (!mode) return;
+    if (!LdshOptions_EggMenu[EGG_ENABLE].val) return;
+    int mode = LdshOptions_EggMenu[EGG_TARGET].val;
+    if (mode == 2) mode = HSD_Randi(2);
+    int distance = LdshOptions_EggMenu[EGG_DISTANCE].val;
+    if (LdshOptions_EggMenu[EGG_RANDOM_DISTANCE].val) {
+        int low = LdshOptions_EggMenu[EGG_MIN_DISTANCE].val;
+        int high = LdshOptions_EggMenu[EGG_MAX_DISTANCE].val;
+        int span = low > high ? low - high : high - low;
+        distance = Ldsh_RandomDistance(low, high, HSD_Randi(span + 1));
+    }
     Vec3 pos;
-    int line = Ledgedash_FindEggSurface(data, mode == 2, &pos);
+    int line = Ledgedash_FindEggSurface(data, mode == 1, distance, &pos);
     int fallback = 0;
-    if (line < 0 && mode == 2) { line = Ledgedash_FindEggSurface(data, 0, &pos); fallback = 1; }
+    if (line < 0 && mode == 1) { line = Ledgedash_FindEggSurface(data, 0, distance, &pos); fallback = 1; }
     if (line < 0) { sprintf(egg_text, "Unavailable"); return; }
     SpawnItem spawn = {.it_kind = ITEM_EGG, .pos = pos, .pos2 = pos, .vel = {0,0,0}};
     GOBJ *object = Item_CreateItem2(&spawn);
@@ -1460,7 +1491,7 @@ static void Ledgedash_EggReset(LedgedashData *data) {
     Vec2 right = (*stc_collvert)[desc->vert_next].pos_curr;
     egg_target.fraction = (pos.X - left.X) / (right.X - left.X);
     Item_UpdatePositionCollision(object);
-    sprintf(egg_text, "%s", fallback ? "Ground (fallback)" : mode == 2 ? "Platform" : "Ground");
+    sprintf(egg_text, "%s", fallback ? "Ground (fallback)" : mode == 1 ? "Platform" : "Ground");
 }
 static int Ledgedash_EggDamage(GOBJ *object) {
     if (object != egg_target.object || !Ledgedash_ItemLive(object)) return 0;
@@ -1470,7 +1501,7 @@ static int Ledgedash_EggDamage(GOBJ *object) {
     /* Only the player's own current target hit can award the protected pop. */
     if (ip->dmg.source_ply != (u8)ft->ply) return 0;
     egg_target.accumulated += ip->dmg.recent;
-    if (egg_target.accumulated < LdshOptions_Main[OPT_EGG_DAMAGE].val) return 0;
+    if (egg_target.accumulated < LdshOptions_EggMenu[EGG_DAMAGE].val) return 0;
     LedgedashData *data = event_vars->event_gobj->userdata;
     int state = ft->state_id;
     int recovered_now = !ft->phys.air_state &&

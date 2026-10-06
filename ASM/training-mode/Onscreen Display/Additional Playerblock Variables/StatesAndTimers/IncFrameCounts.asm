@@ -4,6 +4,12 @@
 
 # Inc Frame Count + Frames Tangible + Hitstun
 
+    # Capture actual frozen updates before discarding them from native counters.
+    SettingsBackup
+    mr r3, r31
+    rtocbl r12, TM_OSDContextTick
+    SettingsRestore
+
     # Don't Run During Hitlag
     lbz r0, 0x2219(r31)
     rlwinm. r0, r0, 30, 31, 31

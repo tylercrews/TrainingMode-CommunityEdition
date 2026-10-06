@@ -45,24 +45,24 @@ unsigned TMTrail_Alpha(unsigned mode, uint32_t age) {
     return (TM_TRAIL_HISTORY_ALPHA * (TM_TRAIL_CURRENT_ALPHA - lost) + TM_TRAIL_CURRENT_ALPHA / 2) / TM_TRAIL_CURRENT_ALPHA;
 }
 uint32_t TMTrail_DamageColor(uint32_t player_color, int damage) {
-    /* Base damage avoids stale-move/handicap changes to the visual cue. Strong
-     * and weak phases/simultaneous hitboxes remain distinct in saved samples. */
-    /* A steeper curve makes strong/late hit phases visibly different instead
-     * of raising both toward the same opacity ceiling. Clamp before squaring. */
-    unsigned alpha = damage <= 0 ? 96 : damage >= 12 ? 255 :
-        96 + ((unsigned)damage * (unsigned)damage * 159 + 72) / 144;
-    return (player_color & 0xFFFFFF00u) | alpha;
+    /* Strength changes hue, never opacity. Blend the player's base toward its
+     * matching accent over 3..15 base damage; simultaneous/early/late hitboxes
+     * keep their own color in history. Clamp before arithmetic. */
+    uint32_t rgb = player_color & 0xFFFFFF00u;
+    uint32_t accent = rgb == 0xFF464600u ? 0xFF00FF00u :
+        rgb == 0xFFE14100u ? 0xFF880000u :
+        rgb == 0x4691FF00u ? 0x00FFFF00u :
+        rgb == 0x4BE16400u ? 0x39FF1400u : 0xFFFFFF00u;
+    unsigned weight = damage <= 3 ? 0 : damage >= 15 ? 12 : (unsigned)damage - 3;
+    uint32_t color = TM_TRAIL_CURRENT_ALPHA;
+    for (unsigned shift = 8; shift <= 24; shift += 8) {
+        unsigned base = (rgb >> shift) & 255, target = (accent >> shift) & 255;
+        color |= ((base * (12 - weight) + target * weight + 6) / 12) << shift;
+    }
+    return color;
 }
 unsigned TMTrail_SampleAlpha(unsigned mode, uint32_t age, uint32_t color) {
-    unsigned fade = TMTrail_Alpha(mode, age);
-    if (!fade) return 0;
-    unsigned strength = color & 255;
-    if (!age) return strength;
-    if (!strength) return 0;
-    unsigned history = strength < 96 ? (strength * 48 + 48) / 96 :
-        48 + ((strength - 96) * 80 + 79) / 159;
-    unsigned alpha = (fade * history + TM_TRAIL_HISTORY_ALPHA / 2) / TM_TRAIL_HISTORY_ALPHA;
-    return alpha ? alpha : (strength ? 1 : 0);
+    return TMTrail_Alpha(mode, age);
 }
 
 unsigned TMTrail_Effective(unsigned very_fast, unsigned instant, unsigned local_enabled, unsigned local_mode) {

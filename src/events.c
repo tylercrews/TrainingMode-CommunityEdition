@@ -1765,6 +1765,7 @@ GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, 
     msg_data->timing_frame = -1;
     msg_data->timing_subtext = OSD_MessageLine(msg_kind);
     msg_data->timing_best = OSD_MessageBestFrame(msg_kind);
+    msg_data->timing_prefix = -1;
     msg_data->state = MSGSTATE_SHIFT;
     msg_data->anim_timer = MSGTIMER_SHIFT;
     msg_jobj->scale.X = MSGJOINT_SCALE;
@@ -1798,6 +1799,8 @@ GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, 
     va_start(args, format);
     unsigned timing_arg = OSD_MessageArgument(msg_kind);
     msg_data->timing_frame = OSD_ReadTimingArgument(args, timing_arg);
+    if (msg_data->timing_frame >= 0)
+        msg_data->timing_hitlag = OSDContext_MessageHitlag(queue_num, msg_data->settings_id);
     vsprintf(buffer, format, args);
     va_end(args);
     char *msg = buffer;
@@ -1850,13 +1853,7 @@ GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, 
         Text_AddSubtext(msg_text, 0, y_base + y_delta, msg_line);
     }
 
-    if (OSD_MessageInline(msg_kind)) {
-        // Two positioned runs on the existing first row: no fourth message line.
-        int y = (line_num - 1) * (-MSGTEXT_YOFFSET / 2);
-        Text_SetText(msg_text, 0, "Wavedash");
-        Text_SetPosition(msg_text, 0, -55, y);
-        msg_data->timing_subtext = Text_AddSubtext(msg_text, 60, y, "Frame %d", msg_data->timing_frame);
-    }
+    OSD_FormatTiming(msg_data, OSD_MessageInline(msg_kind), (line_num - 1) * (-MSGTEXT_YOFFSET / 2));
     OSD_ApplyMessageStyle(msg_data);
 
     // Add to queue

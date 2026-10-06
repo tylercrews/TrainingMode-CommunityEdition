@@ -120,6 +120,7 @@ void ActionCues_LCancel(GOBJ *gobj) {
     if (!live || !gobj || !gobj->userdata) return;
     FighterData *data = gobj->userdata;
     if (data->state_id < ASID_LANDINGAIRN || data->state_id > ASID_LANDINGAIRLW) return;
+    OSDContext_LCancel(gobj);
     CueFighter *entry = get_fighter(gobj);
     if (entry) entry->missed_entry = (u8)data->input.timer_trigger_any_ignore_hitlag >= (**stc_ftcommon).lcancel_input_window;
 }
@@ -192,7 +193,10 @@ static void Cue_Draw(GOBJ *gobj, int pass) {
      * Timing explicitly replaces missed-cancel red, including Lab's own overlay. */
     ColorOverlay saved[3];
     memcpy(saved, data->color, sizeof(saved));
-    data->color[0].color_enable = 0; data->color[2].color_enable = 0;
+    /* Native 0x800C0658 selects slot 0 when its colanim ID is nonzero,
+     * otherwise slot 1. Disabling slot 0's color flag does not select slot 1. */
+    unsigned selected = data->color[0].colanim ? 0 : 1;
+    for (unsigned i = 0; i < 3; ++i) data->color[i].color_enable = 0;
     static const GXColor colors[] = {{0,0,0,0}, {255,240,0,220}, {80,255,90,220}, {255,40,40,180}};
     GXColor color = colors[cue];
     if (!cue && !protected && local) color = entry->local_color;
@@ -202,12 +206,13 @@ static void Cue_Draw(GOBJ *gobj, int pass) {
         uint32_t rgba = TMTrail_PlayerColor(player ? player->color_accent : 4, !player || player->p_kind == 1);
         color = (GXColor){rgba >> 24, rgba >> 16, rgba >> 8, 112};
     }
-    data->color[1].hex = color;
-    data->color[1].color_enable = 1;
+    data->color[selected].hex = color;
+    data->color[selected].color_enable = 1;
     entry->draw(gobj, pass);
     memcpy(data->color, saved, sizeof(saved));
 }
 void ActionCues_Clear(void) {
+    OSDContext_Clear();
     for (unsigned i = 0; i < countof(fighters); ++i) {
         fighters[i].cue = (TMCueState){0};
         fighters[i].color = TM_CUE_NONE; fighters[i].missed_entry = -1;

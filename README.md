@@ -19,22 +19,30 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Restored original Ledgedash reset order, failure checks and delay behavior while keeping harder criteria's protected opportunity.
+- Moved all egg controls into Egg Targets, adding random Ground/Platform targets and inclusive randomized-distance bounds.
+- Fixed global and Ledgedash protection colors using the native-selected color slot; fixed yellow/green priority during perfect invincible ledgedashes.
+- Included ordinary landing and direct recovery exits in Act OoWait, using actual normal lag and recovery-source labels.
+- Shortened the Ledgedash action legend to Act and restored compact Wavedash top-row fonts.
+- Changed the global master label to OVERRIDE OSDS OFF.
+- Added own-fighter hitlag prefixes to timed OSDs, preserving actionable measurements, timing colors and L-cancel outcomes.
+- Replaced damage-scaled trail opacity with fixed translucent history and player-to-alternate hue blending: red/magenta, yellow/orange, blue/cyan, green/neon green, gray/white.
+- Audited the original plan and added a running list of remaining work at its top; these corrections consume no save bits (30 remain).
+
 - Fixed lost fighter draw callbacks across death/respawn and stopped wrapping native renderers when overlays are all Off.
 - Fixed missed L-cancel detection using the native integer input window and a landing-entry fallback; shortened red pulses to eight simulation frames.
 - Renamed the diagnostic controls to Missed L Cancel / Run Turnaround and moved the shortened Global Settings title to the right.
-- Raised low-damage trail opacity while retaining quadratic strength contrast, player colors and existing decay timing.
 - Implemented Ledgedash Attack/Dash, Ledge selection, Protection Highlight and all four Success Criteria with criterion-aware HUD statistics.
 - Added Ledgedash ground/platform egg targets, distance/pop-damage controls, safe ground fallback and restore/scene cleanup.
-- Separated Ledgedash approach, committed attempt, pending criterion and reset delay so Falling starts are not failed before reaching ledge.
 - Extended protection detection to all protected hurtboxes for rolls and moves, while preserving the Yoshi jump-armor exception.
 
 - Renamed the recovery cue setting to Actionable Yellow/Green.
 
-- Shortened the global OSD master label to OVERRIDE: OSDS OFF.
+- Shortened the global OSD master label to OVERRIDE OSDS OFF.
 
-- Regrouped Global Settings - OSDs and Overlays: ordered OSDs, a gap, OVERRIDE: OSDS OFF, another gap, then shared controls in the bottom right.
+- Regrouped Global Settings - OSDs and Overlays: ordered OSDs, a gap, OVERRIDE OSDS OFF, another gap, then shared controls in the bottom right.
 - Changed missed L-cancel and Run Turnaround diagnostics to repeat a red opacity pulse throughout their action states.
-- Restored strong/weak trail contrast using base-damage opacity while retaining player colors; removed Very Very Fast from both local decay menus.
+- Removed Very Very Fast from both local decay menus.
 
 - Fixed repeated invalid reads after creating a save by preventing an unsupported MEX relocation in the game-ID comparison; added optimized DAT relocation regressions.
 - Added a global translucent player-colored invincibility/intangibility overlay for ledge, respawn, dodges and moves, including Yoshi's active double-jump armor.
@@ -51,7 +59,7 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 - Separated overlapping message queue identities, preserved outcome/angle colors, split Wavedash title/timing runs within the existing three lines, and added explicit L-cancel Success/Missed feedback.
 - Finalized shared global trail-row labels/bindings, independent edits, and an explicit Both On status in local trail menus; verified all four saved toggle combinations.
 - Added global Very Fast and Instant hitbox trails to the L-button OSD menu and Lab OSD menu, with a shared renderer across gameplay matches.
-- Added Very Very Fast decay to Lab and Eggs-ercise, softer historical trails, player/team-accent colors, and gray CPU trails.
+- Added softer historical trails, player/team-accent colors, and gray CPU trails.
 - Included subfighters and owner-colored projectiles; removed duplicate event renderers and cleared shared history on scene/retry/restore/rewind boundaries.
 - Prevented duplicate drawing when both global modes are enabled and repeated translucent samples during stationary hitlag.
 - Added shared C/native settings accessors, explicit 44-byte packing, validation, and migration of Tyro's existing settings.

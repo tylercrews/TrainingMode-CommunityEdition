@@ -32,6 +32,13 @@ ActOoWait_SearchForWait:
     beq ActOoWait_FoundWait
     cmpwi r3, ASID_Landing
     beq ActOoWait_FoundWait
+    cmpwi r3, ASID_LandingFallSpecial
+    beq ActOoWait_FoundWait
+    cmpwi r3, ASID_LandingAirN
+    blt ActOoWait_CheckIntermediate
+    cmpwi r3, ASID_LandingAirLw
+    ble ActOoWait_FoundWait
+ActOoWait_CheckIntermediate:
     
     # If the player walks/turns as an intermediate state,
     # skip this intermediate state and show the OSD for the next state.
