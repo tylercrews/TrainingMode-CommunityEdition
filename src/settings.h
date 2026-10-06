@@ -20,6 +20,8 @@
 /* Shared labels and native L-menu row bindings. Build-generated ASM uses these names too. */
 #define TM_GLOBAL_TRAIL_VERY_FAST_ROW 2
 #define TM_GLOBAL_TRAIL_INSTANT_ROW 4
+#define TM_GLOBAL_OSDS_OFF_ROW 6
+#define TM_GLOBAL_OSDS_OFF_NAME "TURN OSDS OFF"
 #define TM_GLOBAL_TRAIL_VERY_FAST_NAME "Hitbox Trails Very Fast"
 #define TM_GLOBAL_TRAIL_INSTANT_NAME "Hitbox Trails Instant"
 #define TM_GLOBAL_TRAIL_STATE_NAMES "Global: Off", "Global: Very Fast", "Global: Instant", "Global: Both On"

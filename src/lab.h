@@ -1846,6 +1846,12 @@ static EventOption LabOptions_OSDs[] = {
         .desc = {"Show only current-frame hitboxes in every match.", "Very Fast takes precedence when both are On."},
         .OnChange = Lab_ChangeGlobalInstant,
     },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_OSDS_OFF_NAME,
+        .desc = {"Hide global OSD messages without clearing their colors.", "Trails and event feedback remain active."},
+        .OnChange = Lab_ChangeOSDsOff,
+    },
 };
 
 static EventMenu LabMenu_OSDs = {

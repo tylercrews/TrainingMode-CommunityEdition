@@ -28,3 +28,5 @@ StartOSDs
 Settings_Get
 Settings_Set
 Message_EndCombo
+OSD_EditorInit
+OSD_EditorInput

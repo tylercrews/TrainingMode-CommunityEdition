@@ -373,6 +373,8 @@ typedef struct MsgData
 } MsgData;
 void OSD_ApplyMessageStyle(MsgData *msg);
 void OSD_MessageGX(GOBJ *gobj, int pass);
+void OSD_EditorInit(void *data);
+int OSD_EditorInput(void *data, unsigned buttons, unsigned row);
 typedef struct MsgMngrData
 {
     COBJ *cobj;

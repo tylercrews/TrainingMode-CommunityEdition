@@ -190,6 +190,12 @@ IncLoopRight:
     cmpwi r29, 15
     blt LoopStartRight
 
+    # Existing row subtexts now show the shared palette/flag values. Preserve FPRs
+    # as well as GPRs across the C call inside this native animation callback.
+    SettingsBackup
+    mr r3, r31
+    rtocbl r12, TM_OSDEditorInit
+    SettingsRestore
     restore
     b exit
 
@@ -289,7 +295,7 @@ OSDPositionTextTopRight:
 
 XYText:
     blrl
-    .string "(X/Y)"
+    .string "X/Y: Position  B/Z: Color"
     .align 2
 
 FDDRecommended:
@@ -319,7 +325,7 @@ TextASCIILeft:
     .string "Act OoS Frame"
     TyroTrailLabel_INSTANT # Global flag; native row ID 4
     .string "Dashback"
-    .string "" # OSD ID 6
+    .string "TURN OSDS OFF" # Global flag; native row ID 6
     .string "" # OSD ID 7
     .string "Fighter-specific Tech"
     .string "Powershield Frame"

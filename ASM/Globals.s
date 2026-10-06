@@ -187,6 +187,8 @@
     ENTRY TM_SettingsGet
     ENTRY TM_SettingsSet
     ENTRY TM_MessageEndCombo
+    ENTRY TM_OSDEditorInit
+    ENTRY TM_OSDEditorInput
 
     # TmDt Data Pointers
     .set TM_Data, TM_tmFunction - 0x4

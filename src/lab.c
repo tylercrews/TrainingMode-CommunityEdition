@@ -326,6 +326,12 @@ void Lab_ChangeOSDs(GOBJ *menu_gobj, int value) {
     Memcard_SaveIfChanged();
 }
 
+void Lab_ChangeOSDsOff(GOBJ *menu_gobj, int value) {
+    TM_SetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF, value);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 2].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF);
+    Memcard_SaveIfChanged();
+}
+
 void Lab_ChangePlayerPercent(GOBJ *menu_gobj, int value)
 {
     GOBJ *fighter = Fighter_GetGObj(0);
@@ -6081,6 +6087,7 @@ void Event_Init(GOBJ *gobj)
     LabOptions_OSDs[TM_SETTINGS_OSDS].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
     LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
     Lab_ChangeHitboxTrails(0, 0);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 2].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF);
 
     // character rng options
     {

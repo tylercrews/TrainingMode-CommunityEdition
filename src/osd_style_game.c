@@ -14,7 +14,9 @@ void OSD_ApplyMessageStyle(MsgData *msg) {
 }
 void OSD_MessageGX(GOBJ *gobj, int pass) {
     MsgData *msg = gobj->userdata;
-    int visible = msg->settings_id < 0 || Settings_Get(TM_SETTING_OSD_COLOR, msg->settings_id) != TM_COLOR_OFF;
+    int visible = msg->settings_id < 0 ||
+        (!Settings_Get(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF) &&
+         Settings_Get(TM_SETTING_OSD_COLOR, msg->settings_id) != TM_COLOR_OFF);
     msg->text->hidden = !visible;
     if (!visible) return; /* Preserve the valid GOBJ contract even when a category is Off. */
     OSD_ApplyMessageStyle(msg); /* After all legacy caller recoloring, before the text GX pass. */

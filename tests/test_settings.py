@@ -425,6 +425,126 @@ class OSDStyleTests(unittest.TestCase):
         self.assertEqual(self.m.call("OSD_MessageInline", wave), 1)
         self.assertEqual(self.m.call("OSD_MessageLine", wave), 0)
 
+    def test_master_off_hides_existing_messages_and_restores_choices(self):
+        m = self.m
+        m.init()
+        m.write(14, 20, 6)
+        m.write(11, 1, 1)
+        before = m.record()
+        m.call("TestStyleInit", 20, 2, 1, 1)
+        m.call("TestStyleDraw")
+        m.write(16, 6, 1)
+        self.assertEqual(m.read(16, 6), 1)
+        self.assertEqual(m.read(15, 6), 0)  # Master is not an OSD mask bit.
+        m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleHidden"), 1)
+        self.assertEqual(m.call("TestStyleBackgrounds"), 1)
+        self.assertEqual(m.read(11, 1), 1)  # Trails remain On.
+        m.call("TestStyleInit", -1, -1, 1, 1)
+        m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleHidden"), 0)
+        m.write(16, 6, 0)
+        self.assertEqual(m.record(), before)
+        m.call("TestStyleInit", 20, 2, 1, 1)
+        m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleHidden"), 0)
+        self.assertEqual(m.call("TestStyleColor", 0), 0x00FFFFFF)
+
+
+class OSDEditorTests(unittest.TestCase):
+    def setUp(self):
+        self.m = Machine()
+        self.m.init()
+
+    def test_native_palette_cycle_and_exit_snapshot(self):
+        m = self.m
+        m.write(14, 20, 6)
+        m.write(15, 15, 1)  # Reserved event bit must survive.
+        m.call("TestEditorInit")
+        self.assertEqual(m.call("TestEditorChoiceChar", 23, 0), ord("C"))
+        self.assertEqual(m.call("TestEditorColor", 23), 0x00FFFFFF)
+        self.assertEqual(m.call("TestEditorInput", 0x200, 23), 1)
+        self.assertEqual(m.read(14, 20), 7)
+        self.assertEqual(m.call("TestEditorChoiceChar", 23, 0), ord("M"))
+        self.assertEqual(m.call("TestEditorInput", 0x200, 23), 1)
+        self.assertEqual(m.read(14, 20), 0)
+        self.assertEqual(m.call("TestEditorCache", 23), 1)  # Native detects the changed Boolean.
+        self.assertEqual(bytes(m.cpu.mem_read(0x804A04F4, 1)), b"\0")
+        m.call("TestEditorAnimate", 23)
+        self.assertEqual(m.call("TestEditorCache", 23), 0)
+        self.assertEqual(m.call("TestEditorInput", 0x10, 23), 1)
+        self.assertEqual(m.read(14, 20), 7)
+        self.assertEqual(m.call("TestEditorCache", 23), 0)
+        self.assertEqual(bytes(m.cpu.mem_read(0x804A04F4, 1)), b"\1")
+        m.call("TestEditorAnimate", 23)
+        self.assertEqual(m.call("TestEditorCache", 23), 1)
+        # The native exit pass saves Boolean rows: chosen Magenta remains Magenta.
+        m.write(16, 20, m.call("TestEditorCache", 23))
+        self.assertEqual(m.read(14, 20), 7)
+        self.assertEqual(m.read(15, 15), 1)
+
+    def test_master_and_trails_are_independent_boolean_rows(self):
+        m = self.m
+        for id in IDS:
+            m.write(14, id, (id % 7) + 1)
+        before = m.record()
+        m.call("TestEditorInit")
+        for row, flag in [(2, 1), (4, 2), (6, 0)]:
+            m.call("TestEditorInput", 0x200, row)
+            self.assertEqual(m.read(11, flag), 1)
+            self.assertEqual(m.call("TestEditorChoiceChar", row, 1), ord("n"))
+        self.assertEqual(m.record()[:10], before[:10])
+        self.assertEqual(m.record()[11:], before[11:])
+        self.assertEqual(m.read(11, 1), 1)
+        self.assertEqual(m.read(11, 2), 1)
+        m.call("TestEditorInput", 0x10, 6)
+        self.assertEqual(m.read(11, 0), 0)
+        self.assertEqual(m.read(11, 1), 1)
+        self.assertEqual(m.read(11, 2), 1)
+
+    def test_unused_rows_and_navigation_do_not_edit_settings(self):
+        m = self.m
+        m.call("TestEditorInit")
+        before = m.record()
+        for row in [7, 10, 18, 20, 26, 27, 28, 29, 65535]:
+            self.assertEqual(m.call("TestEditorInput", 0x200, row), 1)
+            self.assertEqual(m.call("TestEditorInput", 0x10, row), 1)
+        for button in [1, 2, 4, 8, 0x100, 0x400, 0x800, 0x1000]:
+            self.assertEqual(m.call("TestEditorInput", button, 0), 0)
+        self.assertEqual(m.record(), before)
+
+    def test_native_editor_future_format_uses_private_defaults(self):
+        m = self.m
+        future = bytearray(m.record())
+        future[10] = 0x80
+        m.put(future)
+        m.call("TestEditorInit")
+        m.call("TestEditorInput", 0x200, 23)
+        self.assertEqual(m.call("Settings_Get", 14, 20), 1)
+        m.call("TestEditorInput", 0x200, 6)
+        self.assertEqual(m.call("Settings_Get", 11, 0), 1)
+        self.assertEqual(m.record(), bytes(future))
+
+    def test_native_palette_and_master_round_trip_into_fresh_service(self):
+        m = self.m
+        m.call("TestEditorInit")
+        for _ in range(6):
+            m.call("TestEditorInput", 0x200, 23)
+        m.call("TestEditorAnimate", 23)
+        m.call("TestEditorInput", 0x200, 6)
+        m.call("TestEditorAnimate", 6)
+        m.write(16, 20, m.call("TestEditorCache", 23))
+        m.write(16, 6, m.call("TestEditorCache", 6))
+        fresh = Machine()
+        fresh.put(m.record())
+        fresh.call("TestEditorInit")
+        self.assertEqual(fresh.call("Settings_Get", 14, 20), 6)
+        self.assertEqual(fresh.call("Settings_Get", 11, 0), 1)
+        self.assertEqual(fresh.call("TestEditorChoiceChar", 23, 0), ord("C"))
+        fresh.call("TestEditorInput", 0x200, 6)
+        self.assertEqual(fresh.call("Settings_Get", 14, 20), 6)
+        self.assertEqual(fresh.call("Settings_Get", 11, 0), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
