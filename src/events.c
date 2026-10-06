@@ -284,7 +284,7 @@ EventDesc LaserLand = {
 // Combo Training
 EventDesc Combo = {
     .eventName = "Combo Training\n",
-    .eventDescription = "L+DPad adjusts percent | DPadDown moves CPU\nDPad right/left saves and loads positions.",
+    .eventDescription = "L+DPad adjusts percent.\nDPad down moves the CPU.",
     .eventFile = 0,
     .jumpTableIndex = JUMP_COMBO,
     .CSSType = SLCHRKIND_TRAINING,
