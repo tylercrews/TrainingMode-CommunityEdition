@@ -768,6 +768,9 @@ RNGControl rng;
 
 static const TMSettingsAPI settings_api = { Settings_Get, Settings_Set, Settings_Status };
 static const TMTrailAPI trails_api = { Trails_Configure, Trails_Clear };
+static unsigned restore_serial;
+static unsigned Events_RestoreSerial(void) { return restore_serial; }
+void Events_NotifyRestore(void) { restore_serial++; }
 
 EventVars stc_event_vars = {
     .event_desc = 0,
@@ -792,6 +795,9 @@ EventVars stc_event_vars = {
     .settings = &settings_api,
     .trails = &trails_api,
     .clear_action_cues = ActionCues_Clear,
+    .set_local_overlay = ActionCues_SetLocalOverlay,
+    .get_restore_serial = Events_RestoreSerial,
+    .is_protected = ActionCues_IsProtected,
 };
 
 static GOBJ *stc_msgmgr;

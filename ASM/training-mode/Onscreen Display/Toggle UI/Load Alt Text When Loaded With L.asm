@@ -257,7 +257,7 @@ TextProperties:
     .long 0x3CB43958        # Text Scaling
     .long 0x42480000        # Text Y Difference
     .long 0x4423C000        # Right Text X Offset
-    .long 0x43960000        # Center Title X
+    .float 655.0           # Right-aligned title; same anchor as right-column text
     .long 0xC22C0000        # Center Title Y
     .float 0                # OSD Position text X
     .float -43.0            # OSD Position text Y
@@ -357,7 +357,7 @@ TextASCIIRight:
 
 FDDTitleText:
     blrl
-    .string "Global Settings - OSDs and Overlays"
+    .string "Global Settings"
     .align 2
 
 original:

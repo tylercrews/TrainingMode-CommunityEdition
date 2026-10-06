@@ -1404,7 +1404,7 @@ struct ftCommonData
     float xd8;                                 // 0xd8
     float xdc;                                 // 0xdc
     float xe0;                                 // 0xe0
-    float xe4;                                 // 0xe4
+    int lcancel_input_window;                  // 0xe4, integer frames (vanilla 7)
     float xe8;                                 // 0xe8
     float xec;                                 // 0xec
     float xf0;                                 // 0xf0

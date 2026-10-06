@@ -1,5 +1,6 @@
 /* Freestanding memory routines and observability for the PowerPC test image. */
 #include "../src/events.h"
+#include "../src/ledgedash_logic.h"
 #include <stddef.h>
 
 void memcpy(void *dst, const void *src, int size) {
@@ -108,6 +109,7 @@ static float cue_lengths[12];
 static void (*cue_early)(GOBJ *), (*cue_late)(GOBJ *);
 static uint32_t cue_draw_colors[12];
 static unsigned cue_draw_flags[12];
+static unsigned cue_draw_count[12];
 GOBJ *GObj_Create(int entity_class, int p_link, int p_priority) { return &cue_manager; }
 GOBJProc *GObj_AddProc(GOBJ *gobj, void *callback, int priority) {
     if (priority == 0) cue_early = callback;
@@ -129,6 +131,7 @@ int Fighter_GetIntangibleFrames(GOBJ *gobj) {
 float Fighter_GetCurrentAnimLength(GOBJ *gobj) { return cue_lengths[gobj - cue_objects]; }
 static void TestCueNativeDraw(GOBJ *gobj, int pass) {
     unsigned slot = gobj - cue_objects;
+    cue_draw_count[slot]++;
     FighterData *data = gobj->userdata;
     GXColor color = data->color[1].hex;
     cue_draw_colors[slot] = ((u32)color.r << 24) | ((u32)color.g << 16) | ((u32)color.b << 8) | color.a;
@@ -139,9 +142,10 @@ void TestCueInit(void) {
     memset(cue_data, 0, sizeof(cue_data));
     memset(cue_objects, 0, sizeof(cue_objects));
     memset(cue_active, 0, sizeof(cue_active));
+    memset(cue_draw_count, 0, sizeof(cue_draw_count));
     memset(cue_players, 0, sizeof(cue_players));
     *stc_ftcommon = &cue_common;
-    cue_common.xe4 = 7; cue_common.x260 = 60;
+    cue_common.lcancel_input_window = 7; cue_common.x260 = 60;
     for (unsigned slot = 0; slot < 12; ++slot) {
         cue_objects[slot].userdata = &cue_data[slot];
         cue_objects[slot].gx_cb = TestCueNativeDraw;
@@ -169,10 +173,25 @@ void TestCueLanding(unsigned slot, int lag, int allow_interrupt) {
 void TestCueFrozen(unsigned slot, int frozen) { cue_data[slot].flags.hitlag = frozen; }
 void TestCueIASA(unsigned slot, int ready) { cue_data[slot].flags.past_iasa = ready; }
 void TestCueKind(unsigned slot, int kind) { cue_data[slot].kind = kind; }
+void TestCueSpawn(unsigned slot, int spawn, int dead) {
+    cue_data[slot].spawn_num = spawn; cue_data[slot].flags.dead = dead;
+}
+void TestCueInputTimer(unsigned slot, int timer) { cue_data[slot].input.timer_trigger_any_ignore_hitlag = timer; }
+unsigned TestCueDrawCount(unsigned slot) { return cue_draw_count[slot]; }
+int TestCueWrapped(unsigned slot) { return cue_objects[slot].gx_cb != TestCueNativeDraw; }
+void TestCueLocal(unsigned slot, unsigned rgba) {
+    GXColor color = {rgba >> 24, rgba >> 16, rgba >> 8, rgba};
+    ActionCues_SetLocalOverlay(&cue_objects[slot], rgba ? &color : 0);
+}
 void TestCueProtection(unsigned slot, int script, int game, int armor100) {
     cue_data[slot].hurt.kind_script = script; cue_data[slot].hurt.kind_game = game;
     cue_data[slot].dmg.armor = armor100 / 100.0f;
 }
+void TestCueCapsules(unsigned slot, int num, int state) {
+    cue_data[slot].hurt_num = num;
+    for (unsigned i = 0; i < countof(cue_data[slot].hurtbox); ++i) cue_data[slot].hurtbox[i].state = state;
+}
+void TestCueCapsule(unsigned slot, unsigned index, int state) { cue_data[slot].hurtbox[index].state = state; }
 void TestCuePlayer(unsigned ply, int accent, int cpu) {
     cue_players[ply].color_accent = accent; cue_players[ply].p_kind = cpu;
 }
@@ -198,4 +217,7 @@ void TestCueScript(unsigned slot, const uint32_t *script, int timer100, int fram
     cue_data[slot].script.script_current = (int *)script;
     cue_data[slot].script.script_event_timer = timer100 / 100.0f;
     cue_data[slot].script.script_frame_timer = frame100 / 100.0f;
+}
+int TestLdshSurface(LdshSurface *surface, int desired100, int ledge100, int platform, float *result) {
+    return LdshSurface_Target(surface, desired100 / 100.f, ledge100 / 100.f, platform, &result[0], &result[1]);
 }

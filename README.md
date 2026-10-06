@@ -19,7 +19,20 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
-- Regrouped Global Settings - OSDs and Overlays: ordered OSDs, a gap, OVERRIDE: TURN ALL OSDS OFF, another gap, then shared controls in the bottom right.
+- Fixed lost fighter draw callbacks across death/respawn and stopped wrapping native renderers when overlays are all Off.
+- Fixed missed L-cancel detection using the native integer input window and a landing-entry fallback; shortened red pulses to eight simulation frames.
+- Renamed the diagnostic controls to Missed L Cancel / Run Turnaround and moved the shortened Global Settings title to the right.
+- Raised low-damage trail opacity while retaining quadratic strength contrast, player colors and existing decay timing.
+- Implemented Ledgedash Attack/Dash, Ledge selection, Protection Highlight and all four Success Criteria with criterion-aware HUD statistics.
+- Added Ledgedash ground/platform egg targets, distance/pop-damage controls, safe ground fallback and restore/scene cleanup.
+- Separated Ledgedash approach, committed attempt, pending criterion and reset delay so Falling starts are not failed before reaching ledge.
+- Extended protection detection to all protected hurtboxes for rolls and moves, while preserving the Yoshi jump-armor exception.
+
+- Renamed the recovery cue setting to Actionable Yellow/Green.
+
+- Shortened the global OSD master label to OVERRIDE: OSDS OFF.
+
+- Regrouped Global Settings - OSDs and Overlays: ordered OSDs, a gap, OVERRIDE: OSDS OFF, another gap, then shared controls in the bottom right.
 - Changed missed L-cancel and Run Turnaround diagnostics to repeat a red opacity pulse throughout their action states.
 - Restored strong/weak trail contrast using base-damage opacity while retaining player colors; removed Very Very Fast from both local decay menus.
 
@@ -27,7 +40,7 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 - Added a global translucent player-colored invincibility/intangibility overlay for ledge, respawn, dodges and moves, including Yoshi's active double-jump armor.
 - Allocated byte 40, bit 1 for protection and migrated settings to format 3; 30 reserved bits remain.
 
-- Added global Recovery Yellow/Green: two frames before normal landing/attack recovery and a two-frame completion pulse, with priority over missed L-cancel red.
+- Added global Actionable Yellow/Green: two frames before normal landing/attack recovery and a two-frame completion pulse, with priority over missed L-cancel red.
 - Added global Run Turnaround and missed L-cancel red flashes, plus full-health Infinite Shields for all main/subfighters.
 - Allocated reserved byte 40, bit 0 to Run Turnaround; migrated packed settings to format 2 while retaining the other 31 reserved bits.
 

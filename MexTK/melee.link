@@ -631,6 +631,7 @@
 8026E15C:Item_CollAir_Bounce
 8026E414:Item_CollAir_Land
 8026DAA8:Item_CollAir_NoCB
+80288E6C:Egg_EnterRest
 8026D62C:Item_CollGround_PassLedge
 8026D8A4:Item_CollGround_StopLedge
 80225DD8:Item_CopyDevelopState

@@ -286,6 +286,9 @@ typedef struct EventVars
     const TMSettingsAPI *settings;
     const TMTrailAPI *trails;
     void (*clear_action_cues)(void);
+    void (*set_local_overlay)(GOBJ *, const GXColor *);
+    unsigned (*get_restore_serial)(void);
+    int (*is_protected)(GOBJ *);
 } EventVars;
 #define event_vars_ptr_loc ((EventVars**)0x803d7054)
 #define event_vars (*event_vars_ptr_loc)
@@ -380,6 +383,9 @@ int OSD_EditorInput(void *data, unsigned buttons, unsigned row);
 void ActionCues_LCancel(GOBJ *gobj);
 int ActionCues_Remaining(GOBJ *gobj);
 int ActionCues_CommonState(int kind, int state);
+void ActionCues_SetLocalOverlay(GOBJ *gobj, const GXColor *color);
+int ActionCues_IsProtected(GOBJ *gobj);
+void Events_NotifyRestore(void);
 typedef struct MsgMngrData
 {
     COBJ *cobj;

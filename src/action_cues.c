@@ -88,7 +88,7 @@ unsigned TMCue_Update(TMCueState *cue, int state, float frame, unsigned instance
     if (timing && recovered) cue->green = 2;
     if (!timing || remaining < 0) cue->green = 0;
     if (red_active) {
-        cue->red = changed || cue->red_source != red_active ? 0 : (cue->red + 1) % 12;
+        cue->red = changed || cue->red_source != red_active ? 0 : (cue->red + 1) % TM_CUE_PULSE_FRAMES;
         cue->red_source = red_active;
     } else { cue->red = 0; cue->red_source = 0; }
     cue->seen = 1; cue->state = state; cue->frame = frame;
@@ -98,6 +98,6 @@ unsigned TMCue_Update(TMCueState *cue, int state, float frame, unsigned instance
     return cue->red_source ? TM_CUE_RED : TM_CUE_NONE;
 }
 unsigned TMCue_RedAlpha(unsigned phase) {
-    static const uint8_t pulse[] = {180,148,116,84,52,20,20,52,84,116,148,180};
-    return pulse[phase % 12];
+    static const uint8_t pulse[] = {180,140,100,60,20,60,100,140};
+    return pulse[phase % TM_CUE_PULSE_FRAMES];
 }

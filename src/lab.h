@@ -1252,7 +1252,7 @@ static EventOption LabOptions_General[OPTGEN_COUNT] = {
     {
         .kind = OPTKIND_MENU,
         .menu = &LabMenu_OSDs,
-        .name = "Global Settings - OSDs and Overlays",
+        .name = "Global Settings",
         .desc = {"Choose global OSD colors, overlays and other shared controls."},
     },
 };
@@ -1855,7 +1855,7 @@ static EventOption LabOptions_OSDs[] = {
     {
         .kind = OPTKIND_TOGGLE,
         .name = TM_GLOBAL_MISSED_LCANCEL_NAME,
-        .desc = {"Pulse red throughout uncancelled aerial landing lag.", "Recovery Yellow/Green takes priority over this flash."},
+        .desc = {"Pulse red throughout uncancelled aerial landing lag.", "Actionable Yellow/Green takes priority over this flash."},
         .OnChange = Lab_ChangeGlobalCue,
     },
     {
@@ -1879,13 +1879,13 @@ static EventOption LabOptions_OSDs[] = {
     {
         .kind = OPTKIND_TOGGLE,
         .name = TM_GLOBAL_INVINCIBILITY_NAME,
-        .desc = {"Show protected fighters in their translucent trail color.", "Includes moves, dodges, respawn, ledge and Yoshi jump armor.", "Recovery Yellow/Green takes priority while active."},
+        .desc = {"Show protected fighters in their translucent trail color.", "Includes moves, dodges, respawn, ledge and Yoshi jump armor.", "Actionable Yellow/Green takes priority while active."},
         .OnChange = Lab_ChangeGlobalCue,
     },
 };
 
 static EventMenu LabMenu_OSDs = {
-    .name = "Global Settings - OSDs and Overlays",
+    .name = "Global Settings",
     .option_num = sizeof(LabOptions_OSDs) / sizeof(EventOption),
     .options = LabOptions_OSDs,
 };

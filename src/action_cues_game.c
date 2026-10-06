@@ -11,26 +11,59 @@ typedef struct CueFighter {
     TMCueState cue;
     unsigned color;
     int missed_entry;
+    GXColor local_color;
+    int local_active;
 } CueFighter;
 static CueFighter fighters[12];
 static GOBJ *manager;
 static unsigned last_frame;
 static int seen_frame, live;
 static void Cue_Draw(GOBJ *gobj, int pass);
+int ActionCues_IsProtected(GOBJ *gobj) {
+    if (!gobj || !gobj->userdata) return 0;
+    FighterData *data = gobj->userdata;
+    if (data->flags.dead) return 0;
+    if (data->hurt.kind_script > 0 || data->hurt.kind_game > 0 ||
+        Fighter_GetIntangibleFrames(gobj) > 0 || (data->kind == FTKIND_YOSHI && data->dmg.armor > 0)) return 1;
+    /* SetAllHurtCapsules (script opcode 0x6C) does not set the aggregate status.
+     * Include whole-body protection through that path, excluding a lone limb. */
+    if (!data->hurt_num || data->hurt_num > countof(data->hurtbox)) return 0;
+    for (unsigned i = 0; i < data->hurt_num; ++i)
+        if (data->hurtbox[i].state <= 0) return 0;
+    return 1;
+}
 
 static CueFighter *get_fighter(GOBJ *gobj) {
     FighterData *data = gobj->userdata;
     unsigned slot = (unsigned)(u8)data->ply * 2 + !!data->flags.ms;
     if (slot >= countof(fighters)) return 0;
     CueFighter *entry = &fighters[slot];
-    if (entry->object != gobj || entry->spawn != data->spawn_num) {
+    if (entry->object != gobj) {
         *entry = (CueFighter){.object = gobj, .spawn = data->spawn_num};
+        entry->missed_entry = -1;
+    } else if (entry->spawn != data->spawn_num) {
+        /* Native respawn reuses the GOBJ. Keep its original renderer even when
+         * gx_cb is already our wrapper; losing it makes the reborn fighter vanish. */
+        entry->spawn = data->spawn_num;
+        entry->cue = (TMCueState){0}; entry->color = TM_CUE_NONE; entry->missed_entry = -1;
+        entry->local_active = 0;
     }
+    int wrap = entry->local_active || Settings_Get(TM_SETTING_FLAG, TM_FLAG_LAST_BLOCKED_FRAME) ||
+        Settings_Get(TM_SETTING_FLAG, TM_FLAG_MISSED_LCANCEL) ||
+        Settings_Get(TM_SETTING_FLAG, TM_FLAG_RUN_TURNAROUND) ||
+        Settings_Get(TM_SETTING_FLAG, TM_FLAG_INVINCIBILITY);
     if (gobj->gx_cb && gobj->gx_cb != Cue_Draw) {
         entry->draw = gobj->gx_cb;
-        gobj->gx_cb = Cue_Draw;
-    }
+        if (wrap) gobj->gx_cb = Cue_Draw;
+    } else if (!wrap && entry->draw) gobj->gx_cb = entry->draw;
     return entry;
+}
+void ActionCues_SetLocalOverlay(GOBJ *gobj, const GXColor *color) {
+    CueFighter *entry = get_fighter(gobj);
+    if (!entry) return;
+    entry->local_active = color != 0;
+    if (color) entry->local_color = *color;
+    get_fighter(gobj); /* Reconcile the draw wrapper after changing local ownership. */
 }
 
 /* Normalize exceptional ordinary attacks; these are not character specials. */
@@ -88,7 +121,7 @@ void ActionCues_LCancel(GOBJ *gobj) {
     FighterData *data = gobj->userdata;
     if (data->state_id < ASID_LANDINGAIRN || data->state_id > ASID_LANDINGAIRLW) return;
     CueFighter *entry = get_fighter(gobj);
-    if (entry) entry->missed_entry = (u8)data->input.timer_trigger_any_ignore_hitlag >= (**stc_ftcommon).xe4;
+    if (entry) entry->missed_entry = (u8)data->input.timer_trigger_any_ignore_hitlag >= (**stc_ftcommon).lcancel_input_window;
 }
 static void full_shields(void) {
     if (!live || !Settings_Get(TM_SETTING_FLAG, TM_FLAG_INFINITE_SHIELDS)) return;
@@ -119,14 +152,17 @@ static void Cue_Think(GOBJ *gobj) {
             CueFighter *entry = get_fighter(ft);
             if (!entry) continue;
             if (data->flags.dead) {
-                entry->cue = (TMCueState){0}; entry->color = TM_CUE_NONE; entry->missed_entry = 0;
+                entry->cue = (TMCueState){0}; entry->color = TM_CUE_NONE; entry->missed_entry = -1;
+                entry->local_active = 0;
                 continue;
             }
             int frozen = data->flags.hitlag || data->flags.freeze;
             if (data->state_id < ASID_LANDINGAIRN || data->state_id > ASID_LANDINGAIRLW)
-                entry->missed_entry = 0; /* Latch the entry result through the entire landing state. */
+                entry->missed_entry = -1;
+            else if (entry->missed_entry < 0)
+                entry->missed_entry = (u8)data->input.timer_trigger_any_ignore_hitlag >= (**stc_ftcommon).lcancel_input_window;
             int red = (turn && data->state_id == ASID_TURNRUN ? 2 : 0) |
-                      (missed && entry->missed_entry ? 1 : 0);
+                      (missed && entry->missed_entry > 0 ? 1 : 0);
             if (!missed && !turn) entry->cue.red = 0;
             entry->color = TMCue_Update(&entry->cue, data->state_id, data->state.frame, data->atk_instance,
                 timing ? ActionCues_Remaining(ft) : -1, frozen, timing, red);
@@ -134,10 +170,10 @@ static void Cue_Think(GOBJ *gobj) {
 }
 static void Cue_Draw(GOBJ *gobj, int pass) {
     FighterData *data = gobj->userdata;
-    unsigned slot = (unsigned)(u8)data->ply * 2 + !!data->flags.ms;
-    if (slot >= countof(fighters)) return;
-    CueFighter *entry = &fighters[slot];
-    if (entry->object != gobj || !entry->draw) return;
+    CueFighter *entry = 0;
+    for (unsigned i = 0; i < countof(fighters); ++i)
+        if (fighters[i].object == gobj) { entry = &fighters[i]; break; }
+    if (!entry || !entry->draw) return;
     unsigned cue = live && !data->flags.dead ? entry->color : TM_CUE_NONE;
     if ((cue == TM_CUE_YELLOW || cue == TM_CUE_GREEN) &&
         !Settings_Get(TM_SETTING_FLAG, TM_FLAG_LAST_BLOCKED_FRAME)) cue = TM_CUE_NONE;
@@ -149,9 +185,9 @@ static void Cue_Draw(GOBJ *gobj, int pass) {
      * meet here. Read at draw time so pause, toggles and restores are immediate. */
     int protected = live && !data->flags.dead &&
         Settings_Get(TM_SETTING_FLAG, TM_FLAG_INVINCIBILITY) &&
-        (Fighter_GetIntangibleFrames(gobj) > 0 ||
-         (data->kind == FTKIND_YOSHI && data->dmg.armor > 0));
-    if (!cue && !protected) { entry->draw(gobj, pass); return; }
+        ActionCues_IsProtected(gobj);
+    int local = live && !data->flags.dead && entry->local_active;
+    if (!cue && !protected && !local) { entry->draw(gobj, pass); return; }
     /* Render-time composition: native/event colanim state survives byte-for-byte.
      * Timing explicitly replaces missed-cancel red, including Lab's own overlay. */
     ColorOverlay saved[3];
@@ -159,6 +195,7 @@ static void Cue_Draw(GOBJ *gobj, int pass) {
     data->color[0].color_enable = 0; data->color[2].color_enable = 0;
     static const GXColor colors[] = {{0,0,0,0}, {255,240,0,220}, {80,255,90,220}, {255,40,40,180}};
     GXColor color = colors[cue];
+    if (!cue && !protected && local) color = entry->local_color;
     if (cue == TM_CUE_RED) color.a = TMCue_RedAlpha(entry->cue.red);
     if (protected && cue != TM_CUE_YELLOW && cue != TM_CUE_GREEN) {
         Playerblock *player = Fighter_GetPlayerblock((u8)data->ply);
@@ -173,7 +210,8 @@ static void Cue_Draw(GOBJ *gobj, int pass) {
 void ActionCues_Clear(void) {
     for (unsigned i = 0; i < countof(fighters); ++i) {
         fighters[i].cue = (TMCueState){0};
-        fighters[i].color = TM_CUE_NONE; fighters[i].missed_entry = 0;
+        fighters[i].color = TM_CUE_NONE; fighters[i].missed_entry = -1;
+        fighters[i].local_active = 0;
     }
     seen_frame = 0; /* Retain original draw callbacks while clearing tracking. */
 }
@@ -183,7 +221,7 @@ void ActionCues_SceneChange(void) {
 }
 void ActionCues_MatchStart(void) {
     if (manager) return;
-    memset(fighters, 0, sizeof(fighters)); seen_frame = 0; live = 1;
+    memset(fighters, 0, sizeof(fighters)); ActionCues_Clear(); live = 1;
     manager = GObj_Create(0, 7, 0);
     if (!manager) { live = 0; return; }
     GObj_AddProc(manager, Cue_Early, 0);

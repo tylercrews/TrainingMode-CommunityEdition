@@ -1,6 +1,6 @@
 # Global OSDs, hitbox trails, and Ledgedash: investigation and implementation plan
 
-Investigated October 4, 2026, initially against checkout `b3d6700`, with the additional filename, success-criteria, reset, and OSD investigations against `08640e8`. Steps 0-6 now have implementations: centralized V1.4.1T2 metadata, versioned outputs, the separate `TYRE01` identity, packed/migrated settings, global trails, both OSD editors, master suppression, shared flashes/shields, and the staged recovery cue. Sections 24-31 record implementation and validation. Step 6 still requires live Dolphin frame-step validation; the separately planned Ledgedash, hitlag-prefix and recovery-label work remains outstanding. The README contains the running Tyro-specific changelog.
+Investigated October 4, 2026, initially against checkout `b3d6700`, with the additional filename, success-criteria, reset, and OSD investigations against `08640e8`. Steps 0-6 now have implementations: centralized V1.4.1T2 metadata, versioned outputs, the separate `TYRE01` identity, packed/migrated settings, global trails, both OSD editors, master suppression, shared flashes/shields, and the staged recovery cue. Sections 24-31 record implementation and validation. Step 6 still requires live Dolphin frame-step validation; Ledgedash is now implemented in section 35; the separately planned hitlag-prefix and recovery-label work remains outstanding. The README contains the running Tyro-specific changelog.
 
 The requested phase-1 changes are feasible. A compact save format can accommodate the new global toggles, including Infinite Shields, OSD title colors, and a reserved phase-2 overlay inside the existing 44-byte settings area, with **30 bits still reserved for future use** after Run Turnaround and the global protection overlay each allocate one bit. No current training feature needs to be removed for that design. If persistent event high scores are deliberately retired, their **204-byte region** can become a settings extension after its score access/reset paths are changed; section 17 explains the budget and work involved. Before changing the serialized format, give Tyro Edition its own stable game/save identity so switching to upstream cannot reinterpret Tyro settings. The yellow last-non-actionable-frame overlay is feasible for specific, understood action states; an accurate implementation covering every character and action needs separate research.
 
@@ -674,7 +674,7 @@ This section records format 2 at step 6. Section 31 is the current format-3 rese
 
 Implemented October 5, 2026, retaining release name **V1.4.1T2** and stable identity **TYRE01**. The packed settings format is now **version 2**. The yellow window is the final **two** simulated recovery frames, followed by a **two-frame** green completion pulse. Green still confirms completion when the player immediately starts the next ordinary action; it is not a claim that the new action's startup is interruptible. New yellow recovery takes priority. Pause does not consume frames; hitlag/freezes suppress the timing color and do not advance its countdown. Restores, Ledgedash repositioning, scene/match changes, death and backwards state/frame clocks clear transient tracking.
 
-Both the L-button menu and Lab OSD menu expose **Recovery Yellow/Green**, **Flash Run Turnaround**, **Flash Missed L-Cancel**, and **Infinite Shields**. The last two complete the deferred shared flash/shield portion of step 3. New controls start Off. B/Z toggle the native Boolean rows; Lab edits only the selected shared flag. TURN OSDS OFF suppresses message text only, so it does not disable these body overlays or shields.
+Both the L-button menu and Lab OSD menu expose **Actionable Yellow/Green**, **Flash Run Turnaround**, **Flash Missed L-Cancel**, and **Infinite Shields**. The last two complete the deferred shared flash/shield portion of step 3. New controls start Off. B/Z toggle the native Boolean rows; Lab edits only the selected shared flag. TURN OSDS OFF suppresses message text only, so it does not disable these body overlays or shields.
 
 | Requested case | Implementation/boundary |
 | --- | --- |
@@ -721,7 +721,7 @@ The drawing service checks native effective whole-body protection at each draw, 
 
 Yoshi's double jump is **armor**, not invincibility. The user's requested exception is included whenever Yoshi's native active jump-armor value (`FighterData.dmg.armor`, `0x18B4`) is positive; it is not keyed to the entire animation or inferred from an arbitrary frame table. The [native double-jump entry](https://github.com/doldecomp/melee/blob/master/src/melee/ft/kinds/ftCommon/ftCo_JumpAerial.c) installs that armor. This overlay is a protection cue; it does not alter damage, knockback, armor strength or invincibility.
 
-Colors use exactly the shared trail RGB mapping: bright Red/Blue/Yellow/Green from the player's accent (including teams), with CPU/unmatched accents Gray. Alpha is **112/255** for a translucent body tint. Recovery Yellow/Green remains highest priority; protection then takes priority over the short red diagnostic flashes and local body colors. The original native/event color structures are restored after each fighter GX call. Vulnerability removes the tint immediately; pause, master-text suppression and history clearing do not prevent the draw-time protection check. Dead fighters remain untinted, and deliberate native/event invisibility remains respected.
+Colors use exactly the shared trail RGB mapping: bright Red/Blue/Yellow/Green from the player's accent (including teams), with CPU/unmatched accents Gray. Alpha is **112/255** for a translucent body tint. Actionable Yellow/Green remains highest priority; protection then takes priority over the short red diagnostic flashes and local body colors. The original native/event color structures are restored after each fighter GX call. Vulnerability removes the tint immediately; pause, master-text suppression and history clearing do not prevent the draw-time protection check. Dead fighters remain untinted, and deliberate native/event invisibility remains respected.
 
 **Current format-3 extension ledger:**
 
@@ -753,16 +753,16 @@ The prior ELF tests did not exercise this failure mode. The test runner now comp
 
 Implemented October 5, 2026, retaining V1.4.1T2, TYRE01, packed format **3**, the **44-byte** record and **30 reserved bits**. These changes allocate no save bytes and reclaim no event scores.
 
-The native title and Lab entry/title now read **Global Settings - OSDs and Overlays**. The exact master label is **OVERRIDE: TURN ALL OSDS OFF**. Read the native grid down the left column, then the right; it has 29 physical rows, 27 named controls and two gaps:
+The native title and Lab entry/title now read **Global Settings - OSDs and Overlays**. The exact master label is **OVERRIDE: OSDS OFF**. Read the native grid down the left column, then the right; it has 29 physical rows, 27 named controls and two gaps:
 
 | Physical cursor rows (zero-based) | Content |
 | --- | --- |
 | Left 0-14 | First fifteen OSDs, in the canonical Lab/settings order |
 | Right 15-18 | Combo Counter, Grab Breakout, Ledgedash Info, Act OoHitstun |
 | Right 19 | Blank gap |
-| Right 20 | **OVERRIDE: TURN ALL OSDS OFF** |
+| Right 20 | **OVERRIDE: OSDS OFF** |
 | Right 21 | Blank gap |
-| Right 22-28 | Very Fast trails, Instant trails, Pulse Missed L-Cancel, Pulse Run Turnaround, Recovery Yellow/Green, Infinite Shields, Invincibility Overlay |
+| Right 22-28 | Very Fast trails, Instant trails, Pulse Missed L-Cancel, Pulse Run Turnaround, Actionable Yellow/Green, Infinite Shields, Invincibility Overlay |
 
 `TMSettings_EditorIDs` is a display-order map over stable OSD/flag identities. New accessor field **17**, `TM_SETTING_EDITOR_ROW`, translates the native RSS physical row IDs into those bindings. L-menu initialization and exit saving use that field; the original logical-row accessor (16), color slots and global flag bits keep their meaning. Both gaps return Off, ignore saves and preserve unknown/custom-event enable bits. Their text and checkbox subtrees are hidden without hiding neighboring rows. B/Z on a gap makes no preference change. Lab places its master immediately after the nineteen OSDs and follows with the same shared-control order; its scrollable menu does not consume native grid gaps.
 
@@ -775,3 +775,46 @@ For the user's Fox-nair example, **12 damage = current alpha 240 / starting hist
 **Very Very Fast was removed** from Lab and Eggs-ercise. Remaining local decays are Normal, Fast, Very Fast, Instant, Slow and Off (no fading). Global Very Fast/Instant preferences retain their saved flags and priority. Local decay values are not serialized, so removing that enum entry requires rebuilding callers, but no memory-card migration. Header fingerprints force the full rebuild.
 
 Forty-nine compiled PowerPC tests pass, including grouped native reads/writes through the actual hook macros, complete exit-save preservation, exact master label/gap visibility, pulse duration/repeat/freeze/exit behavior, strong/weak opacity and historical samples, removed-preset indexing, and relocated production DAT settings access. The optimized release is rebuilt and checked separately. Dolphin validation is still needed for title/row fit, gap navigation, the pulse's visual feel and Fox-nair/other hitbox contrast under Very Fast/Instant/slow motion/frame advance.
+
+
+**35. October 6 fixes, resumed trail tuning and Ledgedash implementation**
+
+The interrupted opacity edit was resumed and expanded to cover the user's additional runtime reports. Release name remains **V1.4.1T2**, identity **TYRE01**, packed format **3**, record size **44 bytes**, reserve **30 bits**. No new persistent field or high-score reclamation was introduced. Ledgedash options follow the existing event-local convention and reset on event reload.
+
+**Renderer lifecycle and missing overlays.** The same native fighter GOBJ is reused across a changed spawn number. The old shared wrapper reset its tracking record, including the saved original GX callback, then saw its own wrapper still installed and failed to recover that callback. It could therefore return without calling the real renderer. The fix retains the original renderer for the same GOBJ, clears only transient state on generation changes, finds draw ownership by object rather than a changing slot value, and restores the native callback when all applicable global/local overlays are Off. A local-overlay API lets Ledgedash use the same render-time composition rather than clearing native color-animation structures. This directly addresses the reported death/spyglass/invisible-respawn failure mechanism; full Dolphin reproduction/verification remains pending.
+
+**Missed L Cancel.** Read-only captured GameCube RAM confirms the common input-window field at offset `0xE4` contains integer **7** (`00000007`), while the old SDK declared it float. That declaration and the detector are corrected. The actual landing hook still captures the result, and a late landing-entry fallback independently latches the correct result when the hook did not populate it. Valid cancels below the window do not pulse; missing/late inputs do. The result lasts only through the corresponding aerial landing state.
+
+The labels are now exactly **Missed L Cancel** and **Run Turnaround**. Pulse alpha repeats over **eight** unfrozen simulation frames: `180,140,100,60,20,60,100,140`; pause/hitlag hold the phase. Actionable Yellow/Green remains higher priority, then protection, then red diagnostics/local body colors. These are fixed waveform/code changes, not new saved preferences.
+
+**Protection coverage.** The shared helper combines engine/script aggregate status, the native effective-status getter, Yoshi's positive jump-armor value, and whole-body protection represented by all current hurtboxes being protected. The [native SetAllHurtCapsules path](https://github.com/doldecomp/melee/blob/master/src/melee/ft/ftcoll.c) changes the capsules without assigning the two aggregate fields, so checking those fields alone can miss roll/move windows. Roll, spot-dodge and air-dodge coverage follows live protection rather than a whole-animation state whitelist. A lone protected limb does not label the whole character invincible. Global and local Ledgedash highlights use this same helper.
+
+**Trail tuning.** Current alpha is now `96 + round(damage^2 * 159 / 144)`, clamped by checking damage before squaring and saturating at 255 for 12+ damage. History starts at 48 for the low end and scales to 128 for the strongest samples. Examples:
+
+| Base damage | Current alpha | Starting history alpha |
+| ---: | ---: | ---: |
+| 0/1 | 96/97 | 48/49 |
+| 2 | **100** | **50** |
+| 3 | **106** | **53** |
+| 9 | **185** | **93** |
+| 12+ | **255** | **128** |
+
+This brightens low-damage moves and the overall curve while retaining stronger-hit contrast, player RGB, 40-byte samples, the 5,132-byte bank and preset fade endpoints. Very Very Fast stays removed.
+
+**Global title.** Native text alignment value 2 is right alignment (verified in the DOL text parser). The short title **Global Settings** now uses the same X anchor, 655, as the right column, at the existing title Y. The green position text keeps its left-side anchor, avoiding the previous long-title overlap. Lab's entry/title are shortened too.
+
+**Ledgedash completion.** The earlier Ledgedash requests remained planning work during steps 0-6. They are now implemented:
+
+- **Attack/Dash** uses the previous attack/grab classifier plus initial Dash, keeping its numeric color/timeline slot. Sustained Run is not automatically classified as Dash.
+- **Ledge** selects Left/Right; D-pad selection still works, and reset-side swaps update the menu value.
+- **Protection Highlight** brightens RGB 40% toward white and raises alpha to 230 while protected. It works independently of Color Overlays, preserves native color state through the common draw wrapper, and leaves the action-log legend palette unchanged.
+- **Success Criteria** selects GALINT (default), Waveland, Attack/Dash in GALINT, or Pop Egg in GALINT. A separate **Criterion** row in the success HUD identifies the selected rule; `*` means the landed attempt is awaiting a harder criterion. Changing criterion resets session statistics and cancels/repositions the current attempt.
+- **Egg Target** selects Off/Ground/Platform, with **Egg Distance** (5-80 stage units, default 20) and **Egg Pop Damage** (1-50, default 10). Pop Egg criteria visibly enables Ground targeting if it was Off.
+
+The explicit attempt model tracks Approach, On Ledge, Released, Landed/Await Criterion and Resolved. Waveland accepts confirmed ground contact after airdodge without requiring GALINT. Default GALINT waits for landing to become actionable and retains ordinary/NIL landing eligibility. Attack/Dash waits for a qualifying grounded action while ledge intangibility remains; egg mode waits for the target's threshold-crossing collision during grounded GALINT. A resolved result updates counts/audio once. The reset countdown starts afterward; Reset=None still records results/audio without repositioning. An unresolved committed attempt has a 180-unfrozen-update limit. During Approach, airdodge/recovery inputs do not trigger the old frame-9 failure. Setup deaths reset without adding failures. Manual reposition or a regrab cancels a pending attempt without adding a new result; already resolved statistics are retained. Regrabs also refresh target health/context. Reset delays continue to use the existing success/failure delay selections.
+
+Egg placement enumerates enabled floor segments and current world vertices, distinguishes solid ground from droppable platforms, clamps targets at least three units from segment endpoints and rejects unsafe/narrow candidates. A Platform request on Final Destination deliberately selects solid Ground fallback, shown in the HUD. Creation uses zero velocity and the verified native resting initializer `0x80288E6C`, with supporting line, collision positions and model updates initialized. It does not launch an egg and wait for it to fall. Moving support vertices update the egg position; disappeared support is reselected. Unavailable setup is reported and excluded from the player's rate.
+
+The target is neutral, unpickable and unnudgeable, one per attempt. Partial damage is not a pop. Pop eligibility is captured at the damage collision, including an immediate action after landing or the last GALINT frame; hitlag/retirement delay cannot retroactively change it. Threshold accumulation is floating point. Damage callbacks are restored before destruction, and a scene-cleanup GOBJ removes active/retiring targets before event code unloads. Target ownership is outside the copied 512-byte event block, and an appended restore serial in EventVars forces reconciliation/recreation after savestate loads instead of trusting a saved item pointer. Ledge searches also correct the right-edge next-line test. Native item/collision timing still requires Dolphin testing.
+
+Sixty compiled PowerPC tests pass: reused-GOBJ/death/respawn forwarding, all-Off unwrapping, local-layer restoration, L-cancel fallback/integer window, live protection/rolls/all-capsule detection, low-damage opacity, all four criteria and pending/timeout/freeze behavior, and safe ground/platform selection including Final Destination fallback. The compiled Ledgedash DAT has seventeen menu rows with all six new controls and the Attack/Dash legend. The release build and packaged assets are checked separately. Model/adapter tests are not a live gameplay reproduction; verify death/respawn in ordinary matches and Lab with globals Off, missed cancels with timing/protection toggles, actual roll/ledge/respawn windows, title placement, all criteria/side/reset modes, egg visibility/collision and native save/reload in Dolphin.

@@ -86,7 +86,7 @@ mex_build() {
 # make build directory if necessary
 mkdir -p build
 tyro_write_build_metadata
-settings_abi_stamp="$(cksum src/settings.h src/trails.h src/osd_style.h src/action_cues.h src/events.h MexTK/tmFunction.txt MexTK/include/memcard.h MexTK/include/fighter.h MexTK/melee.link ASM/Globals.s)"
+settings_abi_stamp="$(cksum src/settings.h src/trails.h src/osd_style.h src/action_cues.h src/ledgedash_logic.h src/events.h MexTK/tmFunction.txt MexTK/include/memcard.h MexTK/include/fighter.h MexTK/include/item.h MexTK/melee.link ASM/Globals.s)"
 
 # A partial build must not pair a new version/identity with old eventMenu or ASM code.
 if [[ -n "${mode}" ]] && { [[ "$(cat build/version-stamp 2>/dev/null || true)" != "${tyro_metadata_stamp}" ]] || \
@@ -106,7 +106,7 @@ queue_mex_build "tmFunction" "build/eventMenu.dat" "src/events.c src/menu.c src/
 queue_mex_build "cssFunction" "build/labCSS.dat" "src/lab_css.c" "dats/labCSS.dat"
 queue_mex_build "evFunction" "build/lab.dat" "src/lab.c" "dats/lab.dat"
 queue_mex_build "evFunction" "build/lcancel.dat" "src/lcancel.c"
-queue_mex_build "evFunction" "build/ledgedash.dat" "src/ledgedash.c"
+queue_mex_build "evFunction" "build/ledgedash.dat" "src/ledgedash.c src/ledgedash_logic.c"
 queue_mex_build "evFunction" "build/wavedash.dat" "src/wavedash.c" "dats/wavedash.dat"
 queue_mex_build "evFunction" "build/powershield.dat" "src/powershield.c"
 queue_mex_build "evFunction" "build/dthrowknee.dat" "src/dthrowknee.c"

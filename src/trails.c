@@ -47,7 +47,10 @@ unsigned TMTrail_Alpha(unsigned mode, uint32_t age) {
 uint32_t TMTrail_DamageColor(uint32_t player_color, int damage) {
     /* Base damage avoids stale-move/handicap changes to the visual cue. Strong
      * and weak phases/simultaneous hitboxes remain distinct in saved samples. */
-    unsigned alpha = damage <= 3 ? 64 : damage >= 12 ? 240 : (unsigned)damage * 20;
+    /* A steeper curve makes strong/late hit phases visibly different instead
+     * of raising both toward the same opacity ceiling. Clamp before squaring. */
+    unsigned alpha = damage <= 0 ? 96 : damage >= 12 ? 255 :
+        96 + ((unsigned)damage * (unsigned)damage * 159 + 72) / 144;
     return (player_color & 0xFFFFFF00u) | alpha;
 }
 unsigned TMTrail_SampleAlpha(unsigned mode, uint32_t age, uint32_t color) {
@@ -55,7 +58,9 @@ unsigned TMTrail_SampleAlpha(unsigned mode, uint32_t age, uint32_t color) {
     if (!fade) return 0;
     unsigned strength = color & 255;
     if (!age) return strength;
-    unsigned history = (strength * 96 + 120) / 240;
+    if (!strength) return 0;
+    unsigned history = strength < 96 ? (strength * 48 + 48) / 96 :
+        48 + ((strength - 96) * 80 + 79) / 159;
     unsigned alpha = (fade * history + TM_TRAIL_HISTORY_ALPHA / 2) / TM_TRAIL_HISTORY_ALPHA;
     return alpha ? alpha : (strength ? 1 : 0);
 }

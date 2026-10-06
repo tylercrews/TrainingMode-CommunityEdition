@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 enum { TM_CUE_NONE, TM_CUE_YELLOW, TM_CUE_GREEN, TM_CUE_RED };
+#define TM_CUE_PULSE_FRAMES 8
 /* Native command interpreter snapshot at Fighter + 0x3E4, including its stack. */
 typedef struct TMCueScript {
     float timer, frame;
