@@ -143,14 +143,27 @@ static void Cue_Draw(GOBJ *gobj, int pass) {
     unsigned red_enabled = (Settings_Get(TM_SETTING_FLAG, TM_FLAG_MISSED_LCANCEL) ? 1 : 0) |
         (Settings_Get(TM_SETTING_FLAG, TM_FLAG_RUN_TURNAROUND) ? 2 : 0);
     if (cue == TM_CUE_RED && !(red_enabled & entry->cue.red_source)) cue = TM_CUE_NONE;
-    if (!cue) { entry->draw(gobj, pass); return; }
+    /* Use current effective whole-body hurt status, not the action name or a
+     * remaining-frame timer: script dodges and engine ledge/respawn protection
+     * meet here. Read at draw time so pause, toggles and restores are immediate. */
+    int protected = live && !data->flags.dead &&
+        Settings_Get(TM_SETTING_FLAG, TM_FLAG_INVINCIBILITY) &&
+        (Fighter_GetIntangibleFrames(gobj) > 0 ||
+         (data->kind == FTKIND_YOSHI && data->dmg.armor > 0));
+    if (!cue && !protected) { entry->draw(gobj, pass); return; }
     /* Render-time composition: native/event colanim state survives byte-for-byte.
      * Timing explicitly replaces missed-cancel red, including Lab's own overlay. */
     ColorOverlay saved[3];
     memcpy(saved, data->color, sizeof(saved));
     data->color[0].color_enable = 0; data->color[2].color_enable = 0;
     static const GXColor colors[] = {{0,0,0,0}, {255,240,0,220}, {80,255,90,220}, {255,40,40,180}};
-    data->color[1].hex = colors[cue];
+    GXColor color = colors[cue];
+    if (protected && cue != TM_CUE_YELLOW && cue != TM_CUE_GREEN) {
+        Playerblock *player = Fighter_GetPlayerblock((u8)data->ply);
+        uint32_t rgba = TMTrail_PlayerColor(player ? player->color_accent : 4, !player || player->p_kind == 1);
+        color = (GXColor){rgba >> 24, rgba >> 16, rgba >> 8, 112};
+    }
+    data->color[1].hex = color;
     data->color[1].color_enable = 1;
     entry->draw(gobj, pass);
     memcpy(data->color, saved, sizeof(saved));

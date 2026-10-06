@@ -333,6 +333,7 @@ void Lab_ChangeOSDsOff(GOBJ *menu_gobj, int value) {
 }
 static const unsigned global_cue_flags[] = {
     TM_FLAG_MISSED_LCANCEL, TM_FLAG_LAST_BLOCKED_FRAME, TM_FLAG_RUN_TURNAROUND, TM_FLAG_INFINITE_SHIELDS,
+    TM_FLAG_INVINCIBILITY,
 };
 static void Lab_RefreshShieldOverride(void) {
     char *status = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_INFINITE_SHIELDS) ?

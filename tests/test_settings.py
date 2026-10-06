@@ -162,16 +162,16 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(m.read(14, osd), slot % 8)
             self.assertEqual(m.read(15, osd), int(slot % 8 != 0))
         self.assertEqual(m.read(15, 31), 1)
-        for flag in range(7):
+        for flag in range(8):
             m.write(11, flag, 1)
-        self.assertEqual(m.record()[10], 0xBF)
+        self.assertEqual(m.record()[10], 0xFF)
         self.assertEqual(m.record()[40] & 1, 1)
         m.write(4, 0, 4)
         m.write(5, 0, 5)
         self.assertEqual(m.record()[7], 0x54)
         m.write(15, IDS[2], 1)
         self.assertEqual(m.read(14, IDS[2]), 2)  # Boolean writer preserves an enabled Red choice.
-        for field, index, value in [(4, 0, 5), (5, 0, 6), (11, 7, 1), (12, 18, 1), (14, 64, 1), (15, 32, 1)]:
+        for field, index, value in [(4, 0, 5), (5, 0, 6), (11, 8, 1), (12, 18, 1), (14, 64, 1), (15, 32, 1)]:
             before = m.record()
             self.assertEqual(m.write(field, index, value), 0)
             self.assertEqual(m.record(), before)
@@ -191,7 +191,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(m.read(12, 16), 10)
         self.assertEqual(m.read(13, 16), 9)
         self.assertEqual(m.read(13, 4), 8)
-        self.assertEqual(m.record()[10], 0x80)
+        self.assertEqual(m.record()[10], 0xC0)
         self.assertEqual(m.record()[4:10], legacy[4:10])
         self.assertEqual(m.read(14, IDS[4]), 1)
         first = m.record()
@@ -218,7 +218,7 @@ class SettingsTests(unittest.TestCase):
         m = self.m
         m.init()
         future = bytearray(m.record())
-        future[10] = 0xFF
+        future[10] = 0x3F
         future[12:38] = bytes(range(26))
         m.put(future)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 3)
@@ -507,7 +507,7 @@ class OSDEditorTests(unittest.TestCase):
         m = self.m
         m.call("TestEditorInit")
         before = m.record()
-        for row in [18, 27, 28, 29, 65535]:
+        for row in [18, 28, 29, 65535]:
             self.assertEqual(m.call("TestEditorInput", 0x200, row), 1)
             self.assertEqual(m.call("TestEditorInput", 0x10, row), 1)
         for button in [1, 2, 4, 8, 0x100, 0x400, 0x800, 0x1000]:
@@ -517,7 +517,7 @@ class OSDEditorTests(unittest.TestCase):
     def test_native_editor_future_format_uses_private_defaults(self):
         m = self.m
         future = bytearray(m.record())
-        future[10] = 0xC0
+        future[10] = 0
         m.put(future)
         m.call("TestEditorInit")
         m.call("TestEditorInput", 0x200, 23)
@@ -688,20 +688,20 @@ class ActionCueTests(unittest.TestCase):
         m.call("TestCueTick", 2)
         self.assertEqual(struct.unpack(">f", m.cpu.mem_read(ptr + 0x1998, 4))[0], 8)
 
-    def test_version_one_migration_initializes_new_bit_and_preserves_31_reserved_bits(self):
+    def test_version_one_migration_initializes_new_bit_and_preserves_30_reserved_bits(self):
         m = self.m
         old = bytearray(m.record())
         old[10] = 0x7F
         old[40:44] = b"\xFFABC"
         m.put(old)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 1)
-        self.assertEqual(m.record()[10], 0xBF)
-        self.assertEqual(m.record()[40:44], b"\xFEABC")
+        self.assertEqual(m.record()[10], 0xFF)
+        self.assertEqual(m.record()[40:44], b"\xFCABC")
         self.assertEqual(m.read(11, 6), 0)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
         m.write(16, 17, 1)
-        self.assertEqual(m.record()[40:44], b"\xFFABC")
-        self.assertEqual(m.record()[10], 0xBF)  # Version bits do not change.
+        self.assertEqual(m.record()[40:44], b"\xFDABC")
+        self.assertEqual(m.record()[10], 0xFF)  # Version bits do not change.
         for row, flag in [(7, 3), (11, 4), (17, 6), (23, 5)]:
             self.assertEqual(m.read(16, row), m.read(11, flag))
 
@@ -760,6 +760,88 @@ class ActionCueTests(unittest.TestCase):
         for cursor, flag in [(7, 3), (10, 4), (20, 6), (26, 5)]:
             self.assertEqual(fresh.call("Settings_Get", 11, flag), 1)
         self.assertEqual(fresh.read(14, 20), 6)
+
+    def test_protection_overlay_uses_trail_palette_for_all_sources_and_cpu(self):
+        m = self.m
+        m.call("Settings_Set", 11, 7, 1)
+        palette = [0xFF464670, 0x4691FF70, 0xFFE14170, 0x4BE16470, 0xB4B4B470]
+        for source in [(0, 1), (0, 2), (1, 0), (2, 0)]:
+            for accent, color in enumerate(palette):
+                m.call("TestCuePlayer", 5, accent, accent == 4)
+                m.call("TestCueState", 11, 181, 0, 40, 100)
+                m.call("TestCueTick", 1)
+                ptr = m.call("TestCueData", 11) + 0x408
+                before = bytes(m.cpu.mem_read(ptr, 0x180))
+                m.call("TestCueProtection", 11, *source, 0)
+                m.call("TestCueDraw", 11)
+                self.assertEqual(m.call("TestCueDrawColor", 11), color)
+                self.assertEqual(bytes(m.cpu.mem_read(ptr, 0x180)), before)
+                m.call("TestCueProtection", 11, 0, 0, 0)
+                m.call("TestCueDraw", 11)
+                self.assertEqual(m.call("TestCueDrawColor", 11), 0)
+        m.call("TestCuePlayer", 5, 0, 1)  # CPU is Gray even with a Red accent.
+        m.call("TestCueProtection", 11, 0, 1, 0)
+        m.call("TestCueDraw", 11)
+        self.assertEqual(m.call("TestCueDrawColor", 11), palette[4])
+
+    def test_protection_is_live_while_paused_and_timing_has_priority(self):
+        m = self.m
+        m.call("Settings_Set", 11, 7, 1)
+        m.call("Settings_Set", 11, 0, 1)  # Text master does not disable protection.
+        m.call("TestCuePlayer", 0, 1, 0)
+        m.call("TestCueProtection", 0, 0, 2, 0)
+        self.assertEqual(self.show(1, 42, 3, 5), self.YELLOW)
+        self.assertEqual(self.show(2, 42, 4, 5), self.YELLOW)
+        self.assertEqual(self.show(3, 14, 0), self.GREEN)
+        self.assertEqual(self.show(4, 14, 1), self.GREEN)
+        self.assertEqual(self.show(5, 14, 2), 0x4691FF70)
+        m.call("Settings_Set", 11, 7, 0)
+        m.call("TestCueDraw", 0)
+        self.assertEqual(m.call("TestCueDrawColor", 0), 0)
+        m.call("Settings_Set", 11, 7, 1)
+        m.call("ActionCues_Clear")
+        m.call("TestCueDraw", 0)
+        self.assertEqual(m.call("TestCueDrawColor", 0), 0x4691FF70)
+        m.call("TestCueProtection", 0, 0, 0, 0)
+        m.call("TestCueDraw", 0)
+        self.assertEqual(m.call("TestCueDrawColor", 0), 0)
+
+    def test_yoshi_double_jump_armor_and_move_protection(self):
+        m = self.m
+        m.call("Settings_Set", 11, 7, 1)
+        m.call("TestCuePlayer", 0, 3, 0)
+        m.call("TestCueKind", 0, 14)  # Yoshi.
+        m.call("TestCueProtection", 0, 0, 0, 12000)
+        self.assertEqual(self.show(1, 27, 0), 0x4BE16470)
+        m.call("TestCueProtection", 0, 0, 0, 0)
+        m.call("TestCueDraw", 0)
+        self.assertEqual(m.call("TestCueDrawColor", 0), 0)
+        m.call("TestCueKind", 0, 1)
+        m.call("TestCueProtection", 0, 0, 0, 12000)  # Other armor alone is not this explicit exception.
+        self.assertEqual(self.show(2, 27, 1), 0)
+        m.call("TestCueProtection", 0, 2, 0, 0)
+        self.assertEqual(self.show(3, 341, 4), 0x4BE16470)  # Move-granted protection has no state whitelist.
+
+    def test_version_two_migration_preserves_turnrun_and_30_reserved_bits(self):
+        m = self.m
+        old = bytearray(m.record())
+        old[10] = 0xBF
+        old[40:44] = b"\xFFABC"
+        m.put(old)
+        self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 1)
+        self.assertEqual(m.record()[10], 0xFF)
+        self.assertEqual(m.record()[40:44], b"\xFDABC")
+        self.assertEqual(m.read(11, 6), 1)
+        self.assertEqual(m.read(11, 7), 0)
+        self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
+        m.call("TestEditorInit")
+        m.call("TestEditorInput", 0x200, 27)  # Native row ID 25.
+        m.call("TestEditorAnimate", 27)
+        m.write(16, 25, m.call("TestEditorCache", 27))
+        self.assertEqual(m.record()[40:44], b"\xFFABC")
+        fresh = Machine()
+        fresh.put(m.record())
+        self.assertEqual(fresh.call("Settings_Get", 11, 7), 1)
 
 
 if __name__ == "__main__":

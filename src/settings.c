@@ -14,6 +14,7 @@ int TMSettings_NativeFlag(unsigned row) {
     case TM_GLOBAL_ACTION_CUES_ROW: return TM_FLAG_LAST_BLOCKED_FRAME;
     case TM_GLOBAL_RUN_TURN_ROW: return TM_FLAG_RUN_TURNAROUND;
     case TM_GLOBAL_INFINITE_SHIELDS_ROW: return TM_FLAG_INFINITE_SHIELDS;
+    case TM_GLOBAL_INVINCIBILITY_ROW: return TM_FLAG_INVINCIBILITY;
     default: return -1;
     }
 }
@@ -75,14 +76,15 @@ int TMSettings_Prepare(uint8_t r[TM_SETTINGS_SIZE], int owns_save) {
     if (!owns_save) return TM_SETTINGS_FOREIGN;
     int signed_format = r[38] == 'T' && r[39] == 'Y';
     unsigned old_version = r[10] >> 6;
-    if (signed_format && old_version != 1 && old_version != TM_SETTINGS_VERSION)
+    if (signed_format && old_version != 1 && old_version != 2 && old_version != TM_SETTINGS_VERSION)
         return TM_SETTINGS_UNSUPPORTED; /* Never reinterpret or overwrite a future format. */
 
     uint8_t before[TM_SETTINGS_SIZE];
     memcpy(before, r, sizeof(before));
-    if (signed_format && old_version == 1) {
+    if (signed_format && old_version < TM_SETTINGS_VERSION) {
         r[10] = (r[10] & 0x3F) | (TM_SETTINGS_VERSION << 6);
-        r[TM_SETTINGS_EXTRA_FLAGS_OFFSET] &= ~1u; /* New flag defaults Off, other reserve bits survive. */
+        /* Version 1 owns neither extension flag; version 2 already owns TurnRun. */
+        r[TM_SETTINGS_EXTRA_FLAGS_OFFSET] &= ~(old_version == 1 ? 3u : 2u);
     }
     if (!signed_format) {
         /* Read both old lists before overwriting any of their overlapping bytes. */
@@ -116,7 +118,7 @@ int TMSettings_Prepare(uint8_t r[TM_SETTINGS_SIZE], int owns_save) {
     }
     /* Write the signature last; native card serialization/checksums remain unchanged. */
     r[38] = 'T'; r[39] = 'Y';
-    if (!signed_format || old_version == 1) return TM_SETTINGS_MIGRATED;
+    if (!signed_format || old_version < TM_SETTINGS_VERSION) return TM_SETTINGS_MIGRATED;
     return bytes_differ(before, r) ? TM_SETTINGS_REPAIRED : TM_SETTINGS_READY;
 }
 
@@ -134,7 +136,8 @@ uint32_t TMSettings_Read(const uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsi
     case TM_SETTING_DPAD_RIGHT: return r[9] >> 4;
     case TM_SETTING_INPUT_DISPLAY: return r[11];
     case TM_SETTING_FLAG:
-        if (index == TM_FLAG_RUN_TURNAROUND) return r[TM_SETTINGS_EXTRA_FLAGS_OFFSET] & 1;
+        if (index >= TM_FLAG_RUN_TURNAROUND && index < TM_FLAG_COUNT)
+            return (r[TM_SETTINGS_EXTRA_FLAGS_OFFSET] >> (index - TM_FLAG_RUN_TURNAROUND)) & 1;
         return index < TM_FLAG_RUN_TURNAROUND ? (r[10] >> index) & 1 : 0;
     case TM_SETTING_OVERLAY_HMN: return index < TM_SETTINGS_OVERLAYS ? r[12 + index] & 15 : 0;
     case TM_SETTING_OVERLAY_CPU: return index < TM_SETTINGS_OVERLAYS ? r[12 + index] >> 4 : 0;
@@ -187,8 +190,8 @@ int TMSettings_Write(uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsigned index
     case TM_SETTING_INPUT_DISPLAY: byte = 11; count = 4; break;
     case TM_SETTING_FLAG:
         if (index >= TM_FLAG_COUNT) return 0;
-        byte = index == TM_FLAG_RUN_TURNAROUND ? TM_SETTINGS_EXTRA_FLAGS_OFFSET : 10;
-        width = 1; shift = index == TM_FLAG_RUN_TURNAROUND ? 0 : index; count = 2; break;
+        byte = index >= TM_FLAG_RUN_TURNAROUND ? TM_SETTINGS_EXTRA_FLAGS_OFFSET : 10;
+        width = 1; shift = index >= TM_FLAG_RUN_TURNAROUND ? index - TM_FLAG_RUN_TURNAROUND : index; count = 2; break;
     case TM_SETTING_OVERLAY_HMN:
     case TM_SETTING_OVERLAY_CPU:
         if (index >= TM_SETTINGS_OVERLAYS) return 0;

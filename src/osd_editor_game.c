@@ -11,7 +11,7 @@ static const char *row_names[] = {
     "Fighter-specific Tech", "Powershield Frame", TM_GLOBAL_ACTION_CUES_NAME, "SDI Inputs", "Grab Breakout",
     "Ledgedash Info", "Act OoHitstun", "Lockout Timers", "Item Throw Interrupts",
     "Boost Grab", 0, "Act OoLag", TM_GLOBAL_RUN_TURN_NAME, "Act OoAirborne", "Jump Cancel Timing",
-    "Fastfall Timing", "Frame Advantage", "Combo Counter", TM_GLOBAL_INFINITE_SHIELDS_NAME, 0, 0,
+    "Fastfall Timing", "Frame Advantage", "Combo Counter", TM_GLOBAL_INFINITE_SHIELDS_NAME, TM_GLOBAL_INVINCIBILITY_NAME, 0,
 };
 static const char *color_names[] = { TM_OSD_COLOR_NAMES };
 

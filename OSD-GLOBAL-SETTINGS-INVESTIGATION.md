@@ -1,8 +1,8 @@
 # Global OSDs, hitbox trails, and Ledgedash: investigation and implementation plan
 
-Investigated October 4, 2026, initially against checkout `b3d6700`, with the additional filename, success-criteria, reset, and OSD investigations against `08640e8`. Steps 0-6 now have implementations: centralized V1.4.1T2 metadata, versioned outputs, the separate `TYRE01` identity, packed/migrated settings, global trails, both OSD editors, master suppression, shared flashes/shields, and the staged recovery cue. Sections 24-30 record implementation and validation. Step 6 still requires live Dolphin frame-step validation; the separately planned Ledgedash, hitlag-prefix and recovery-label work remains outstanding. The README contains the running Tyro-specific changelog.
+Investigated October 4, 2026, initially against checkout `b3d6700`, with the additional filename, success-criteria, reset, and OSD investigations against `08640e8`. Steps 0-6 now have implementations: centralized V1.4.1T2 metadata, versioned outputs, the separate `TYRE01` identity, packed/migrated settings, global trails, both OSD editors, master suppression, shared flashes/shields, and the staged recovery cue. Sections 24-31 record implementation and validation. Step 6 still requires live Dolphin frame-step validation; the separately planned Ledgedash, hitlag-prefix and recovery-label work remains outstanding. The README contains the running Tyro-specific changelog.
 
-The requested phase-1 changes are feasible. A compact save format can accommodate the new global toggles, including Infinite Shields, OSD title colors, and a reserved phase-2 overlay inside the existing 44-byte settings area, with **31 bits still reserved for future use** after step 6 allocates one bit to Run Turnaround. No current training feature needs to be removed for that design. If persistent event high scores are deliberately retired, their **204-byte region** can become a settings extension after its score access/reset paths are changed; section 17 explains the budget and work involved. Before changing the serialized format, give Tyro Edition its own stable game/save identity so switching to upstream cannot reinterpret Tyro settings. The yellow last-non-actionable-frame overlay is feasible for specific, understood action states; an accurate implementation covering every character and action needs separate research.
+The requested phase-1 changes are feasible. A compact save format can accommodate the new global toggles, including Infinite Shields, OSD title colors, and a reserved phase-2 overlay inside the existing 44-byte settings area, with **30 bits still reserved for future use** after Run Turnaround and the global protection overlay each allocate one bit. No current training feature needs to be removed for that design. If persistent event high scores are deliberately retired, their **204-byte region** can become a settings extension after its score access/reset paths are changed; section 17 explains the budget and work involved. Before changing the serialized format, give Tyro Edition its own stable game/save identity so switching to upstream cannot reinterpret Tyro settings. The yellow last-non-actionable-frame overlay is feasible for specific, understood action states; an accurate implementation covering every character and action needs separate research.
 
 **1. What “permanent memory” means in this project**
 
@@ -77,7 +77,7 @@ Use a small OSD choice enum: `Off, White, Red, Green, Blue, Yellow, Cyan, Magent
 
 Retain the existing four-byte enable mask for assembly compatibility. Menu setters synchronize it with the compact choices. This modest duplication avoids changing every existing enable check at once.
 
-| Current allocation (format 2) | Bytes |
+| Current allocation (format 3) | Bytes |
 | --- | ---: |
 | Existing enable mask | 4 |
 | Existing position, page, legacy behavior, advance/decrement, D-pad U/D, D-pad L/R, input display | 7 |
@@ -85,11 +85,11 @@ Retain the existing four-byte enable mask for assembly compatibility. Menu sette
 | Packed overlays, including phase-2 slot | 18 |
 | Packed OSD choices | 8 |
 | Format signature | 2 |
-| Extra flags byte (Run Turnaround bit 0; seven bits reserved) | 1 |
+| Extra flags byte (Run Turnaround bit 0, protection bit 1; six bits reserved) | 1 |
 | Fully unallocated reserve | 3 |
 | **Total** | **44** |
 
-Current byte placement (format 2):
+Current byte placement (format 3):
 
 | Offsets | Current purpose |
 | --- | --- |
@@ -98,10 +98,10 @@ Current byte placement (format 2):
 | `0x1F30–0x1F41` | Eighteen packed overlay bytes. |
 | `0x1F42–0x1F49` | Eight packed OSD-choice bytes. |
 | `0x1F4A–0x1F4B` | Format signature. |
-| `0x1F4C` | Run Turnaround flash in bit 0; bits 1-7 reserved. |
+| `0x1F4C` | Run Turnaround flash in bit 0, protection overlay in bit 1; bits 2-7 reserved. |
 | `0x1F4D-0x1F4F` | Three fully reserved bytes. |
 
-Six flag bits cover TURN OSDS OFF, Very Fast trails, Instant trails, missed-L-cancel flash, two-frame yellow/green recovery cue, and Infinite Shields. Infinite Shields consumes the previously spare flag bit, so no flag bits remain free in this byte; step 6 adds Run Turnaround at byte `0x1F4C`, bit 0. **Seven bits in that byte plus three full bytes remain: 31 reserved bits total.** A future independent global Very Very Fast toggle would need one of those bits, although the event-local decay preset still needs no save bytes. The flags plus version occupy one byte as a group. Use explicit masks/byte packing; an ordinary C enum can occupy four bytes, and C bitfield layout should not define a serialized format.
+Six flag bits cover TURN OSDS OFF, Very Fast trails, Instant trails, missed-L-cancel flash, two-frame yellow/green recovery cue, and Infinite Shields. Infinite Shields consumes the previously spare flag bit, so no flag bits remain free in this byte; step 6 adds Run Turnaround at byte `0x1F4C`, bit 0. **Six bits in that byte plus three full bytes remain: 30 reserved bits total.** A future independent global Very Very Fast toggle would need one of those bits, although the event-local decay preset still needs no save bytes. The flags plus version occupy one byte as a group. Use explicit masks/byte packing; an ordinary C enum can occupy four bytes, and C bitfield layout should not define a serialized format.
 
 A more direct palette indexed by all 32 bitfield IDs costs 12 bytes instead of eight. That alternative required the original four-byte reserve; after allocating Run Turnaround, it would overlap the extra flag and require a revised layout or extension. A three-bit palette allows eight values total; expanding beyond that would require a format change or additional storage.
 
@@ -668,7 +668,9 @@ The master toggle uses the previously reserved `TM_FLAG_OSDS_OFF` bit 0. Native 
 Twenty-six compiled PowerPC tests pass. Editor coverage exercises forward/backward wrapping, native snapshot saving, reserved-row/navigation isolation, independent master/trail toggles, existing-message suppression and restoration, event-owned visibility, future-format fallback, and a serialized round trip into a fresh service instance. The optimized C/assembly release build passes without compiler warnings and produces the updated ISO/ZIP. These checks do not substitute for Dolphin verification of menu layout/clicks, checkbox animation, pause visibility or actual card I/O. Test a color choice, both global trail flags and master suppression across exit/re-entry, match/event changes, pause, save/reload and an upstream/Tyro switch.
 
 
-**30. Step 6: recovery cues, global flashes/shields, and reserve ledger**
+**30. Step 6: recovery cues, global flashes/shields, and original reserve ledger**
+
+This section records format 2 at step 6. Section 31 is the current format-3 reserve ledger.
 
 Implemented October 5, 2026, retaining release name **V1.4.1T2** and stable identity **TYRE01**. The packed settings format is now **version 2**. The yellow window is the final **two** simulated recovery frames, followed by a **two-frame** green completion pulse. Green still confirms completion when the player immediately starts the next ordinary action; it is not a claim that the new action's startup is interruptible. New yellow recovery takes priority. Pause does not consume frames; hitlag/freezes suppress the timing color and do not advance its countdown. Restores, Ledgedash repositioning, scene/match changes, death and backwards state/frame clocks clear transient tracking.
 
@@ -709,3 +711,30 @@ The settings record remains **44 bytes**. Version-1 signed records migrate to ve
 The PowerPC build reports **624 bytes** for twelve fighter tracking/draw records, plus **16 bytes** of manager/clock/live state (640 static bytes), one GOBJ/two process records and ordinary stack/code overhead. The render wrapper temporarily copies 384 bytes of native color structures on the stack; script lookahead copies 36 bytes. These are runtime costs, not card space.
 
 Forty compiled PowerPC tests pass, including state/rate boundaries, all five cancelled/uncancelled aerial landing categories, IASA before animation end, two-yellow/two-green sequences, immediate next actions, freeze/pause/restore, subfighters, four-frame flashes, source-specific flash suppression, actual draw-callback composition/restoration, full shields in all twelve slots, native editor rows, and reserve-preserving version migration. Native DOL disassembly and the [landing implementation](https://github.com/doldecomp/melee/blob/master/src/melee/ft/kinds/ftCommon/ftCo_Landing.c), [aerial landing/rate scaling](https://github.com/doldecomp/melee/blob/master/src/melee/ft/kinds/ftCommon/ftCo_LandingAir.c), [attack callbacks](https://github.com/doldecomp/melee/blob/master/src/melee/ft/kinds/ftCommon/ftCo_AttackAir.c), [command dispatcher](https://github.com/doldecomp/melee/blob/master/src/melee/ft/ftaction.c) and [animation completion](https://github.com/doldecomp/melee/blob/master/src/sysdolphin/baselib/aobj.c) support the staged boundaries. **Live Dolphin frame-step/input verification remains required**; synthetic adapter tests are not evidence that every fighter/animation/camera combination has been observed in-game. Validate all requested cases on Fox/Falco and another character, L-cancel red priority in Lab, G&W/Kirby exceptions, Nana, slow motion/frame advance, pause, recordings/restores, save/reload and upstream switching before calling runtime validation complete.
+
+
+**31. Global invincibility/protection overlay and current reserve ledger**
+
+Implemented October 5, 2026, retaining **V1.4.1T2** / **TYRE01**. Both OSD editors now expose **Invincibility Overlay**. Native row ID **25** is a Boolean flag row, independent of OSD enable-mask bit 25. It starts Off and applies globally to humans, CPUs and active subfighters.
+
+The drawing service checks native effective whole-body protection at each draw, through the existing `Fighter_GetIntangibleFrames` SDK symbol (`0x8007B868`). Despite that SDK name, the native function returns a **hurt status**, not a remaining-frame count: normal, invincible or intangible. Its implementation combines script and engine protection, which covers ledge/respawn protection, dodge windows and move-granted protection without guessing from an action name. The [native collision/protection code](https://github.com/doldecomp/melee/blob/master/src/melee/ft/ftcoll.c) confirms those status fields and the engine's ledge/respawn setters. Partial limb-only protection is not presented as whole-character invincibility.
+
+Yoshi's double jump is **armor**, not invincibility. The user's requested exception is included whenever Yoshi's native active jump-armor value (`FighterData.dmg.armor`, `0x18B4`) is positive; it is not keyed to the entire animation or inferred from an arbitrary frame table. The [native double-jump entry](https://github.com/doldecomp/melee/blob/master/src/melee/ft/kinds/ftCommon/ftCo_JumpAerial.c) installs that armor. This overlay is a protection cue; it does not alter damage, knockback, armor strength or invincibility.
+
+Colors use exactly the shared trail RGB mapping: bright Red/Blue/Yellow/Green from the player's accent (including teams), with CPU/unmatched accents Gray. Alpha is **112/255** for a translucent body tint. Recovery Yellow/Green remains highest priority; protection then takes priority over the short red diagnostic flashes and local body colors. The original native/event color structures are restored after each fighter GX call. Vulnerability removes the tint immediately; pause, master-text suppression and history clearing do not prevent the draw-time protection check. Dead fighters remain untinted, and deliberate native/event invisibility remains respected.
+
+**Current format-3 extension ledger:**
+
+| Logical record / RAM location | Assignment | Remaining reserve |
+| --- | --- | ---: |
+| Byte 10 / `0x1F2E`, bits 0-5 | Existing six global flags | 0 bits |
+| Byte 10, bits 6-7 | Packed format version **3** | 0 bits |
+| Byte 40 / `0x1F4C`, bit 0 (`0x01`) | Run Turnaround, logical flag 6 | Allocated |
+| Byte 40 / `0x1F4C`, bit 1 (`0x02`) | Invincibility Overlay, logical flag **7**, native row **25** | Newly allocated: **1 bit** |
+| Byte 40, bits 2-7 (`0xFC`) | Preserved, unassigned | **6 bits** |
+| Bytes 41-43 / `0x1F4D-0x1F4F` | Preserved, unassigned | **24 bits / 3 bytes** |
+| **Total available from the original reserve** | No score reclamation or record growth | **30 bits (3 bytes + 6 bits)** |
+
+The record remains **44 bytes**. Version-2 records retain Run Turnaround and every other existing preference; only the new protection bit is initialized Off, alongside the version-tag change. Version-1 records initialize both newly assigned extension bits Off. The other **30 reserved bits** survive both migrations. Unversioned records still use the existing migration. Older version-aware builds reject format 3 and use private defaults without rewriting it; settings reappear when returning to this build. Signed version 0 remains unsupported; any later format must deliberately define its migration/tag instead of blindly incrementing the two-bit field.
+
+Forty-four compiled PowerPC tests pass, adding palette/CPU/subfighter coverage across engine and script statuses, live pause/toggle/protection-end behavior, timing priority, unchanged native color data, move protection, Yoshi's active armor, native row save/reload and version-2 migration preserving Run Turnaround and the 30 reserve bits. The optimized release build is checked separately. Actual Dolphin validation still needs ledge/respawn/air-dodge/spot-dodge and move windows, Yoshi armor, teams/Nana, paused toggles, restore and native card save/reload; tests model these inputs rather than executing every native move.

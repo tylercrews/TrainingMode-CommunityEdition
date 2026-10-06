@@ -3406,7 +3406,7 @@ void Fighter_AddStaleIncCombo(GOBJ *thrower, GOBJ *victim, float dmg); // 800789
 void Fighter_SetAllHurtboxState(GOBJ *f, int state);                   // 8007b0c0
 void Fighter_SetHurtboxState(GOBJ *f, int bone_index, int state);      // 8007b128
 void Fighter_SetScriptHurtStatus(GOBJ *f, int state);                  // 8007b62c
-int Fighter_GetIntangibleFrames(GOBJ *f);                              // 8007b868
+int Fighter_GetIntangibleFrames(GOBJ *f); // 8007b868: effective hurt STATUS (0 normal/1 invincible/2 intangible), not frames.
 void Fighter_IncPercent(GOBJ *f, float *dmg);                          // 80076640
 float Fighter_KnockbackCalculate(float match_dmg_ratio, float ft_attk_ratio, float ft_def_ratio, float unk, FighterData *fp, ftHit *hit, int dmg);
 float Fighter_GetAttackRatio(int ply);                                            // 800338f4

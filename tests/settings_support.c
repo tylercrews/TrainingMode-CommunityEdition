@@ -89,6 +89,7 @@ uint32_t TestEditorColor(unsigned row) { return editor_colors[row]; }
 static GOBJ cue_manager, cue_objects[12];
 static FighterData cue_data[12];
 static ftCommonData cue_common;
+static Playerblock cue_players[6];
 static int cue_active[12];
 static float cue_lengths[12];
 static void (*cue_early)(GOBJ *), (*cue_late)(GOBJ *);
@@ -104,6 +105,14 @@ GOBJ *Fighter_GetSubcharGObj(int ply, int sub) {
     unsigned slot = ply * 2 + sub;
     return slot < 12 && cue_active[slot] ? &cue_objects[slot] : 0;
 }
+Playerblock *Fighter_GetPlayerblock(int ply) { return ply >= 0 && ply < 6 ? &cue_players[ply] : 0; }
+int Fighter_GetIntangibleFrames(GOBJ *gobj) {
+    FighterData *data = gobj->userdata;
+    int status = (*(u8 *)((u8 *)data + 0x221D) & 2) ? 1 : 0;
+    if (data->hurt.kind_script > status) status = data->hurt.kind_script;
+    if (data->hurt.kind_game > status) status = data->hurt.kind_game;
+    return status;
+}
 float Fighter_GetCurrentAnimLength(GOBJ *gobj) { return cue_lengths[gobj - cue_objects]; }
 static void TestCueNativeDraw(GOBJ *gobj, int pass) {
     unsigned slot = gobj - cue_objects;
@@ -117,6 +126,7 @@ void TestCueInit(void) {
     memset(cue_data, 0, sizeof(cue_data));
     memset(cue_objects, 0, sizeof(cue_objects));
     memset(cue_active, 0, sizeof(cue_active));
+    memset(cue_players, 0, sizeof(cue_players));
     *stc_ftcommon = &cue_common;
     cue_common.xe4 = 7; cue_common.x260 = 60;
     for (unsigned slot = 0; slot < 12; ++slot) {
@@ -146,6 +156,13 @@ void TestCueLanding(unsigned slot, int lag, int allow_interrupt) {
 void TestCueFrozen(unsigned slot, int frozen) { cue_data[slot].flags.hitlag = frozen; }
 void TestCueIASA(unsigned slot, int ready) { cue_data[slot].flags.past_iasa = ready; }
 void TestCueKind(unsigned slot, int kind) { cue_data[slot].kind = kind; }
+void TestCueProtection(unsigned slot, int script, int game, int armor100) {
+    cue_data[slot].hurt.kind_script = script; cue_data[slot].hurt.kind_game = game;
+    cue_data[slot].dmg.armor = armor100 / 100.0f;
+}
+void TestCuePlayer(unsigned ply, int accent, int cpu) {
+    cue_players[ply].color_accent = accent; cue_players[ply].p_kind = cpu;
+}
 void TestCueMissed(unsigned slot, int timer) {
     cue_data[slot].input.timer_trigger_any_ignore_hitlag = timer;
     ActionCues_LCancel(&cue_objects[slot]);

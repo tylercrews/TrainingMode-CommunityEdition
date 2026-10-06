@@ -1876,6 +1876,12 @@ static EventOption LabOptions_OSDs[] = {
         .desc = {"Keep all players' and CPUs' shields at full health.", "Overrides event-local shield health while On."},
         .OnChange = Lab_ChangeGlobalCue,
     },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_INVINCIBILITY_NAME,
+        .desc = {"Show protected fighters in their translucent trail color.", "Includes moves, dodges, respawn, ledge and Yoshi jump armor.", "Recovery Yellow/Green takes priority while active."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
 };
 
 static EventMenu LabMenu_OSDs = {
