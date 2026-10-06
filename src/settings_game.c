@@ -13,7 +13,10 @@ static int seen;
 static int last_owns;
 static int status;
 
-static int same_bytes(const u8 *a, const u8 *b, unsigned count) {
+/* Keep pointers as runtime arguments. Inlining this against low-memory identity
+ * can make GCC emit a symbol-minus-0x80000000 relocation; the MEX loader does
+ * not preserve that addend and the resulting indexed read wraps into low RAM. */
+__attribute__((noinline)) static int same_bytes(const u8 *a, const u8 *b, unsigned count) {
     for (unsigned i = 0; i < count; ++i)
         if (a[i] != b[i]) return 0;
     return 1;

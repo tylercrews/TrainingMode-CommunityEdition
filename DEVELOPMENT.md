@@ -76,7 +76,9 @@ python -m pip install --target build/test-deps unicorn==2.1.4
 bash tests/run_settings_tests.sh
 ```
 
-The tests compile a freestanding big-endian PowerPC image with devkitPro, then emulate it. They cover legacy/duplicate/invalid migration, all overlay slots, cross-byte palettes, flags/control nibbles, surrounding canaries, reserved bytes, future/foreign ownership, save-dirty behavior, and hook GPR/FPR/CR/CTR/XER preservation. This is independent of the native card's on-disk checksums; save/reload and downgrade behavior should also be checked in Dolphin on a test card before distributing the format change.
+The runner compiles both a freestanding big-endian PowerPC ELF and a fresh optimized production DAT. Tests apply native MEX relocation rules to that DAT and emulate the actual exported settings accessors, as well as the ELF fixtures. They cover legacy/duplicate/invalid migration, all overlay slots, cross-byte palettes, flags/control nibbles, surrounding canaries, reserved bytes, future/foreign ownership, save-dirty behavior, and hook GPR/FPR/CR/CTR/XER preservation. This is independent of the native card's on-disk checksums; save/reload and downgrade behavior should also be checked in Dolphin on a test card before distributing the format change.
+
+Keep the settings byte-comparison helper non-inlined. Inlining comparisons between fixed low-memory addresses and module strings can emit symbol-minus-fixed-address addends that hmex/native relocation cannot preserve. ELF-only checks can pass while the loaded DAT reads a wrapped low address. The save-creation regressions therefore require the optimized DAT path.
 
 ## OSD Identities and Styling
 

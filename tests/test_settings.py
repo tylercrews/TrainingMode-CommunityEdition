@@ -79,6 +79,92 @@ class Machine:
         return self.call("TMSettings_Write", RECORD, field, index, value)
 
 
+class RelocatedDATSettingsTests(unittest.TestCase):
+    """Exercise hmex's emitted DAT with the native MEX relocation rules.
+
+    The original ELF tests cannot catch relocation-table addend loss. Requires
+    build/settings-relocated-test.dat from the runner; the input is never modified.
+    """
+    dat_path = ROOT / "build/settings-relocated-test.dat"
+
+    def setUp(self):
+        self.m = Machine()
+        self.m.cpu.mem_map(0x80500000, 0x1300000)
+        dat = self.dat_path.read_bytes()
+        _, data_size, reloc_count, root_count, ref_count = struct.unpack_from(">5I", dat)
+        nodes = 32 + data_size + reloc_count * 4
+        strings = nodes + (root_count + ref_count) * 8
+        header = None
+        for i in range(root_count):
+            offset, name = struct.unpack_from(">II", dat, nodes + i * 8)
+            if dat[strings + name:].split(b"\0", 1)[0] == b"tmFunction":
+                header = struct.unpack_from(">6I", dat, 32 + offset)
+        self.assertIsNotNone(header)
+        code, table, count, exports, num_exports, size = header
+        self.base = 0x80700000
+        payload = bytearray(dat[32 + code:32 + code + size])
+        for i in range(count):
+            word, target = struct.unpack_from(">II", dat, 32 + table + i * 8)
+            kind, offset = word >> 24, word & 0xFFFFFF
+            # Native loader treats 0x8... targets as absolute, others as offsets.
+            if target & 0xF0000000 != 0x80000000:
+                target = (target + self.base) & 0xFFFFFFFF
+            if kind == 1:
+                struct.pack_into(">I", payload, offset, target)
+            elif kind == 4:
+                struct.pack_into(">H", payload, offset, target & 0xFFFF)
+            elif kind == 6:
+                struct.pack_into(">H", payload, offset, ((target + 0x8000) >> 16) & 0xFFFF)
+            elif kind == 10:
+                old = struct.unpack_from(">I", payload, offset)[0]
+                branch = (target - self.base - offset) & 0x03FFFFFC
+                struct.pack_into(">I", payload, offset, old | branch)
+            elif kind == 26:
+                struct.pack_into(">I", payload, offset, (target - self.base - offset) & 0xFFFFFFFF)
+            else:
+                self.fail(f"Unknown native MEX relocation {kind}")
+        self.m.cpu.mem_write(self.base, bytes(payload))
+        for i in range(num_exports):
+            index, offset = struct.unpack_from(">II", dat, 32 + exports + i * 8)
+            if index in [27, 28]:
+                self.m.symbols["DAT_Get" if index == 27 else "DAT_Set"] = self.base + offset
+        # Native memcpy is an external SDK dependency; use the tested PPC stub.
+        address = self.m.symbols["memcpy"]
+        self.m.cpu.mem_write(0x800031F4, struct.pack(">4I", 0x3D800000 | (address >> 16),
+            0x618C0000 | (address & 0xFFFF), 0x7D8903A6, 0x4E800420))
+        link = (ROOT / "MexTK/melee.link").read_text()
+        native_memset = int(next(line.split(":")[0] for line in link.splitlines() if line.endswith(":memset")), 16)
+        address = self.m.symbols["memset"]
+        self.m.cpu.mem_write(native_memset, struct.pack(">4I", 0x3D800000 | (address >> 16),
+            0x618C0000 | (address & 0xFFFF), 0x7D8903A6, 0x4E800420))
+
+    def test_new_save_identity_and_repeated_reads_after_real_dat_relocation(self):
+        m = self.m
+        blank = bytearray(44)
+        blank[4:6] = b"\1\1"
+        m.put(blank)
+        self.assertEqual(m.call("DAT_Get", 1, 0), 1)
+        self.assertEqual(m.record()[38:40], b"TY")
+        self.assertEqual(m.record()[10] >> 6, 3)
+        for _ in range(10):
+            self.assertEqual(m.call("DAT_Get", 1, 0), 1)
+        m.call("DAT_Set", 11, 7, 1)
+        self.assertEqual(m.call("DAT_Get", 11, 7), 1)
+
+    def test_relocated_dat_migration_and_foreign_identity_preserve_records(self):
+        m = self.m
+        m.init()
+        old = bytearray(m.record())
+        old[10] = 0xBF
+        m.put(old)
+        self.assertEqual(m.call("DAT_Get", 11, 7), 0)
+        self.assertEqual(m.record()[10] >> 6, 3)
+        before = m.record()
+        m.cpu.mem_write(0x80000000, b"GTME01")
+        m.call("DAT_Set", 11, 7, 1)
+        self.assertEqual(m.record(), before)
+
+
 class SettingsTests(unittest.TestCase):
     def setUp(self):
         self.m = Machine()
