@@ -6,7 +6,7 @@
 /* Serialized bytes, not a C struct/bitfield ABI. All offsets are within 0x1F24..0x1F4F. */
 #define TM_SETTINGS_OFFSET 0x1F24
 #define TM_SETTINGS_SIZE 44
-#define TM_SETTINGS_VERSION 1
+#define TM_SETTINGS_VERSION 2
 #define TM_SETTINGS_OVERLAYS 18
 #define TM_SETTINGS_LEGACY_OVERLAYS 17
 #define TM_SETTINGS_OVERLAY_CHOICES 11
@@ -16,12 +16,21 @@
 #define TM_SETTINGS_COLORS_OFFSET 30
 #define TM_SETTINGS_SIGNATURE_OFFSET 38
 #define TM_SETTINGS_RESERVED_OFFSET 40
+#define TM_SETTINGS_EXTRA_FLAGS_OFFSET 40 /* Bit 0: Run Turnaround flash; other bits preserved. */
 
 /* Shared labels and native L-menu row bindings. Build-generated ASM uses these names too. */
 #define TM_GLOBAL_TRAIL_VERY_FAST_ROW 2
 #define TM_GLOBAL_TRAIL_INSTANT_ROW 4
 #define TM_GLOBAL_OSDS_OFF_ROW 6
 #define TM_GLOBAL_OSDS_OFF_NAME "TURN OSDS OFF"
+#define TM_GLOBAL_MISSED_LCANCEL_ROW 7
+#define TM_GLOBAL_ACTION_CUES_ROW 11
+#define TM_GLOBAL_RUN_TURN_ROW 17
+#define TM_GLOBAL_INFINITE_SHIELDS_ROW 23
+#define TM_GLOBAL_MISSED_LCANCEL_NAME "Flash Missed L-Cancel"
+#define TM_GLOBAL_ACTION_CUES_NAME "Recovery Yellow/Green"
+#define TM_GLOBAL_RUN_TURN_NAME "Flash Run Turnaround"
+#define TM_GLOBAL_INFINITE_SHIELDS_NAME "Infinite Shields"
 #define TM_GLOBAL_TRAIL_VERY_FAST_NAME "Hitbox Trails Very Fast"
 #define TM_GLOBAL_TRAIL_INSTANT_NAME "Hitbox Trails Instant"
 #define TM_GLOBAL_TRAIL_STATE_NAMES "Global: Off", "Global: Very Fast", "Global: Instant", "Global: Both On"
@@ -42,6 +51,7 @@ enum TMSettingsColor {
 enum TMSettingsFlag {
     TM_FLAG_OSDS_OFF, TM_FLAG_TRAILS_VERY_FAST, TM_FLAG_TRAILS_INSTANT,
     TM_FLAG_MISSED_LCANCEL, TM_FLAG_LAST_BLOCKED_FRAME, TM_FLAG_INFINITE_SHIELDS,
+    TM_FLAG_RUN_TURNAROUND,
     TM_FLAG_COUNT,
 };
 
@@ -57,6 +67,7 @@ enum TMSettingsField {
 };
 
 extern const uint8_t TMSettings_OSDIDs[TM_SETTINGS_OSDS];
+int TMSettings_NativeFlag(unsigned row);
 void TMSettings_Init(uint8_t record[TM_SETTINGS_SIZE]);
 int TMSettings_Prepare(uint8_t record[TM_SETTINGS_SIZE], int owns_save);
 uint32_t TMSettings_Read(const uint8_t record[TM_SETTINGS_SIZE], unsigned field, unsigned index);

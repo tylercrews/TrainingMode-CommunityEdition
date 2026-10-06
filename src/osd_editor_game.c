@@ -7,19 +7,16 @@ static const uint8_t row_ids[] = {
 };
 static const char *row_names[] = {
     "Wavedash Info", "L-Cancel", TM_GLOBAL_TRAIL_VERY_FAST_NAME, "Act OoS Frame",
-    TM_GLOBAL_TRAIL_INSTANT_NAME, "Dashback", TM_GLOBAL_OSDS_OFF_NAME, 0,
-    "Fighter-specific Tech", "Powershield Frame", 0, "SDI Inputs", "Grab Breakout",
+    TM_GLOBAL_TRAIL_INSTANT_NAME, "Dashback", TM_GLOBAL_OSDS_OFF_NAME, TM_GLOBAL_MISSED_LCANCEL_NAME,
+    "Fighter-specific Tech", "Powershield Frame", TM_GLOBAL_ACTION_CUES_NAME, "SDI Inputs", "Grab Breakout",
     "Ledgedash Info", "Act OoHitstun", "Lockout Timers", "Item Throw Interrupts",
-    "Boost Grab", 0, "Act OoLag", 0, "Act OoAirborne", "Jump Cancel Timing",
-    "Fastfall Timing", "Frame Advantage", "Combo Counter", 0, 0, 0,
+    "Boost Grab", 0, "Act OoLag", TM_GLOBAL_RUN_TURN_NAME, "Act OoAirborne", "Jump Cancel Timing",
+    "Fastfall Timing", "Frame Advantage", "Combo Counter", TM_GLOBAL_INFINITE_SHIELDS_NAME, 0, 0,
 };
 static const char *color_names[] = { TM_OSD_COLOR_NAMES };
 
 static int flag_for(unsigned id) {
-    if (id == TM_GLOBAL_TRAIL_VERY_FAST_ROW) return TM_FLAG_TRAILS_VERY_FAST;
-    if (id == TM_GLOBAL_TRAIL_INSTANT_ROW) return TM_FLAG_TRAILS_INSTANT;
-    if (id == TM_GLOBAL_OSDS_OFF_ROW) return TM_FLAG_OSDS_OFF;
-    return -1;
+    return TMSettings_NativeFlag(id);
 }
 
 static void refresh_row(void *data, unsigned row) {

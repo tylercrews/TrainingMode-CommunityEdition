@@ -284,6 +284,7 @@
 80085FD4:Fighter_GetFtAction
 80085E50:Fighter_GetAnimData
 8001E8F8:Fighter_GetAnimLength
+8006F484:Fighter_GetCurrentAnimLength
 8003418C:Fighter_GetSubcharGObj
 8007DB24:Fighter_GFXRemoveAll
 8006CC7C:Fighter_GiveDamage

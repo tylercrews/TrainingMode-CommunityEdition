@@ -162,15 +162,16 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(m.read(14, osd), slot % 8)
             self.assertEqual(m.read(15, osd), int(slot % 8 != 0))
         self.assertEqual(m.read(15, 31), 1)
-        for flag in range(6):
+        for flag in range(7):
             m.write(11, flag, 1)
-        self.assertEqual(m.record()[10], 0x7F)
+        self.assertEqual(m.record()[10], 0xBF)
+        self.assertEqual(m.record()[40] & 1, 1)
         m.write(4, 0, 4)
         m.write(5, 0, 5)
         self.assertEqual(m.record()[7], 0x54)
         m.write(15, IDS[2], 1)
         self.assertEqual(m.read(14, IDS[2]), 2)  # Boolean writer preserves an enabled Red choice.
-        for field, index, value in [(4, 0, 5), (5, 0, 6), (11, 6, 1), (12, 18, 1), (14, 64, 1), (15, 32, 1)]:
+        for field, index, value in [(4, 0, 5), (5, 0, 6), (11, 7, 1), (12, 18, 1), (14, 64, 1), (15, 32, 1)]:
             before = m.record()
             self.assertEqual(m.write(field, index, value), 0)
             self.assertEqual(m.record(), before)
@@ -190,7 +191,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(m.read(12, 16), 10)
         self.assertEqual(m.read(13, 16), 9)
         self.assertEqual(m.read(13, 4), 8)
-        self.assertEqual(m.record()[10], 0x40)
+        self.assertEqual(m.record()[10], 0x80)
         self.assertEqual(m.record()[4:10], legacy[4:10])
         self.assertEqual(m.read(14, IDS[4]), 1)
         first = m.record()
@@ -217,7 +218,7 @@ class SettingsTests(unittest.TestCase):
         m = self.m
         m.init()
         future = bytearray(m.record())
-        future[10] = 0xBF
+        future[10] = 0xFF
         future[12:38] = bytes(range(26))
         m.put(future)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 3)
@@ -506,7 +507,7 @@ class OSDEditorTests(unittest.TestCase):
         m = self.m
         m.call("TestEditorInit")
         before = m.record()
-        for row in [7, 10, 18, 20, 26, 27, 28, 29, 65535]:
+        for row in [18, 27, 28, 29, 65535]:
             self.assertEqual(m.call("TestEditorInput", 0x200, row), 1)
             self.assertEqual(m.call("TestEditorInput", 0x10, row), 1)
         for button in [1, 2, 4, 8, 0x100, 0x400, 0x800, 0x1000]:
@@ -516,7 +517,7 @@ class OSDEditorTests(unittest.TestCase):
     def test_native_editor_future_format_uses_private_defaults(self):
         m = self.m
         future = bytearray(m.record())
-        future[10] = 0x80
+        future[10] = 0xC0
         m.put(future)
         m.call("TestEditorInit")
         m.call("TestEditorInput", 0x200, 23)
@@ -544,6 +545,221 @@ class OSDEditorTests(unittest.TestCase):
         fresh.call("TestEditorInput", 0x200, 6)
         self.assertEqual(fresh.call("Settings_Get", 14, 20), 6)
         self.assertEqual(fresh.call("Settings_Get", 11, 0), 0)
+
+
+class ActionCueTests(unittest.TestCase):
+    YELLOW, GREEN, RED = 0xFFF000DC, 0x50FF5ADC, 0xFF2828B4
+
+    def setUp(self):
+        self.m = Machine()
+        self.m.init()
+        self.m.call("TestCueInit")
+        self.m.call("Settings_Set", 11, 4, 1)
+
+    def show(self, tick, state, frame, end=40, rate=100, slot=0):
+        m = self.m
+        m.call("TestCueState", slot, state, frame, end, rate)
+        m.call("TestCueTick", tick)
+        m.call("TestCueDraw", slot)
+        return m.call("TestCueDrawColor", slot)
+
+    def test_normal_and_autocancel_landing_two_yellow_two_green(self):
+        m = self.m
+        m.call("TestCueLanding", 0, 5, 1)
+        results = [self.show(i, 42, i) for i in range(8)]
+        self.assertEqual(results, [0, 0, 0, self.YELLOW, self.YELLOW, self.GREEN, self.GREEN, 0])
+
+    def test_wavelanding_uses_actual_rate_and_end_not_normal_lag(self):
+        m = self.m
+        m.call("TestCueLanding", 0, 4, 0)
+        results = [self.show(i, 43, i * 2, 19, 200) for i in range(10)]
+        self.assertEqual(results[-3:], [0, self.YELLOW, self.YELLOW])
+        self.assertEqual(self.show(10, 14, 0), self.GREEN)
+        self.assertEqual(self.show(11, 14, 1), self.GREEN)
+        self.assertEqual(self.show(12, 14, 2), 0)
+
+    def test_all_five_landing_lags_cancelled_and_uncancelled(self):
+        for state in range(70, 75):
+            for rate, frames in [(100, [6, 7]), (200, [4, 6])]:
+                self.m.call("ActionCues_Clear")
+                self.assertEqual(self.show(1, state, frames[0], 8, rate), self.YELLOW)
+                self.assertEqual(self.show(2, state, frames[1], 8, rate), self.YELLOW)
+                self.assertEqual(self.show(3, 14, 0), self.GREEN)
+                self.assertEqual(self.show(4, 14, 1), self.GREEN)
+                self.assertEqual(self.show(5, 14, 2), 0)
+
+    def test_aerials_and_grounded_attacks_use_iasa_before_animation_end(self):
+        m = self.m
+        script = 0x80403000
+        m.cpu.mem_write(script, struct.pack(">II", 22 << 26, 0))
+        for state in [44, 45, 46, 49, 50, 51, 55, 57, 60, 63, 64, 65, 66, 67, 68, 69]:
+            m.call("ActionCues_Clear")
+            m.call("TestCueIASA", 0, 0)
+            m.call("TestCueScript", 0, script, 200, 1000)
+            self.assertEqual(self.show(1, state, 10, 80), self.YELLOW)
+            m.call("TestCueScript", 0, script, 100, 1100)
+            self.assertEqual(self.show(2, state, 11, 80), self.YELLOW)
+            m.call("TestCueIASA", 0, 1)
+            self.assertEqual(self.show(3, state, 12, 80), self.GREEN)
+            self.assertEqual(self.show(4, state, 13, 80), self.GREEN)
+            self.assertEqual(self.show(5, state, 14, 80), 0)
+
+    def test_green_completion_pulse_survives_immediate_next_action(self):
+        self.assertEqual(self.show(1, 65, 38, 40), self.YELLOW)
+        self.assertEqual(self.show(2, 65, 39, 40), self.YELLOW)
+        self.assertEqual(self.show(3, 65, 0, 40), 0)  # Same-state rewind clears history.
+        self.m.call("ActionCues_Clear")
+        self.assertEqual(self.show(4, 70, 7, 8), self.YELLOW)
+        self.assertEqual(self.show(5, 20, 0), self.GREEN)  # Dash on first recovered frame.
+        self.assertEqual(self.show(6, 44, 0), self.GREEN)  # Next action does not shorten confirmation.
+        self.assertEqual(self.show(7, 44, 1), 0)
+
+    def test_timing_replaces_local_red_and_restores_all_native_colanim_bytes(self):
+        m = self.m
+        ptr = m.call("TestCueData", 0) + 0x408
+        native = bytearray((i * 17 + 9) & 255 for i in range(0x180))
+        native[0x80 + 0x2C:0x80 + 0x30] = self.RED.to_bytes(4, "big")
+        m.cpu.mem_write(ptr, bytes(native))
+        m.call("Settings_Set", 11, 3, 1)
+        m.call("TestCueState", 0, 70, 6, 8, 100)
+        m.call("TestCueMissed", 0, 7)
+        self.assertEqual(self.show(1, 70, 6, 8), self.YELLOW)
+        self.assertEqual(m.call("TestCueDrawFlags", 0), 2)
+        self.assertEqual(bytes(m.cpu.mem_read(ptr, 0x180)), bytes(native))
+        self.assertEqual(self.show(2, 70, 7, 8), self.YELLOW)
+        self.assertEqual(self.show(3, 14, 0), self.GREEN)
+        self.assertEqual(self.show(4, 14, 1), self.GREEN)
+        self.assertEqual(bytes(m.cpu.mem_read(ptr, 0x180)), bytes(native))
+
+    def test_missed_cancel_flash_uses_landing_entry_result_and_four_ticks(self):
+        m = self.m
+        m.call("Settings_Set", 11, 4, 0)
+        m.call("Settings_Set", 11, 3, 1)
+        m.call("TestCueState", 0, 70, 0, 40, 100)
+        m.call("TestCueMissed", 0, 7)
+        self.assertEqual([self.show(i, 70, i) for i in range(5)], [self.RED] * 4 + [0])
+        m.call("ActionCues_Clear")
+        m.call("TestCueMissed", 0, 6)
+        self.assertEqual(self.show(6, 70, 0), 0)
+
+    def test_turnrun_flash_is_specific_and_independent_of_text_master(self):
+        m = self.m
+        m.call("Settings_Set", 11, 4, 0)
+        m.call("Settings_Set", 11, 6, 1)
+        m.call("Settings_Set", 11, 0, 1)
+        for state in [18, 20, 21, 23]:
+            m.call("ActionCues_Clear")
+            self.assertEqual(self.show(1, state, 0), 0)
+        m.call("ActionCues_Clear")
+        self.assertEqual([self.show(i, 19, i) for i in range(5)], [self.RED] * 4 + [0])
+        self.assertEqual(self.show(6, 14, 0), 0)
+        self.assertEqual(self.show(7, 19, 0), self.RED)
+        m.call("Settings_Set", 11, 6, 0)
+        m.call("Settings_Set", 11, 3, 1)
+        m.call("TestCueDraw", 0)
+        self.assertEqual(m.call("TestCueDrawColor", 0), 0)
+
+    def test_pause_hitlag_restore_and_subfighters(self):
+        m = self.m
+        self.assertEqual(self.show(10, 42, 3, 5, slot=11), self.YELLOW)
+        self.assertEqual(self.show(10, 42, 4, 5, slot=11), self.YELLOW)  # No extra tick on same key.
+        m.call("TestCueFrozen", 11, 1)
+        self.assertEqual(self.show(11, 42, 4, 5, slot=11), 0)
+        m.call("TestCueFrozen", 11, 0)
+        self.assertEqual(self.show(12, 42, 4, 5, slot=11), self.YELLOW)
+        self.assertEqual(self.show(13, 14, 0, slot=11), self.GREEN)
+        m.call("ActionCues_Clear")
+        self.assertEqual(self.show(14, 14, 1, slot=11), 0)
+
+    def test_infinite_shields_full_health_all_slots_and_off_does_not_write(self):
+        m = self.m
+        m.call("Settings_Set", 11, 5, 1)
+        for slot in range(12):
+            m.call("TestCueState", slot, 14, 0, 40, 100)
+            ptr = m.call("TestCueData", slot)
+            m.cpu.mem_write(ptr + 0x1998, struct.pack(">f", 8))  # SDK shield.health offset.
+        m.call("TestCueTick", 1)
+        for slot in range(12):
+            ptr = m.call("TestCueData", slot)
+            self.assertEqual(struct.unpack(">f", m.cpu.mem_read(ptr + 0x1998, 4))[0], 60)
+        m.call("Settings_Set", 11, 5, 0)
+        ptr = m.call("TestCueData", 0)
+        m.cpu.mem_write(ptr + 0x1998, struct.pack(">f", 8))
+        m.call("TestCueTick", 2)
+        self.assertEqual(struct.unpack(">f", m.cpu.mem_read(ptr + 0x1998, 4))[0], 8)
+
+    def test_version_one_migration_initializes_new_bit_and_preserves_31_reserved_bits(self):
+        m = self.m
+        old = bytearray(m.record())
+        old[10] = 0x7F
+        old[40:44] = b"\xFFABC"
+        m.put(old)
+        self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 1)
+        self.assertEqual(m.record()[10], 0xBF)
+        self.assertEqual(m.record()[40:44], b"\xFEABC")
+        self.assertEqual(m.read(11, 6), 0)
+        self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
+        m.write(16, 17, 1)
+        self.assertEqual(m.record()[40:44], b"\xFFABC")
+        self.assertEqual(m.record()[10], 0xBF)  # Version bits do not change.
+        for row, flag in [(7, 3), (11, 4), (17, 6), (23, 5)]:
+            self.assertEqual(m.read(16, row), m.read(11, flag))
+
+    def test_script_lookahead_is_bounded_read_only_and_handles_native_controls(self):
+        m = self.m
+        script, snapshot = 0x80403000, 0x80402000
+        cases = [
+            ([22 << 26, 0], 100, 1),
+            ([22 << 26, 0], 200, 2),
+            ([(1 << 26) | 1, 22 << 26, 0], 100, 2),
+            ([(2 << 26) | 12, 22 << 26, 0], 100, 2),
+            ([(10 << 26), 0, 0, 0, 0, 22 << 26, 0], 100, 1),
+            ([(3 << 26) | 2, (1 << 26) | 1, 4 << 26, 22 << 26, 0], 0, 2),
+            ([7 << 26, script], 0, 0xFFFFFFFF),
+            ([63 << 26], 0, 0xFFFFFFFF),
+        ]
+        for words, timer, expected in cases:
+            m.cpu.mem_write(script, struct.pack(">" + "I" * len(words), *words))
+            data = struct.pack(">ffII5I", timer / 100, 10, script, 0, *([0] * 5))
+            m.cpu.mem_write(snapshot, data)
+            self.assertEqual(m.call("TestCueScriptIASA", snapshot, 100), expected)
+            self.assertEqual(bytes(m.cpu.mem_read(snapshot, len(data))), data)
+        for args, expected in [((300, 100, 500), 2), ((400, 100, 500), 1), ((500, 100, 500), 0), ((300, 0, 500), 0xFFFFFFFF)]:
+            self.assertEqual(m.call("TestCueRemaining", *args), expected)
+
+    def test_character_exceptions_and_excluded_states(self):
+        m = self.m
+        for kind, state, common in [(24, 347, 65), (24, 350, 70), (24, 344, 49), (4, 351, 50), (4, 352, 50)]:
+            self.assertEqual(m.call("ActionCues_CommonState", kind, state), common)
+            m.call("ActionCues_Clear")
+            m.call("TestCueKind", 0, kind)
+            self.assertEqual(self.show(1, state, 38, 40), self.YELLOW)
+        m.call("TestCueKind", 0, 4)
+        m.call("TestCueIASA", 0, 1)
+        m.call("TestCueState", 0, 352, 10, 40, 100)
+        self.assertEqual(m.call("ActionCues_Remaining", m.call("TestCueObject", 0)), 3)
+        m.call("TestCueKind", 0, 1)
+        for state in [47, 48, 181, 183, 199, 341]:
+            m.call("TestCueState", 0, state, 38, 40, 100)
+            self.assertEqual(m.call("ActionCues_Remaining", m.call("TestCueObject", 0)), 0xFFFFFFFF)
+
+    def test_new_global_editor_rows_round_trip_and_preserve_other_choices(self):
+        m = self.m
+        for flag in [3, 4, 5, 6]:
+            m.call("Settings_Set", 11, flag, 0)
+        m.call("TestEditorInit")
+        m.write(14, 20, 6)
+        for cursor, row, flag in [(7, 7, 3), (10, 11, 4), (20, 17, 6), (26, 23, 5)]:
+            m.call("TestEditorInput", 0x200, cursor)
+            self.assertEqual(m.read(11, flag), 1)
+            m.call("TestEditorAnimate", cursor)
+            m.write(16, row, m.call("TestEditorCache", cursor))
+        fresh = Machine()
+        fresh.put(m.record())
+        fresh.call("TestEditorInit")
+        for cursor, flag in [(7, 3), (10, 4), (20, 6), (26, 5)]:
+            self.assertEqual(fresh.call("Settings_Get", 11, flag), 1)
+        self.assertEqual(fresh.read(14, 20), 6)
 
 
 if __name__ == "__main__":

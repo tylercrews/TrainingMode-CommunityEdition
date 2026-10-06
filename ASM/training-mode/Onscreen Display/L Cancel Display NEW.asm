@@ -20,6 +20,12 @@
     backupall
     lwz REG_FighterData, 0x2c(player)
 
+    # Record the landing result even when the text category is disabled.
+    SettingsBackup
+    mr r3, player
+    rtocbl r12, TM_ActionCuesLCancel
+    SettingsRestore
+
     # CHECK IF ENABLED
     li r0, OSD.LCancel              # wavedash ID
     # lwz r4, -0xdbc(rtoc) #get frame data toggle bits

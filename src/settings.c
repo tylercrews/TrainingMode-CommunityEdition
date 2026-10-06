@@ -5,6 +5,18 @@
 const uint8_t TMSettings_OSDIDs[TM_SETTINGS_OSDS] = {
     0, 1, 3, 5, 8, 9, 10, 12, 13, 14, 16, 18, 19, 20, 21, 22, 24, 26, 28,
 };
+int TMSettings_NativeFlag(unsigned row) {
+    switch (row) {
+    case TM_GLOBAL_OSDS_OFF_ROW: return TM_FLAG_OSDS_OFF;
+    case TM_GLOBAL_TRAIL_VERY_FAST_ROW: return TM_FLAG_TRAILS_VERY_FAST;
+    case TM_GLOBAL_TRAIL_INSTANT_ROW: return TM_FLAG_TRAILS_INSTANT;
+    case TM_GLOBAL_MISSED_LCANCEL_ROW: return TM_FLAG_MISSED_LCANCEL;
+    case TM_GLOBAL_ACTION_CUES_ROW: return TM_FLAG_LAST_BLOCKED_FRAME;
+    case TM_GLOBAL_RUN_TURN_ROW: return TM_FLAG_RUN_TURNAROUND;
+    case TM_GLOBAL_INFINITE_SHIELDS_ROW: return TM_FLAG_INFINITE_SHIELDS;
+    default: return -1;
+    }
+}
 
 static uint32_t read_mask(const uint8_t *r) {
     return ((uint32_t)r[0] << 24) | ((uint32_t)r[1] << 16) | ((uint32_t)r[2] << 8) | r[3];
@@ -62,11 +74,16 @@ static void validate_prefix(uint8_t *r) {
 int TMSettings_Prepare(uint8_t r[TM_SETTINGS_SIZE], int owns_save) {
     if (!owns_save) return TM_SETTINGS_FOREIGN;
     int signed_format = r[38] == 'T' && r[39] == 'Y';
-    if (signed_format && (r[10] >> 6) != TM_SETTINGS_VERSION)
+    unsigned old_version = r[10] >> 6;
+    if (signed_format && old_version != 1 && old_version != TM_SETTINGS_VERSION)
         return TM_SETTINGS_UNSUPPORTED; /* Never reinterpret or overwrite a future format. */
 
     uint8_t before[TM_SETTINGS_SIZE];
     memcpy(before, r, sizeof(before));
+    if (signed_format && old_version == 1) {
+        r[10] = (r[10] & 0x3F) | (TM_SETTINGS_VERSION << 6);
+        r[TM_SETTINGS_EXTRA_FLAGS_OFFSET] &= ~1u; /* New flag defaults Off, other reserve bits survive. */
+    }
     if (!signed_format) {
         /* Read both old lists before overwriting any of their overlapping bytes. */
         uint8_t legacy[32];
@@ -99,7 +116,7 @@ int TMSettings_Prepare(uint8_t r[TM_SETTINGS_SIZE], int owns_save) {
     }
     /* Write the signature last; native card serialization/checksums remain unchanged. */
     r[38] = 'T'; r[39] = 'Y';
-    if (!signed_format) return TM_SETTINGS_MIGRATED;
+    if (!signed_format || old_version == 1) return TM_SETTINGS_MIGRATED;
     return bytes_differ(before, r) ? TM_SETTINGS_REPAIRED : TM_SETTINGS_READY;
 }
 
@@ -116,7 +133,9 @@ uint32_t TMSettings_Read(const uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsi
     case TM_SETTING_DPAD_LEFT: return r[9] & 15;
     case TM_SETTING_DPAD_RIGHT: return r[9] >> 4;
     case TM_SETTING_INPUT_DISPLAY: return r[11];
-    case TM_SETTING_FLAG: return index < TM_FLAG_COUNT ? (r[10] >> index) & 1 : 0;
+    case TM_SETTING_FLAG:
+        if (index == TM_FLAG_RUN_TURNAROUND) return r[TM_SETTINGS_EXTRA_FLAGS_OFFSET] & 1;
+        return index < TM_FLAG_RUN_TURNAROUND ? (r[10] >> index) & 1 : 0;
     case TM_SETTING_OVERLAY_HMN: return index < TM_SETTINGS_OVERLAYS ? r[12 + index] & 15 : 0;
     case TM_SETTING_OVERLAY_CPU: return index < TM_SETTINGS_OVERLAYS ? r[12 + index] >> 4 : 0;
     case TM_SETTING_OSD_COLOR: {
@@ -125,9 +144,7 @@ uint32_t TMSettings_Read(const uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsi
     }
     case TM_SETTING_OSD_ENABLED: return index < 32 ? (read_mask(r) >> index) & 1 : 0;
     case TM_SETTING_NATIVE_ROW:
-        if (index == TM_GLOBAL_OSDS_OFF_ROW) return TMSettings_Read(r, TM_SETTING_FLAG, TM_FLAG_OSDS_OFF);
-        if (index == TM_GLOBAL_TRAIL_VERY_FAST_ROW) return TMSettings_Read(r, TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
-        if (index == TM_GLOBAL_TRAIL_INSTANT_ROW) return TMSettings_Read(r, TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
+        if (TMSettings_NativeFlag(index) >= 0) return TMSettings_Read(r, TM_SETTING_FLAG, TMSettings_NativeFlag(index));
         return TMSettings_Read(r, TM_SETTING_OSD_ENABLED, index);
     default: return 0;
     }
@@ -136,9 +153,7 @@ uint32_t TMSettings_Read(const uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsi
 int TMSettings_Write(uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsigned index, uint32_t value) {
     if (r[38] != 'T' || r[39] != 'Y' || (r[10] >> 6) != TM_SETTINGS_VERSION) return 0;
     if (field == TM_SETTING_NATIVE_ROW) {
-        if (index == TM_GLOBAL_OSDS_OFF_ROW) return TMSettings_Write(r, TM_SETTING_FLAG, TM_FLAG_OSDS_OFF, value);
-        if (index == TM_GLOBAL_TRAIL_VERY_FAST_ROW) return TMSettings_Write(r, TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST, value);
-        if (index == TM_GLOBAL_TRAIL_INSTANT_ROW) return TMSettings_Write(r, TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT, value);
+        if (TMSettings_NativeFlag(index) >= 0) return TMSettings_Write(r, TM_SETTING_FLAG, TMSettings_NativeFlag(index), value);
         return TMSettings_Write(r, TM_SETTING_OSD_ENABLED, index, value);
     }
     if (field == TM_SETTING_OSD_MASK) {
@@ -172,7 +187,8 @@ int TMSettings_Write(uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsigned index
     case TM_SETTING_INPUT_DISPLAY: byte = 11; count = 4; break;
     case TM_SETTING_FLAG:
         if (index >= TM_FLAG_COUNT) return 0;
-        byte = 10; width = 1; shift = index; count = 2; break;
+        byte = index == TM_FLAG_RUN_TURNAROUND ? TM_SETTINGS_EXTRA_FLAGS_OFFSET : 10;
+        width = 1; shift = index == TM_FLAG_RUN_TURNAROUND ? 0 : index; count = 2; break;
     case TM_SETTING_OVERLAY_HMN:
     case TM_SETTING_OVERLAY_CPU:
         if (index >= TM_SETTINGS_OVERLAYS) return 0;

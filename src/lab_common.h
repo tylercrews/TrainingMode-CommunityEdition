@@ -416,6 +416,7 @@ void Lab_RemoveCustomOSD(GOBJ *menu_gobj);
 void Lab_AddCustomOSD(GOBJ *menu_gobj);
 void Lab_ChangeOSDs(GOBJ *menu_gobj, int value);
 void Lab_ChangeOSDsOff(GOBJ *menu_gobj, int value);
+void Lab_ChangeGlobalCue(GOBJ *menu_gobj, int value);
 void Lab_ChangeStadiumTransformation(GOBJ *menu_gobj, int value);
 void Lab_ChangeInputDisplay(GOBJ *menu_gobj, int value);
 void Lab_ChangeOverlays(GOBJ *menu_gobj, int value);

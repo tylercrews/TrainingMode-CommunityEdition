@@ -19,6 +19,10 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Added global Recovery Yellow/Green: two frames before normal landing/attack recovery and a two-frame completion pulse, with priority over missed L-cancel red.
+- Added global Run Turnaround and missed L-cancel red flashes, plus full-health Infinite Shields for all main/subfighters.
+- Allocated reserved byte 40, bit 0 to Run Turnaround; migrated packed settings to format 2 while retaining the other 31 reserved bits.
+
 - Added color selection in the L-button OSD editor (B forward / Z backward), with saved color names and previews alongside each row.
 - Added TURN OSDS OFF to both OSD editors; it hides global message text/backgrounds while preserving individual colors, trails and event feedback.
 - Added saved Off/White/Red/Green/Blue/Yellow/Cyan/Magenta title choices in Lab's OSD editor, with canonical identities across C/native messages.

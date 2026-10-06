@@ -189,6 +189,7 @@
     ENTRY TM_MessageEndCombo
     ENTRY TM_OSDEditorInit
     ENTRY TM_OSDEditorInput
+    ENTRY TM_ActionCuesLCancel
 
     # TmDt Data Pointers
     .set TM_Data, TM_tmFunction - 0x4

@@ -869,6 +869,7 @@ void Fighter_PlaceOnLedge(void)
     Ledgedash_InitVariables(event_data);
     event_data->tip.refresh_displayed = 0;
     event_vars->trails->clear();
+    event_vars->clear_action_cues();
     event_data->tip.is_input_release = 0;
     event_data->tip.refresh_num = 0;
 

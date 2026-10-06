@@ -3191,6 +3191,7 @@ void Fighter_SubactionFastForward(GOBJ *fighter);
 FtAction *Fighter_GetFtAction(FighterData *fighter, int action_id); // returns the desired ft action entry stored in the dat file
 Figatree *Fighter_GetAnimData(FighterData *fighter, int action_id); // this will request the anim data from the AJ file in ARAM and overwrite the current animation!
 float Fighter_GetAnimLength(Figatree *ft_anim);
+float Fighter_GetCurrentAnimLength(GOBJ *fighter); // Read-only current animation length (8006F484).
 void Fighter_EnterLightThrow(GOBJ *fighter, int stateID);
 void Fighter_EnterDamageFall(GOBJ *fighter);
 void Fighter_EnterWait(GOBJ *fighter);

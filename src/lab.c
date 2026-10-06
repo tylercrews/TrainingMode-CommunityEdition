@@ -331,6 +331,26 @@ void Lab_ChangeOSDsOff(GOBJ *menu_gobj, int value) {
     LabOptions_OSDs[TM_SETTINGS_OSDS + 2].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF);
     Memcard_SaveIfChanged();
 }
+static const unsigned global_cue_flags[] = {
+    TM_FLAG_MISSED_LCANCEL, TM_FLAG_LAST_BLOCKED_FRAME, TM_FLAG_RUN_TURNAROUND, TM_FLAG_INFINITE_SHIELDS,
+};
+static void Lab_RefreshShieldOverride(void) {
+    char *status = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_INFINITE_SHIELDS) ?
+        "Global Infinite Shields: On (full health overrides local)." : "Global Infinite Shields: Off.";
+    LabOptions_CPU[OPTCPU_SHIELD].desc[2] = status;
+    LabOptions_CPU[OPTCPU_SHIELDHEALTH].desc[2] = status;
+}
+void Lab_ChangeGlobalCue(GOBJ *menu_gobj, int value) {
+    MenuData *menu = menu_gobj->userdata;
+    unsigned row = menu->curr_menu->scroll + menu->curr_menu->cursor;
+    if (menu->curr_menu != &LabMenu_OSDs || row < TM_SETTINGS_OSDS + 3 ||
+        row >= TM_SETTINGS_OSDS + 3 + countof(global_cue_flags)) return;
+    TM_SetSetting(TM_SETTING_FLAG, global_cue_flags[row - TM_SETTINGS_OSDS - 3], value);
+    for (unsigned i = 0; i < countof(global_cue_flags); ++i)
+        LabOptions_OSDs[TM_SETTINGS_OSDS + 3 + i].val = TM_GetSetting(TM_SETTING_FLAG, global_cue_flags[i]);
+    Lab_RefreshShieldOverride();
+    Memcard_SaveIfChanged();
+}
 
 void Lab_ChangePlayerPercent(GOBJ *menu_gobj, int value)
 {
@@ -6088,6 +6108,9 @@ void Event_Init(GOBJ *gobj)
     LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
     Lab_ChangeHitboxTrails(0, 0);
     LabOptions_OSDs[TM_SETTINGS_OSDS + 2].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF);
+    for (unsigned i = 0; i < countof(global_cue_flags); ++i)
+        LabOptions_OSDs[TM_SETTINGS_OSDS + 3 + i].val = TM_GetSetting(TM_SETTING_FLAG, global_cue_flags[i]);
+    Lab_RefreshShieldOverride();
 
     // character rng options
     {

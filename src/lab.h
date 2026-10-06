@@ -1852,6 +1852,30 @@ static EventOption LabOptions_OSDs[] = {
         .desc = {"Hide global OSD messages without clearing their colors.", "Trails and event feedback remain active."},
         .OnChange = Lab_ChangeOSDsOff,
     },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_MISSED_LCANCEL_NAME,
+        .desc = {"Flash red for four simulation frames on a missed cancel.", "Recovery Yellow/Green takes priority over this flash."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_ACTION_CUES_NAME,
+        .desc = {"Yellow: last two blocked frames. Green: recovery completes.", "Green lasts two frames, even if you start your next action.", "Covers landings, aerials and ordinary grounded attacks."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_RUN_TURN_NAME,
+        .desc = {"Flash red for four simulation frames on entering TurnRun.", "Standing and dash turns do not trigger this flash."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_INFINITE_SHIELDS_NAME,
+        .desc = {"Keep all players' and CPUs' shields at full health.", "Overrides event-local shield health while On."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
 };
 
 static EventMenu LabMenu_OSDs = {

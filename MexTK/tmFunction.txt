@@ -30,3 +30,4 @@ Settings_Set
 Message_EndCombo
 OSD_EditorInit
 OSD_EditorInput
+ActionCues_LCancel

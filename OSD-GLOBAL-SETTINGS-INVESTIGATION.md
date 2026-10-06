@@ -1,8 +1,8 @@
 # Global OSDs, hitbox trails, and Ledgedash: investigation and implementation plan
 
-Investigated October 4, 2026, initially against checkout `b3d6700`, with the additional filename, success-criteria, reset, and OSD investigations against `08640e8`. Steps 0, 1 and 2 have since been implemented: centralized V1.4.1T2 metadata, versioned outputs, the separate `TYRE01` identity, shared packed settings, and shared/global hitbox trails. Sections 24-26 record implementation and validation. The remaining menu/gameplay work is still planned. The README contains the running Tyro-specific changelog.
+Investigated October 4, 2026, initially against checkout `b3d6700`, with the additional filename, success-criteria, reset, and OSD investigations against `08640e8`. Steps 0-6 now have implementations: centralized V1.4.1T2 metadata, versioned outputs, the separate `TYRE01` identity, packed/migrated settings, global trails, both OSD editors, master suppression, shared flashes/shields, and the staged recovery cue. Sections 24-30 record implementation and validation. Step 6 still requires live Dolphin frame-step validation; the separately planned Ledgedash, hitlag-prefix and recovery-label work remains outstanding. The README contains the running Tyro-specific changelog.
 
-The requested phase-1 changes are feasible. A compact save format can accommodate the new global toggles, including Infinite Shields, OSD title colors, and a reserved phase-2 overlay inside the existing 44-byte settings area, with **four bytes still reserved for future use**. No current training feature needs to be removed for that design. If persistent event high scores are deliberately retired, their **204-byte region** can become a settings extension after its score access/reset paths are changed; section 17 explains the budget and work involved. Before changing the serialized format, give Tyro Edition its own stable game/save identity so switching to upstream cannot reinterpret Tyro settings. The yellow last-non-actionable-frame overlay is feasible for specific, understood action states; an accurate implementation covering every character and action needs separate research.
+The requested phase-1 changes are feasible. A compact save format can accommodate the new global toggles, including Infinite Shields, OSD title colors, and a reserved phase-2 overlay inside the existing 44-byte settings area, with **31 bits still reserved for future use** after step 6 allocates one bit to Run Turnaround. No current training feature needs to be removed for that design. If persistent event high scores are deliberately retired, their **204-byte region** can become a settings extension after its score access/reset paths are changed; section 17 explains the budget and work involved. Before changing the serialized format, give Tyro Edition its own stable game/save identity so switching to upstream cannot reinterpret Tyro settings. The yellow last-non-actionable-frame overlay is feasible for specific, understood action states; an accurate implementation covering every character and action needs separate research.
 
 **1. What “permanent memory” means in this project**
 
@@ -77,7 +77,7 @@ Use a small OSD choice enum: `Off, White, Red, Green, Blue, Yellow, Cyan, Magent
 
 Retain the existing four-byte enable mask for assembly compatibility. Menu setters synchronize it with the compact choices. This modest duplication avoids changing every existing enable check at once.
 
-| Proposed allocation | Bytes |
+| Current allocation (format 2) | Bytes |
 | --- | ---: |
 | Existing enable mask | 4 |
 | Existing position, page, legacy behavior, advance/decrement, D-pad U/D, D-pad L/R, input display | 7 |
@@ -85,23 +85,25 @@ Retain the existing four-byte enable mask for assembly compatibility. Menu sette
 | Packed overlays, including phase-2 slot | 18 |
 | Packed OSD choices | 8 |
 | Format signature | 2 |
-| Unallocated reserve | 4 |
+| Extra flags byte (Run Turnaround bit 0; seven bits reserved) | 1 |
+| Fully unallocated reserve | 3 |
 | **Total** | **44** |
 
-Suggested byte placement:
+Current byte placement (format 2):
 
-| Offsets | Proposed purpose |
+| Offsets | Current purpose |
 | --- | --- |
 | `0x1F24–0x1F2D` and `0x1F2F` | Preserve current fields and their offsets. |
 | `0x1F2E` | Two version bits and six flag bits. |
 | `0x1F30–0x1F41` | Eighteen packed overlay bytes. |
 | `0x1F42–0x1F49` | Eight packed OSD-choice bytes. |
 | `0x1F4A–0x1F4B` | Format signature. |
-| `0x1F4C–0x1F4F` | Four reserved bytes. |
+| `0x1F4C` | Run Turnaround flash in bit 0; bits 1-7 reserved. |
+| `0x1F4D-0x1F4F` | Three fully reserved bytes. |
 
-Six flag bits cover TURN OSDS OFF, Very Fast trails, Instant trails, missed-L-cancel flash, phase-2 yellow flash, and Infinite Shields. Infinite Shields consumes the previously spare flag bit, so no flag bits remain free in this byte; the four reserved bytes remain untouched. A future independent global Very Very Fast toggle would need space elsewhere, although the event-local decay preset still needs no save bytes. The flags plus version occupy one byte as a group. Use explicit masks/byte packing; an ordinary C enum can occupy four bytes, and C bitfield layout should not define a serialized format.
+Six flag bits cover TURN OSDS OFF, Very Fast trails, Instant trails, missed-L-cancel flash, two-frame yellow/green recovery cue, and Infinite Shields. Infinite Shields consumes the previously spare flag bit, so no flag bits remain free in this byte; step 6 adds Run Turnaround at byte `0x1F4C`, bit 0. **Seven bits in that byte plus three full bytes remain: 31 reserved bits total.** A future independent global Very Very Fast toggle would need one of those bits, although the event-local decay preset still needs no save bytes. The flags plus version occupy one byte as a group. Use explicit masks/byte packing; an ordinary C enum can occupy four bytes, and C bitfield layout should not define a serialized format.
 
-A more direct palette indexed by all 32 bitfield IDs costs 12 bytes instead of eight. That alternative fits too, but consumes the four reserved bytes. A three-bit palette allows eight values total; expanding beyond that would require a format change or additional storage.
+A more direct palette indexed by all 32 bitfield IDs costs 12 bytes instead of eight. That alternative required the original four-byte reserve; after allocating Run Turnaround, it would overlap the extra flag and require a revised layout or extension. A three-bit palette allows eight values total; expanding beyond that would require a format change or additional storage.
 
 Migration must operate on Tyro's separate save or an explicitly created copy of a legacy save, never overwrite the shared upstream save. Read both old overlay lists into temporary RAM **before** overwriting their bytes, validate them, and convert them into the packed arrays. Enabled old OSD rows become White; disabled rows become Off. New flags default off. Write the signature/version only after constructing a complete valid new record. Initialize the whole new configuration on a genuinely new save or no-card boot, and use the signature together with the version to distinguish formats. Validate all enum values during loading.
 
@@ -193,15 +195,15 @@ Persistent cost is **one enable bit** for fixed color/duration. Detection state 
 
 An initial global preset could use red for four simulation frames, then be tuned in-game. That is a proposed default, not the existing Lab behavior or a measured visibility requirement.
 
-**8. Phase 2: yellow on the last frame before inputs become actionable**
+**8. Phase 2: yellow on the final two blocked frames, green on two recovered frames**
 
-Yellow already exists in the overlay palette. What is new is the condition, not the RGB value. Define it as: **this displayed simulation frame is still non-actionable, and the next simulated frame becomes actionable for the defined input category**.
+Yellow already exists in the overlay palette. What is new is the condition, not the RGB value. The accepted step-6 behavior is **yellow on the final two unfrozen simulated frames before supported recovery, followed by a two-frame green completion pulse**. The pulse can confirm recovery even if the player immediately starts the next action; it does not label that new action's startup as actionable.
 
 This is more difficult than identifying the first actionable frame. The current `OVERLAY_ACTIONABLE` and `CheckIASA` helpers evaluate present state; seeing a transition on the next frame cannot retroactively flash the previous frame. End-of-animation is not a universal answer because attacks can become interruptible early, landing/shield/hitstun have their own timers, specials have character-specific cancel paths, and hitlag/animation rates affect the boundary. Some states permit a subset of actions before others, so “prevents inputs” needs a defined scope.
 
 Start with a small verified set: normal landing, L-canceled and missed aerial landing, special landing, shieldstun, and selected ordinary attacks with understood IASA boundaries. Research each transition and account for callback order and displayed-frame indexing. Expand to hitstun, dodges, rolls, jumpsquat and specials only as their boundaries are proven. Do not advertise universal coverage while relying on a generic animation-length heuristic.
 
-Use one yellow flash per actual simulation frame, with intentional behavior during pause/frame advance and hitlag. Validate by frame stepping and trying inputs on the flash frame and the next frame. Existing comments document a stale IASA flag and a spotdodge exception; those are concrete reasons to test individual states.
+Count two yellow frames and two green frames in simulation time, with intentional pause/frame-advance and hitlag behavior. Validate by frame stepping and trying inputs on the flash frame and the next frame. Existing comments document a stale IASA flag and a spotdodge exception; those are concrete reasons to test individual states.
 
 Reserve the global enable bit and eighteenth packed Lab overlay condition now, but expose the global feature after the detector's supported scope is validated. As a global fixed-yellow feature it costs **one bit**; as a selectable Lab overlay it uses the already budgeted extra pair of nibbles. Extra detector tables, timers and tracking are code/RAM, not save capacity.
 
@@ -215,7 +217,7 @@ Reserve the global enable bit and eighteenth packed Lab overlay condition now, b
 | 3 | Add global trail rows, missed-L-cancel flash, and Infinite Shields through the common match service. | C/assembly events and ordinary matches use the preferences; shield handling includes all fighters/subfighters and recording overrides. |
 | 4 | Canonicalize OSD settings identities, title/result metadata and timing helper. Update C/assembly callers. | All nineteen selectable categories have correct titles; displayed timing frames 1/2/3/4+ have Cyan/Green/White/Red. |
 | 5 | Update both OSD editors and add TURN OSDS OFF. | Preferences persist; currently visible OSDs suppress immediately and re-enable correctly; no unsafe NULL message return. |
-| 6 | Prototype the phase-2 last-frame detector with documented state coverage, then expose it globally. | Frame-step evidence verifies the last blocked/first actionable boundary for every supported state. |
+| 6 | Implement the staged two-frame yellow/two-frame green recovery detector, with documented state coverage and global controls; add Run Turnaround flash. | PowerPC tests pass; live frame stepping must confirm the final two blocked/first two recovered frames for each supported state and priority over missed-L-cancel red. |
 
 Use small, reviewable changes; build shared C code, affected event modules and the assembly codeset together after API changes. `build.sh` already centralizes these modules, so a new shared source file must be included in the `eventMenu.dat` build and exports added consistently to `tmFunction.txt`/assembly definitions. Preserve existing ABI offsets or append fields/exports deliberately.
 
@@ -664,3 +666,46 @@ TURN OSDS OFF appears in both editors. On suppresses tagged configurable global 
 The master toggle uses the previously reserved `TM_FLAG_OSDS_OFF` bit 0. Native row ID 6 routes to that flag, independently of OSD enable bit 6. No additional save bytes are allocated: the settings record remains 44 bytes, format version 1, and the four reserved bytes remain free. Future/foreign formats continue to use private defaults without rewriting their records.
 
 Twenty-six compiled PowerPC tests pass. Editor coverage exercises forward/backward wrapping, native snapshot saving, reserved-row/navigation isolation, independent master/trail toggles, existing-message suppression and restoration, event-owned visibility, future-format fallback, and a serialized round trip into a fresh service instance. The optimized C/assembly release build passes without compiler warnings and produces the updated ISO/ZIP. These checks do not substitute for Dolphin verification of menu layout/clicks, checkbox animation, pause visibility or actual card I/O. Test a color choice, both global trail flags and master suppression across exit/re-entry, match/event changes, pause, save/reload and an upstream/Tyro switch.
+
+
+**30. Step 6: recovery cues, global flashes/shields, and reserve ledger**
+
+Implemented October 5, 2026, retaining release name **V1.4.1T2** and stable identity **TYRE01**. The packed settings format is now **version 2**. The yellow window is the final **two** simulated recovery frames, followed by a **two-frame** green completion pulse. Green still confirms completion when the player immediately starts the next ordinary action; it is not a claim that the new action's startup is interruptible. New yellow recovery takes priority. Pause does not consume frames; hitlag/freezes suppress the timing color and do not advance its countdown. Restores, Ledgedash repositioning, scene/match changes, death and backwards state/frame clocks clear transient tracking.
+
+Both the L-button menu and Lab OSD menu expose **Recovery Yellow/Green**, **Flash Run Turnaround**, **Flash Missed L-Cancel**, and **Infinite Shields**. The last two complete the deferred shared flash/shield portion of step 3. New controls start Off. B/Z toggle the native Boolean rows; Lab edits only the selected shared flag. TURN OSDS OFF suppresses message text only, so it does not disable these body overlays or shields.
+
+| Requested case | Implementation/boundary |
+| --- | --- |
+| Landing without a move | `Landing` (42): normal landing-lag attribute when native landing interruption is allowed, or animation completion if earlier. |
+| Autocancel landing | Also `Landing` (42); it uses the same native boundary. |
+| Wavelanding / wavedashing | `LandingFallSpecial` (43): native animation endpoint and actual playback rate; ordinary landing's shorter interrupt threshold is used only if its native allow-interrupt flag is set. Air-dodge landing normally has it clear. |
+| Aerial performed without landing | `AttackAirN/F/B/Hi/Lw` (65?69): the earlier of the native IASA command and animation completion. Landing switches to the appropriate landing detector. |
+| Missed aerial landing lag | `LandingAirN/F/B/Hi/Lw` (70?74): actual animation endpoint/rate, retaining full lag. |
+| L-cancelled aerial landing lag | The same five states; native rate scaling already represents shortened, truncated L-cancel lag. The cue does not guess by halving a counter. |
+| Ordinary grounded attack recovery | Jabs, rapid-jab end, dash attacks, tilts and smashes: native IASA or animation completion. Rapid-jab start/loop, looping animations and zero-rate charge holds are excluded until ordinary recovery resumes. |
+| Character exceptions | Game & Watch's custom ordinary attack/aerial/landing IDs 341?352 normalize to their equivalent categories. His non-L-cancellable custom aerial landings are not reported as missed cancels. Kirby dash attack IDs 351?352 are included; its airborne continuation has no IASA callback and uses animation completion only. |
+
+The staged scope means broad normal-action recovery, not every input available in every state. Earlier narrow cancels (jab followups, boost grabs, aerial drift/fastfall) are not the general recovery boundary. Character specials, hitstun, shieldstun, dodge/roll/tech/getup recovery and ledge actions are not predicted yet. Shieldstun and tech/getup would be useful next additions after their native timers and input boundaries are checked. Do not add them using the animation endpoint alone.
+
+`src/action_cues.c` provides the bounded, read-only two-frame script lookahead and pulse model. It copies the full native command snapshot including its stack, handles native timers/loops/subroutines/jumps, skips command payloads using the verified DOL sizes, and watches opcode 0x58 (Enable IASA). It never executes hitbox, sound, background-flash or other gameplay side effects. Pointer, opcode, stack and instruction-budget checks prevent unbounded traversal; unknown scripts do not produce a guessed IASA boundary. `src/action_cues_game.c` samples all six player slots and both subfighters after their simulation/event callbacks. Live animation length is read through the verified getter at `0x8006F484`, without requesting/replacing animation data.
+
+The service wraps each fighter's existing GX callback. Immediately before drawing, yellow/green replaces all competing body-color layers, including **Lab's red missed-L-cancel overlay** and the shared red flash. All three original `ColorOverlay` structures are restored byte-for-byte after the native draw. Native/event color-animation timers and scripts are not erased. Invisibility and collision-display choices keep their own behavior. Yellow/green is visible only in its short timing window; other local overlays resume afterward.
+
+Run Turnaround flashes red for **four** unfrozen simulation frames on entry to `TurnRun` (19), not standing turn (18), dash, run or run-brake. Re-entry triggers another flash. The shared missed-cancel flash lasts four unfrozen frames, recording the trigger-window result at the real aerial-landing entry before the timer ages; it works even when L-cancel text is Off. Timing colors have priority over both flashes. Infinite Shields refills every live main/subfighter to native full shield health before fighter processing and after event-local writes; Lab's local shield rows show whether the global override is On. Off leaves local event policy alone. This is the existing refill-style training behavior, not new immunity to a single hit that exceeds a full shield.
+
+**Current persistent reserve ledger (logical record offsets; not raw encoded card offsets):**
+
+| Location | Assignment | Reserved capacity left there |
+| --- | --- | ---: |
+| Record byte 10 / RAM `0x1F2E`, bits 0?5 | Master OSD Off, Very Fast trails, Instant trails, missed L-cancel, recovery cue, Infinite Shields | 0 bits |
+| Record byte 10, bits 6?7 | Format version = 2 | 0 bits |
+| Record byte 40 / RAM `0x1F4C`, bit 0 (mask `0x01`) | `TM_FLAG_RUN_TURNAROUND` (logical flag index 6), native row ID 17 | Allocated: 1 bit |
+| Record byte 40, bits 1?7 (mask `0xFE`) | Unassigned; preserved by setters and validation | **7 bits** |
+| Record bytes 41?43 / RAM `0x1F4D?0x1F4F` | Unassigned; preserved | **24 bits / 3 bytes** |
+| **Total remaining in the original reserve** | No score reclamation or record growth | **31 bits (3 bytes + 7 bits)** |
+
+The settings record remains **44 bytes**. Version-1 signed records migrate to version 2 by initializing only the newly allocated Run Turnaround bit Off and changing the existing version bits; palettes, controls, overlays, original six flags and the other **31 reserve bits** are retained. Unversioned Tyro records still go through the prior packed migration. Migration is idempotent and marks native card data dirty. Earlier version-aware Tyro builds reject version 2 and use private defaults without rewriting it; their settings will not be shown until returning to the new build. This does not make the old unversioned TYRE prototype safe to reuse. GTME upstream saves remain separate.
+
+The PowerPC build reports **624 bytes** for twelve fighter tracking/draw records, plus **16 bytes** of manager/clock/live state (640 static bytes), one GOBJ/two process records and ordinary stack/code overhead. The render wrapper temporarily copies 384 bytes of native color structures on the stack; script lookahead copies 36 bytes. These are runtime costs, not card space.
+
+Forty compiled PowerPC tests pass, including state/rate boundaries, all five cancelled/uncancelled aerial landing categories, IASA before animation end, two-yellow/two-green sequences, immediate next actions, freeze/pause/restore, subfighters, four-frame flashes, source-specific flash suppression, actual draw-callback composition/restoration, full shields in all twelve slots, native editor rows, and reserve-preserving version migration. Native DOL disassembly and the [landing implementation](https://github.com/doldecomp/melee/blob/master/src/melee/ft/kinds/ftCommon/ftCo_Landing.c), [aerial landing/rate scaling](https://github.com/doldecomp/melee/blob/master/src/melee/ft/kinds/ftCommon/ftCo_LandingAir.c), [attack callbacks](https://github.com/doldecomp/melee/blob/master/src/melee/ft/kinds/ftCommon/ftCo_AttackAir.c), [command dispatcher](https://github.com/doldecomp/melee/blob/master/src/melee/ft/ftaction.c) and [animation completion](https://github.com/doldecomp/melee/blob/master/src/sysdolphin/baselib/aobj.c) support the staged boundaries. **Live Dolphin frame-step/input verification remains required**; synthetic adapter tests are not evidence that every fighter/animation/camera combination has been observed in-game. Validate all requested cases on Fox/Falco and another character, L-cancel red priority in Lab, G&W/Kirby exceptions, Nana, slow motion/frame advance, pause, recordings/restores, save/reload and upstream switching before calling runtime validation complete.

@@ -3,7 +3,8 @@
 #include <stddef.h>
 
 typedef char settings_mask_offset[(offsetof(Memcard, TM_OSDEnabled) == TM_SETTINGS_OFFSET) ? 1 : -1];
-typedef char settings_tail_offset[(offsetof(Memcard, TM_SettingsReserved) == 0x1F4C) ? 1 : -1];
+typedef char settings_extra_offset[(offsetof(Memcard, TM_SettingsExtraFlags) == 0x1F4C) ? 1 : -1];
+typedef char settings_tail_offset[(offsetof(Memcard, TM_SettingsReserved) == 0x1F4D) ? 1 : -1];
 typedef char settings_boundary[(offsetof(Memcard, unk2004) == TM_SETTINGS_OFFSET + TM_SETTINGS_SIZE) ? 1 : -1];
 
 static u8 last_record[TM_SETTINGS_SIZE];

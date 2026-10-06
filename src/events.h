@@ -10,6 +10,7 @@
 #include "settings.h"
 #include "trails.h"
 #include "osd_style.h"
+#include "action_cues.h"
 #define EVENT_DATASIZE 512
 #define TM_FUNC -(50 * 4)
 
@@ -284,6 +285,7 @@ typedef struct EventVars
     void (*HUD_DrawInfoPanel)(const char **label, const char **info, int count);
     const TMSettingsAPI *settings;
     const TMTrailAPI *trails;
+    void (*clear_action_cues)(void);
 } EventVars;
 #define event_vars_ptr_loc ((EventVars**)0x803d7054)
 #define event_vars (*event_vars_ptr_loc)
@@ -375,6 +377,9 @@ void OSD_ApplyMessageStyle(MsgData *msg);
 void OSD_MessageGX(GOBJ *gobj, int pass);
 void OSD_EditorInit(void *data);
 int OSD_EditorInput(void *data, unsigned buttons, unsigned row);
+void ActionCues_LCancel(GOBJ *gobj);
+int ActionCues_Remaining(GOBJ *gobj);
+int ActionCues_CommonState(int kind, int state);
 typedef struct MsgMngrData
 {
     COBJ *cobj;

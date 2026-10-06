@@ -85,3 +85,87 @@ unsigned TestEditorCache(unsigned row) { return editor_data[row + 2]; }
 void TestEditorAnimate(unsigned row) { editor_data[row + 2] = *(volatile uint8_t *)0x804A04F4; }
 unsigned TestEditorChoiceChar(unsigned row, unsigned offset) { return editor_choices[row][offset]; }
 uint32_t TestEditorColor(unsigned row) { return editor_colors[row]; }
+
+static GOBJ cue_manager, cue_objects[12];
+static FighterData cue_data[12];
+static ftCommonData cue_common;
+static int cue_active[12];
+static float cue_lengths[12];
+static void (*cue_early)(GOBJ *), (*cue_late)(GOBJ *);
+static uint32_t cue_draw_colors[12];
+static unsigned cue_draw_flags[12];
+GOBJ *GObj_Create(int entity_class, int p_link, int p_priority) { return &cue_manager; }
+GOBJProc *GObj_AddProc(GOBJ *gobj, void *callback, int priority) {
+    if (priority == 0) cue_early = callback;
+    if (priority == 23) cue_late = callback;
+    return 0;
+}
+GOBJ *Fighter_GetSubcharGObj(int ply, int sub) {
+    unsigned slot = ply * 2 + sub;
+    return slot < 12 && cue_active[slot] ? &cue_objects[slot] : 0;
+}
+float Fighter_GetCurrentAnimLength(GOBJ *gobj) { return cue_lengths[gobj - cue_objects]; }
+static void TestCueNativeDraw(GOBJ *gobj, int pass) {
+    unsigned slot = gobj - cue_objects;
+    FighterData *data = gobj->userdata;
+    GXColor color = data->color[1].hex;
+    cue_draw_colors[slot] = ((u32)color.r << 24) | ((u32)color.g << 16) | ((u32)color.b << 8) | color.a;
+    cue_draw_flags[slot] = (data->color[0].color_enable << 2) | (data->color[1].color_enable << 1) | data->color[2].color_enable;
+}
+void TestCueInit(void) {
+    ActionCues_SceneChange();
+    memset(cue_data, 0, sizeof(cue_data));
+    memset(cue_objects, 0, sizeof(cue_objects));
+    memset(cue_active, 0, sizeof(cue_active));
+    *stc_ftcommon = &cue_common;
+    cue_common.xe4 = 7; cue_common.x260 = 60;
+    for (unsigned slot = 0; slot < 12; ++slot) {
+        cue_objects[slot].userdata = &cue_data[slot];
+        cue_objects[slot].gx_cb = TestCueNativeDraw;
+        cue_data[slot].ply = slot / 2; cue_data[slot].flags.ms = slot & 1;
+        cue_data[slot].state_id = ASID_WAIT;
+        cue_data[slot].state.rate = 1;
+        cue_lengths[slot] = 40;
+    }
+    stc_match->time_frames = 0;
+    ActionCues_MatchStart();
+}
+uintptr_t TestCueData(unsigned slot) { return (uintptr_t)&cue_data[slot]; }
+uintptr_t TestCueObject(unsigned slot) { return (uintptr_t)&cue_objects[slot]; }
+void TestCueState(unsigned slot, int state, int frame, int end, int rate100) {
+    cue_active[slot] = 1;
+    cue_data[slot].state_id = state;
+    cue_data[slot].state.frame = frame;
+    cue_data[slot].state.rate = rate100 / 100.0f;
+    cue_lengths[slot] = end;
+}
+void TestCueLanding(unsigned slot, int lag, int allow_interrupt) {
+    cue_data[slot].attr.normal_landing_lag = lag;
+    cue_data[slot].state_var.state_var1 = allow_interrupt;
+}
+void TestCueFrozen(unsigned slot, int frozen) { cue_data[slot].flags.hitlag = frozen; }
+void TestCueIASA(unsigned slot, int ready) { cue_data[slot].flags.past_iasa = ready; }
+void TestCueKind(unsigned slot, int kind) { cue_data[slot].kind = kind; }
+void TestCueMissed(unsigned slot, int timer) {
+    cue_data[slot].input.timer_trigger_any_ignore_hitlag = timer;
+    ActionCues_LCancel(&cue_objects[slot]);
+}
+void TestCueTick(unsigned frame) {
+    stc_match->time_frames = frame;
+    cue_early(&cue_manager);
+    cue_late(&cue_manager);
+}
+void TestCueDraw(unsigned slot) { cue_objects[slot].gx_cb(&cue_objects[slot], 2); }
+uint32_t TestCueDrawColor(unsigned slot) { return cue_draw_colors[slot]; }
+unsigned TestCueDrawFlags(unsigned slot) { return cue_draw_flags[slot]; }
+int TestCueRemaining(int frame100, int rate100, int boundary100) {
+    return TMCue_Remaining(frame100 / 100.0f, rate100 / 100.0f, boundary100 / 100.0f);
+}
+int TestCueScriptIASA(TMCueScript *script, int rate100) {
+    return TMCue_ScriptIASA(script, rate100 / 100.0f);
+}
+void TestCueScript(unsigned slot, const uint32_t *script, int timer100, int frame100) {
+    cue_data[slot].script.script_current = (int *)script;
+    cue_data[slot].script.script_event_timer = timer100 / 100.0f;
+    cue_data[slot].script.script_frame_timer = frame100 / 100.0f;
+}

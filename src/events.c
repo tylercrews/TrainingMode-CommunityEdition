@@ -791,6 +791,7 @@ EventVars stc_event_vars = {
     .HUD_DrawInfoPanel = HUD_DrawInfoPanel,
     .settings = &settings_api,
     .trails = &trails_api,
+    .clear_action_cues = ActionCues_Clear,
 };
 
 static GOBJ *stc_msgmgr;
@@ -1465,6 +1466,7 @@ void OnFileLoad(HSD_Archive *archive) // this function is run right after TmDt i
 void OnSceneChange(void)
 {
     Trails_SceneChange();
+    ActionCues_SceneChange();
     // Hook exists at 801a4c94
     TM_CreateWatermark();
 
@@ -1482,6 +1484,7 @@ void OnStartMelee(void)
 {
     Settings_Status();
     Trails_MatchStart();
+    ActionCues_MatchStart();
     Message_Init();
     Tip_Init();
 }
