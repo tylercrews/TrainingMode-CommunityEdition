@@ -357,9 +357,8 @@ TextASCIIRight:
 
 FDDTitleText:
     blrl
-    .long 0x4f534420
-    .long 0x4d656e75
-    .long 0x00000000
+    .string "Global Settings - OSDs and Overlays"
+    .align 2
 
 original:
     branchl r4, 0x802359c8

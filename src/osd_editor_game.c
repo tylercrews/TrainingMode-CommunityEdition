@@ -1,19 +1,33 @@
 #include "events.h"
 
 /* Native RSS cursor order, not sparse OSD ID order. The first 15 rows are left. */
-static const uint8_t row_ids[] = {
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 10, 24, 26, 28,
-    12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 25, 27,
-};
+#define row_ids TMSettings_EditorIDs
 static const char *row_names[] = {
-    "Wavedash Info", "L-Cancel", TM_GLOBAL_TRAIL_VERY_FAST_NAME, "Act OoS Frame",
-    TM_GLOBAL_TRAIL_INSTANT_NAME, "Dashback", TM_GLOBAL_OSDS_OFF_NAME, TM_GLOBAL_MISSED_LCANCEL_NAME,
-    "Fighter-specific Tech", "Powershield Frame", TM_GLOBAL_ACTION_CUES_NAME, "SDI Inputs", "Grab Breakout",
-    "Ledgedash Info", "Act OoHitstun", "Lockout Timers", "Item Throw Interrupts",
-    "Boost Grab", 0, "Act OoLag", TM_GLOBAL_RUN_TURN_NAME, "Act OoAirborne", "Jump Cancel Timing",
-    "Fastfall Timing", "Frame Advantage", "Combo Counter", TM_GLOBAL_INFINITE_SHIELDS_NAME, TM_GLOBAL_INVINCIBILITY_NAME, 0,
+    "Wavedash Info", "L-Cancel", "Act OoS Frame", "Dashback", "Fighter-specific Tech",
+    "Powershield Frame", "SDI Inputs", "Lockout Timers", "Item Throw Interrupts", "Boost Grab",
+    "Act OoLag", "Act OoAirborne", "Jump Cancel Timing", "Fastfall Timing", "Frame Advantage",
+    "Combo Counter", "Grab Breakout", "Ledgedash Info", "Act OoHitstun", 0,
+    TM_GLOBAL_OSDS_OFF_NAME, 0, TM_GLOBAL_TRAIL_VERY_FAST_NAME, TM_GLOBAL_TRAIL_INSTANT_NAME,
+    TM_GLOBAL_MISSED_LCANCEL_NAME, TM_GLOBAL_RUN_TURN_NAME, TM_GLOBAL_ACTION_CUES_NAME,
+    TM_GLOBAL_INFINITE_SHIELDS_NAME, TM_GLOBAL_INVINCIBILITY_NAME,
 };
 static const char *color_names[] = { TM_OSD_COLOR_NAMES };
+static void hide_tree(JOBJ *joint) {
+    joint->flags |= JOBJ_HIDDEN;
+    for (JOBJ *child = joint->child; child; child = child->sibling) hide_tree(child);
+}
+static void hide_gaps(void *data) {
+    /* Same column-root/child/sibling layout as native RSS at 0x802364A0.
+     * Do not follow a row's next sibling when hiding its subtree. */
+    for (unsigned row = 0; row < sizeof(row_ids); ++row) {
+        if (row_ids[row] != 255) continue;
+        JOBJ *root = *(JOBJ **)((uint8_t *)data + (row < 15 ? 0x2C : 0x34));
+        JOBJ *joint = root ? root->child : 0;
+        unsigned index = row < 15 ? row : row - 15;
+        while (index-- && joint) joint = joint->sibling;
+        if (joint) hide_tree(joint);
+    }
+}
 
 static int flag_for(unsigned id) {
     return TMSettings_NativeFlag(id);
@@ -40,12 +54,18 @@ void OSD_EditorInit(void *data) {
         if (row_names[row]) {
             refresh_row(data, row);
             ((uint8_t *)data)[row + 2] = !!Settings_Get(TM_SETTING_NATIVE_ROW, row_ids[row]);
+        } else {
+            Text *text = *(Text **)((uint8_t *)data + (row < 15 ? 0x40 : 0x44));
+            Text_SetText(text, (row < 15 ? row : row - 15) + 1, "");
+            ((uint8_t *)data)[row + 2] = 0;
         }
+    hide_gaps(data);
 }
 
 /* Return whether B/Z was consumed, including on unused rows. A/Start still exit,
  * D-pad/stick still navigate and X/Y still choose the screen position. */
 int OSD_EditorInput(void *data, unsigned buttons, unsigned row) {
+    hide_gaps(data); /* Native initialization can clear the model's hidden flags. */
     if (!(buttons & (HSD_BUTTON_B | HSD_TRIGGER_Z))) return 0;
     if (row >= sizeof(row_ids) || !row_names[row]) return 1;
     unsigned id = row_ids[row];

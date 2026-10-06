@@ -32,8 +32,8 @@ void TMTrail_Add(TMTrailBank *bank, const TMTrailSample *sample) {
 }
 
 unsigned TMTrail_Alpha(unsigned mode, uint32_t age) {
-    static const uint8_t hold[] = {15, 10, 5, 1, 0, 30, 0};
-    static const uint8_t fade[] = {4, 8, 13, 50, 200, 2, 0};
+    static const uint8_t hold[] = {15, 10, 5, 0, 30, 0};
+    static const uint8_t fade[] = {4, 8, 13, 200, 2, 0};
     if (mode >= TM_TRAIL_DISABLED) return 0;
     if (age == 0) return TM_TRAIL_CURRENT_ALPHA;
     unsigned lost = 0;
@@ -43,6 +43,21 @@ unsigned TMTrail_Alpha(unsigned mode, uint32_t age) {
         lost = elapsed * fade[mode];
     }
     return (TM_TRAIL_HISTORY_ALPHA * (TM_TRAIL_CURRENT_ALPHA - lost) + TM_TRAIL_CURRENT_ALPHA / 2) / TM_TRAIL_CURRENT_ALPHA;
+}
+uint32_t TMTrail_DamageColor(uint32_t player_color, int damage) {
+    /* Base damage avoids stale-move/handicap changes to the visual cue. Strong
+     * and weak phases/simultaneous hitboxes remain distinct in saved samples. */
+    unsigned alpha = damage <= 3 ? 64 : damage >= 12 ? 240 : (unsigned)damage * 20;
+    return (player_color & 0xFFFFFF00u) | alpha;
+}
+unsigned TMTrail_SampleAlpha(unsigned mode, uint32_t age, uint32_t color) {
+    unsigned fade = TMTrail_Alpha(mode, age);
+    if (!fade) return 0;
+    unsigned strength = color & 255;
+    if (!age) return strength;
+    unsigned history = (strength * 96 + 120) / 240;
+    unsigned alpha = (fade * history + TM_TRAIL_HISTORY_ALPHA / 2) / TM_TRAIL_HISTORY_ALPHA;
+    return alpha ? alpha : (strength ? 1 : 0);
 }
 
 unsigned TMTrail_Effective(unsigned very_fast, unsigned instant, unsigned local_enabled, unsigned local_mode) {

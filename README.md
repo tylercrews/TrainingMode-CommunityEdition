@@ -19,6 +19,10 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Regrouped Global Settings - OSDs and Overlays: ordered OSDs, a gap, OVERRIDE: TURN ALL OSDS OFF, another gap, then shared controls in the bottom right.
+- Changed missed L-cancel and Run Turnaround diagnostics to repeat a red opacity pulse throughout their action states.
+- Restored strong/weak trail contrast using base-damage opacity while retaining player colors; removed Very Very Fast from both local decay menus.
+
 - Fixed repeated invalid reads after creating a save by preventing an unsupported MEX relocation in the game-ID comparison; added optimized DAT relocation regressions.
 - Added a global translucent player-colored invincibility/intangibility overlay for ledge, respawn, dodges and moves, including Yoshi's active double-jump armor.
 - Allocated byte 40, bit 1 for protection and migrated settings to format 3; 30 reserved bits remain.

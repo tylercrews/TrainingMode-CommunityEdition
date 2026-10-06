@@ -1252,8 +1252,8 @@ static EventOption LabOptions_General[OPTGEN_COUNT] = {
     {
         .kind = OPTKIND_MENU,
         .menu = &LabMenu_OSDs,
-        .name = "OSD Menu",
-        .desc = {"Enable/disable OSDs"},
+        .name = "Global Settings - OSDs and Overlays",
+        .desc = {"Choose global OSD colors, overlays and other shared controls."},
     },
 };
 static EventMenu LabMenu_General = {
@@ -1836,6 +1836,12 @@ static EventOption LabOptions_OSDs[] = {
     },
     {
         .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_OSDS_OFF_NAME,
+        .desc = {"Hide global OSD messages without clearing their colors.", "Trails and event feedback remain active."},
+        .OnChange = Lab_ChangeOSDsOff,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
         .name = TM_GLOBAL_TRAIL_VERY_FAST_NAME,
         .desc = {"Enable Very Fast trails in every gameplay match."},
         .OnChange = Lab_ChangeGlobalVeryFast,
@@ -1848,26 +1854,20 @@ static EventOption LabOptions_OSDs[] = {
     },
     {
         .kind = OPTKIND_TOGGLE,
-        .name = TM_GLOBAL_OSDS_OFF_NAME,
-        .desc = {"Hide global OSD messages without clearing their colors.", "Trails and event feedback remain active."},
-        .OnChange = Lab_ChangeOSDsOff,
+        .name = TM_GLOBAL_MISSED_LCANCEL_NAME,
+        .desc = {"Pulse red throughout uncancelled aerial landing lag.", "Recovery Yellow/Green takes priority over this flash."},
+        .OnChange = Lab_ChangeGlobalCue,
     },
     {
         .kind = OPTKIND_TOGGLE,
-        .name = TM_GLOBAL_MISSED_LCANCEL_NAME,
-        .desc = {"Flash red for four simulation frames on a missed cancel.", "Recovery Yellow/Green takes priority over this flash."},
+        .name = TM_GLOBAL_RUN_TURN_NAME,
+        .desc = {"Pulse red throughout the Run Turnaround state.", "Standing and dash turns do not trigger this flash."},
         .OnChange = Lab_ChangeGlobalCue,
     },
     {
         .kind = OPTKIND_TOGGLE,
         .name = TM_GLOBAL_ACTION_CUES_NAME,
         .desc = {"Yellow: last two blocked frames. Green: recovery completes.", "Green lasts two frames, even if you start your next action.", "Covers landings, aerials and ordinary grounded attacks."},
-        .OnChange = Lab_ChangeGlobalCue,
-    },
-    {
-        .kind = OPTKIND_TOGGLE,
-        .name = TM_GLOBAL_RUN_TURN_NAME,
-        .desc = {"Flash red for four simulation frames on entering TurnRun.", "Standing and dash turns do not trigger this flash."},
         .OnChange = Lab_ChangeGlobalCue,
     },
     {
@@ -1885,7 +1885,7 @@ static EventOption LabOptions_OSDs[] = {
 };
 
 static EventMenu LabMenu_OSDs = {
-    .name = "OSDs",
+    .name = "Global Settings - OSDs and Overlays",
     .option_num = sizeof(LabOptions_OSDs) / sizeof(EventOption),
     .options = LabOptions_OSDs,
 };

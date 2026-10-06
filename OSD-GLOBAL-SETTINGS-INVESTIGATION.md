@@ -747,3 +747,31 @@ The user reported repeated Dolphin warnings after creating a save: invalid read 
 The byte comparison helper is now explicitly non-inlined, keeping both addresses as runtime arguments and their subtraction outside relocatable symbol constants. The six-byte identity check, validation/migration and fallback behavior are retained. No save format, reserved-bit allocation, identity or release-version changes were needed. The current record remains format 3 / 44 bytes with **30 reserved bits**. User card files were neither opened nor edited during diagnosis; the emulator inspection was read-only.
 
 The prior ELF tests did not exercise this failure mode. The test runner now compiles a fresh optimized production DAT and applies the actual native relocation rules before emulating its exported settings accessors. Regressions cover a fresh/no-signature save, repeated reads, settings writes, format-2 migration and foreign-identity preservation. Forty-six PowerPC tests pass, including those DAT regressions. The rebuilt release passes without warnings/errors. The user's running session has not been replaced or patched; restart emulation with the rebuilt ISO to validate the full save-creation flow. Keep the existing save rather than deleting it to work around a code-address bug.
+
+
+**33. Grouped global menu, sustained red pulses and damage-weighted trails**
+
+Implemented October 5, 2026, retaining V1.4.1T2, TYRE01, packed format **3**, the **44-byte** record and **30 reserved bits**. These changes allocate no save bytes and reclaim no event scores.
+
+The native title and Lab entry/title now read **Global Settings - OSDs and Overlays**. The exact master label is **OVERRIDE: TURN ALL OSDS OFF**. Read the native grid down the left column, then the right; it has 29 physical rows, 27 named controls and two gaps:
+
+| Physical cursor rows (zero-based) | Content |
+| --- | --- |
+| Left 0-14 | First fifteen OSDs, in the canonical Lab/settings order |
+| Right 15-18 | Combo Counter, Grab Breakout, Ledgedash Info, Act OoHitstun |
+| Right 19 | Blank gap |
+| Right 20 | **OVERRIDE: TURN ALL OSDS OFF** |
+| Right 21 | Blank gap |
+| Right 22-28 | Very Fast trails, Instant trails, Pulse Missed L-Cancel, Pulse Run Turnaround, Recovery Yellow/Green, Infinite Shields, Invincibility Overlay |
+
+`TMSettings_EditorIDs` is a display-order map over stable OSD/flag identities. New accessor field **17**, `TM_SETTING_EDITOR_ROW`, translates the native RSS physical row IDs into those bindings. L-menu initialization and exit saving use that field; the original logical-row accessor (16), color slots and global flag bits keep their meaning. Both gaps return Off, ignore saves and preserve unknown/custom-event enable bits. Their text and checkbox subtrees are hidden without hiding neighboring rows. B/Z on a gap makes no preference change. Lab places its master immediately after the nineteen OSDs and follows with the same shared-control order; its scrollable menu does not consume native grid gaps.
+
+Missed L-cancel latches the actual landing-entry result and repeats red for the **entire uncancelled aerial landing state**; a successful cancel does not pulse. Run Turnaround repeats red only while **TurnRun** is active. Both stop on state exit, reset/restore/death or disabling the selected global preference. Opacity repeats a twelve-simulation-frame waveform: **180, 148, 116, 84, 52, 20, 20, 52, 84, 116, 148, 180**. Pause and hitlag retain the current phase. This replaces the earlier single four-frame flash; it is a Slippi-like pulse, not a claim of exact Slippi timing. Yellow/green recovery remains highest priority, followed by protection, then red diagnostics. Native/local colors are restored after drawing.
+
+Investigation of the pre-unification trail implementation (`2ddff77`, `HitboxTrails_Color`) found **damage-dependent RGB**, with a fixed initial alpha of 200, rather than a dedicated hard/soft-hit flag. Fighter and item hitboxes expose base damage (`dmg`) and actual/staled damage (`dmg_f`); the latter is unsuitable for a stable move-strength cue. The new renderer keeps player RGB and stores damage-weighted opacity in the existing sample color's alpha byte. Damage at/below 3 uses alpha 64; damage 4-11 uses `20 * damage`; damage at/above 12 uses alpha 240. This is a bounded damage-strength visualization, not a universal sweetspot or knockback classifier.
+
+For the user's Fox-nair example, **12 damage = current alpha 240 / starting history alpha 96**, versus **9 damage = current alpha 180 / starting history alpha 72**. Simultaneous hitboxes are sampled independently, and a damage/alpha change preserves the previous stronger sample rather than refreshing it as identical geometry. The preset's fade timing stays unchanged; history caps scale with captured strength. Fighter and projectile samples share this rule. No damage fields were added to the 40-byte sample: the bank remains 128 samples / **5,132 bytes including clock/index state**. Extremely strong hitboxes saturate the opacity cap, so different high-damage values can have the same alpha.
+
+**Very Very Fast was removed** from Lab and Eggs-ercise. Remaining local decays are Normal, Fast, Very Fast, Instant, Slow and Off (no fading). Global Very Fast/Instant preferences retain their saved flags and priority. Local decay values are not serialized, so removing that enum entry requires rebuilding callers, but no memory-card migration. Header fingerprints force the full rebuild.
+
+Forty-nine compiled PowerPC tests pass, including grouped native reads/writes through the actual hook macros, complete exit-save preservation, exact master label/gap visibility, pulse duration/repeat/freeze/exit behavior, strong/weak opacity and historical samples, removed-preset indexing, and relocated production DAT settings access. The optimized release is rebuilt and checked separately. Dolphin validation is still needed for title/row fit, gap navigation, the pulse's visual feel and Fox-nair/other hitbox contrast under Very Fast/Instant/slow motion/frame advance.

@@ -966,6 +966,7 @@
 .set SettingsField_Recommended, 3
 .set SettingsField_Enabled, 15
 .set SettingsField_Row, 16
+.set SettingsField_EditorRow, 17
 
 # Preserve the native hook's entire register context, including volatile FPRs,
 # r0, CR, CTR and XER. Leave ABI linkage/argument space below the saves.
@@ -1040,11 +1041,11 @@
     .endif
     SettingsRestore
 .endm
-.macro SettingsToggle id, value
+.macro SettingsToggle id, value, field=SettingsField_Row
     SettingsBackup
     SettingsSavedLoad r4, \id
     SettingsSavedLoad r5, \value
-    li r3, SettingsField_Row
+    li r3, \field
     rtocbl r12, TM_SettingsSet
     SettingsRestore
 .endm

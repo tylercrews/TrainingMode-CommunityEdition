@@ -10,7 +10,7 @@
 
     # Native row mapping keeps global trail flags separate from the OSD mask.
     rlwinm r3, r3, 0, 16, 31
-    SettingsReadIndexed SettingsField_Row, 3, 3
+    SettingsReadIndexed SettingsField_EditorRow, 3, 3
     b exit
 
 original:

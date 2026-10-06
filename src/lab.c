@@ -303,8 +303,8 @@ void Lab_ChangeHitboxTrails(GOBJ *menu_gobj, int value) {
 static void Lab_SetGlobalTrail(unsigned flag, int value) {
     // Change only the selected preference; another editor may have changed its sibling.
     TM_SetSetting(TM_SETTING_FLAG, flag, value);
-    LabOptions_OSDs[TM_SETTINGS_OSDS].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
-    LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 2].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
     Lab_ChangeHitboxTrails(0, 0);
     Memcard_SaveIfChanged();
 }
@@ -328,11 +328,11 @@ void Lab_ChangeOSDs(GOBJ *menu_gobj, int value) {
 
 void Lab_ChangeOSDsOff(GOBJ *menu_gobj, int value) {
     TM_SetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF, value);
-    LabOptions_OSDs[TM_SETTINGS_OSDS + 2].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF);
+    LabOptions_OSDs[TM_SETTINGS_OSDS].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF);
     Memcard_SaveIfChanged();
 }
 static const unsigned global_cue_flags[] = {
-    TM_FLAG_MISSED_LCANCEL, TM_FLAG_LAST_BLOCKED_FRAME, TM_FLAG_RUN_TURNAROUND, TM_FLAG_INFINITE_SHIELDS,
+    TM_FLAG_MISSED_LCANCEL, TM_FLAG_RUN_TURNAROUND, TM_FLAG_LAST_BLOCKED_FRAME, TM_FLAG_INFINITE_SHIELDS,
     TM_FLAG_INVINCIBILITY,
 };
 static void Lab_RefreshShieldOverride(void) {
@@ -6105,10 +6105,10 @@ void Event_Init(GOBJ *gobj)
     for (int i = 0; i < (int)countof(LabOSD_ID); i++)
         LabOptions_OSDs[i].val = TM_GetSetting(TM_SETTING_OSD_COLOR, LabOSD_ID[i]);
 
-    LabOptions_OSDs[TM_SETTINGS_OSDS].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
-    LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 2].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
     Lab_ChangeHitboxTrails(0, 0);
-    LabOptions_OSDs[TM_SETTINGS_OSDS + 2].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF);
+    LabOptions_OSDs[TM_SETTINGS_OSDS].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF);
     for (unsigned i = 0; i < countof(global_cue_flags); ++i)
         LabOptions_OSDs[TM_SETTINGS_OSDS + 3 + i].val = TM_GetSetting(TM_SETTING_FLAG, global_cue_flags[i]);
     Lab_RefreshShieldOverride();

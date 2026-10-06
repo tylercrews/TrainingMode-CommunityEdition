@@ -18,6 +18,14 @@ TestSettingsWrite:
 TestSettingsRow:
     SettingsReadIndexed SettingsField_Row, 3, 3
     blr
+.global TestSettingsEditorRow
+TestSettingsEditorRow:
+    SettingsReadIndexed SettingsField_EditorRow, 3, 3
+    blr
+.global TestSettingsEditorWrite
+TestSettingsEditorWrite:
+    SettingsToggle 3, 4, SettingsField_EditorRow
+    blr
 .global TestSeedXER
 TestSeedXER:
     lis r3, 0xa000

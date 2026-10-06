@@ -150,6 +150,12 @@ class RelocatedDATSettingsTests(unittest.TestCase):
             self.assertEqual(m.call("DAT_Get", 1, 0), 1)
         m.call("DAT_Set", 11, 7, 1)
         self.assertEqual(m.call("DAT_Get", 11, 7), 1)
+        m.call("DAT_Set", 17, 19, 1)  # Grouped Very Fast row; native physical ID 19.
+        self.assertEqual(m.call("DAT_Get", 11, 1), 1)
+        self.assertEqual(m.call("DAT_Get", 17, 19), 1)
+        before = m.record()
+        m.call("DAT_Set", 17, 16, 1)  # First gap is not a saved preference.
+        self.assertEqual(m.record(), before)
 
     def test_relocated_dat_migration_and_foreign_identity_preserve_records(self):
         m = self.m
@@ -384,22 +390,22 @@ class TrailTests(unittest.TestCase):
         self.assertEqual(bytes(self.m.cpu.mem_read(self.bank + 5132, 8)), b"\xA5" * 8)
 
     def test_decay_lifetimes_and_soft_history(self):
-        for mode, lifetime in enumerate([65, 35, 21, 5, 1, 130]):
+        for mode, lifetime in enumerate([65, 35, 21, 1, 130]):
             self.assertEqual(self.m.call("TMTrail_Alpha", mode, 0), 200)
             for age in range(1, lifetime):
                 alpha = self.m.call("TMTrail_Alpha", mode, age)
                 self.assertGreater(alpha, 0)
                 self.assertLessEqual(alpha, 72)
             self.assertEqual(self.m.call("TMTrail_Alpha", mode, lifetime), 0)
-        self.assertEqual(self.m.call("TMTrail_Alpha", 6, 0xFFFFFFFF), 72)
+        self.assertEqual(self.m.call("TMTrail_Alpha", 5, 0xFFFFFFFF), 72)
         self.assertEqual(self.m.call("TMTrail_Alpha", 99, 0), 0)
 
     def test_union_global_priority_and_player_palette(self):
         self.assertEqual(self.m.call("TMTrail_Effective", 1, 1, 1, 5), 2)
-        self.assertEqual(self.m.call("TMTrail_Effective", 0, 1, 1, 5), 4)
+        self.assertEqual(self.m.call("TMTrail_Effective", 0, 1, 1, 5), 3)
         self.assertEqual(self.m.call("TMTrail_Effective", 0, 0, 1, 3), 3)
-        self.assertEqual(self.m.call("TMTrail_Effective", 0, 0, 0, 0), 7)
-        self.assertEqual(self.m.call("TMTrail_Effective", 0, 0, 1, 99), 7)
+        self.assertEqual(self.m.call("TMTrail_Effective", 0, 0, 0, 0), 6)
+        self.assertEqual(self.m.call("TMTrail_Effective", 0, 0, 1, 99), 6)
         for index, color in enumerate([0xFF4646C8, 0x4691FFC8, 0xFFE141C8, 0x4BE164C8]):
             self.assertEqual(self.m.call("TMTrail_PlayerColor", index, 0), color)
             self.assertEqual(self.m.call("TMTrail_PlayerColor", index, 1), 0xB4B4B4C8)
@@ -433,6 +439,31 @@ class TrailTests(unittest.TestCase):
         for source in range(140):
             self.add(1, source)
         self.assertEqual(self.next_index(), 12)
+
+    def test_damage_opacity_preserves_player_rgb_and_phase_history(self):
+        m = self.m
+        strong = m.call("TMTrail_DamageColor", 0x4691FFC8, 12)
+        weak = m.call("TMTrail_DamageColor", 0x4691FFC8, 9)
+        self.assertEqual(strong, 0x4691FFF0)
+        self.assertEqual(weak, 0x4691FFB4)
+        self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 0, strong), 240)
+        self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 0, weak), 180)
+        self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 1, strong), 96)
+        self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 1, weak), 72)
+        for age in range(1, 21):
+            self.assertGreaterEqual(m.call("TMTrail_SampleAlpha", 2, age, strong),
+                                    m.call("TMTrail_SampleAlpha", 2, age, weak))
+        self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 21, strong), 0)
+        self.assertEqual(m.call("TMTrail_SampleAlpha", 3, 1, strong), 0)
+        self.assertEqual(m.call("TMTrail_DamageColor", 0xFF4646C8, 0), 0xFF464640)
+        self.assertEqual(m.call("TMTrail_DamageColor", 0xFF4646C8, 100), 0xFF4646F0)
+        for frame, color in [(0, strong), (1, weak)]:
+            sample = struct.pack(">7f3I", 1,2,3,4,5,6,2,color,frame,1)
+            m.cpu.mem_write(self.sample, sample)
+            m.call("TMTrail_Add", self.bank, self.sample)
+        self.assertEqual(self.next_index(), 2)  # Damage changes do not overwrite the strong sample.
+        self.assertEqual(struct.unpack(">I", m.cpu.mem_read(self.bank + 28, 4))[0], strong)
+        self.assertEqual(struct.unpack(">I", m.cpu.mem_read(self.bank + 40 + 28, 4))[0], weak)
 
 
 class OSDStyleTests(unittest.TestCase):
@@ -548,25 +579,25 @@ class OSDEditorTests(unittest.TestCase):
         m.write(14, 20, 6)
         m.write(15, 15, 1)  # Reserved event bit must survive.
         m.call("TestEditorInit")
-        self.assertEqual(m.call("TestEditorChoiceChar", 23, 0), ord("C"))
-        self.assertEqual(m.call("TestEditorColor", 23), 0x00FFFFFF)
-        self.assertEqual(m.call("TestEditorInput", 0x200, 23), 1)
+        self.assertEqual(m.call("TestEditorChoiceChar", 13, 0), ord("C"))
+        self.assertEqual(m.call("TestEditorColor", 13), 0x00FFFFFF)
+        self.assertEqual(m.call("TestEditorInput", 0x200, 13), 1)
         self.assertEqual(m.read(14, 20), 7)
-        self.assertEqual(m.call("TestEditorChoiceChar", 23, 0), ord("M"))
-        self.assertEqual(m.call("TestEditorInput", 0x200, 23), 1)
+        self.assertEqual(m.call("TestEditorChoiceChar", 13, 0), ord("M"))
+        self.assertEqual(m.call("TestEditorInput", 0x200, 13), 1)
         self.assertEqual(m.read(14, 20), 0)
-        self.assertEqual(m.call("TestEditorCache", 23), 1)  # Native detects the changed Boolean.
+        self.assertEqual(m.call("TestEditorCache", 13), 1)  # Native detects the changed Boolean.
         self.assertEqual(bytes(m.cpu.mem_read(0x804A04F4, 1)), b"\0")
-        m.call("TestEditorAnimate", 23)
-        self.assertEqual(m.call("TestEditorCache", 23), 0)
-        self.assertEqual(m.call("TestEditorInput", 0x10, 23), 1)
+        m.call("TestEditorAnimate", 13)
+        self.assertEqual(m.call("TestEditorCache", 13), 0)
+        self.assertEqual(m.call("TestEditorInput", 0x10, 13), 1)
         self.assertEqual(m.read(14, 20), 7)
-        self.assertEqual(m.call("TestEditorCache", 23), 0)
+        self.assertEqual(m.call("TestEditorCache", 13), 0)
         self.assertEqual(bytes(m.cpu.mem_read(0x804A04F4, 1)), b"\1")
-        m.call("TestEditorAnimate", 23)
-        self.assertEqual(m.call("TestEditorCache", 23), 1)
+        m.call("TestEditorAnimate", 13)
+        self.assertEqual(m.call("TestEditorCache", 13), 1)
         # The native exit pass saves Boolean rows: chosen Magenta remains Magenta.
-        m.write(16, 20, m.call("TestEditorCache", 23))
+        m.write(16, 20, m.call("TestEditorCache", 13))
         self.assertEqual(m.read(14, 20), 7)
         self.assertEqual(m.read(15, 15), 1)
 
@@ -576,7 +607,7 @@ class OSDEditorTests(unittest.TestCase):
             m.write(14, id, (id % 7) + 1)
         before = m.record()
         m.call("TestEditorInit")
-        for row, flag in [(2, 1), (4, 2), (6, 0)]:
+        for row, flag in [(22, 1), (23, 2), (20, 0)]:
             m.call("TestEditorInput", 0x200, row)
             self.assertEqual(m.read(11, flag), 1)
             self.assertEqual(m.call("TestEditorChoiceChar", row, 1), ord("n"))
@@ -584,7 +615,7 @@ class OSDEditorTests(unittest.TestCase):
         self.assertEqual(m.record()[11:], before[11:])
         self.assertEqual(m.read(11, 1), 1)
         self.assertEqual(m.read(11, 2), 1)
-        m.call("TestEditorInput", 0x10, 6)
+        m.call("TestEditorInput", 0x10, 20)
         self.assertEqual(m.read(11, 0), 0)
         self.assertEqual(m.read(11, 1), 1)
         self.assertEqual(m.read(11, 2), 1)
@@ -593,7 +624,7 @@ class OSDEditorTests(unittest.TestCase):
         m = self.m
         m.call("TestEditorInit")
         before = m.record()
-        for row in [18, 28, 29, 65535]:
+        for row in [19, 21, 29, 65535]:
             self.assertEqual(m.call("TestEditorInput", 0x200, row), 1)
             self.assertEqual(m.call("TestEditorInput", 0x10, row), 1)
         for button in [1, 2, 4, 8, 0x100, 0x400, 0x800, 0x1000]:
@@ -606,9 +637,9 @@ class OSDEditorTests(unittest.TestCase):
         future[10] = 0
         m.put(future)
         m.call("TestEditorInit")
-        m.call("TestEditorInput", 0x200, 23)
+        m.call("TestEditorInput", 0x200, 13)
         self.assertEqual(m.call("Settings_Get", 14, 20), 1)
-        m.call("TestEditorInput", 0x200, 6)
+        m.call("TestEditorInput", 0x200, 20)
         self.assertEqual(m.call("Settings_Get", 11, 0), 1)
         self.assertEqual(m.record(), bytes(future))
 
@@ -616,21 +647,50 @@ class OSDEditorTests(unittest.TestCase):
         m = self.m
         m.call("TestEditorInit")
         for _ in range(6):
-            m.call("TestEditorInput", 0x200, 23)
-        m.call("TestEditorAnimate", 23)
-        m.call("TestEditorInput", 0x200, 6)
-        m.call("TestEditorAnimate", 6)
-        m.write(16, 20, m.call("TestEditorCache", 23))
-        m.write(16, 6, m.call("TestEditorCache", 6))
+            m.call("TestEditorInput", 0x200, 13)
+        m.call("TestEditorAnimate", 13)
+        m.call("TestEditorInput", 0x200, 20)
+        m.call("TestEditorAnimate", 20)
+        m.write(16, 20, m.call("TestEditorCache", 13))
+        m.write(16, 6, m.call("TestEditorCache", 20))
         fresh = Machine()
         fresh.put(m.record())
         fresh.call("TestEditorInit")
         self.assertEqual(fresh.call("Settings_Get", 14, 20), 6)
         self.assertEqual(fresh.call("Settings_Get", 11, 0), 1)
-        self.assertEqual(fresh.call("TestEditorChoiceChar", 23, 0), ord("C"))
-        fresh.call("TestEditorInput", 0x200, 6)
+        self.assertEqual(fresh.call("TestEditorChoiceChar", 13, 0), ord("C"))
+        fresh.call("TestEditorInput", 0x200, 20)
         self.assertEqual(fresh.call("Settings_Get", 14, 20), 6)
         self.assertEqual(fresh.call("Settings_Get", 11, 0), 0)
+
+    def test_grouped_editor_gaps_and_native_exit_keep_every_preference(self):
+        m = self.m
+        physical = [0,1,2,3,4,5,6,7,8,9,11,10,24,26,28,12,13,14,15,16,17,18,19,20,21,22,23,25,27]
+        expected = IDS + [255,6,255,2,4,7,17,11,23,25]
+        for i, id in enumerate(IDS):
+            m.write(14, id, (i % 7) + 1)
+        for flag in range(8):
+            m.write(11, flag, flag & 1)
+        m.write(15, 15, 1)  # Reserved event preference survives menu exit.
+        m.call("TestEditorInit")
+        for row, native in enumerate(physical):
+            self.assertEqual(m.call("TMSettings_EditorID", native), expected[row])
+            self.assertEqual(m.call("TestEditorHidden", row), int(row in [19, 21]))
+            self.assertEqual(m.read(17, native), m.call("TestEditorCache", row))
+            self.assertEqual(m.call("TestSettingsEditorRow", native), m.call("TestEditorCache", row))
+        label = "OVERRIDE: TURN ALL OSDS OFF"
+        self.assertEqual(''.join(chr(m.call("TestEditorLabelChar", 20, i)) for i in range(len(label))), label)
+        m.call("TestEditorInput", 0x200, 7)  # Lockout Timers palette.
+        m.call("TestEditorAnimate", 7)
+        m.call("TestEditorInput", 0x200, 25)  # Run Turnaround flag.
+        m.call("TestEditorAnimate", 25)
+        before = m.record()
+        for row, native in enumerate(physical):
+            m.call("TestSettingsEditorWrite", native, m.call("TestEditorCache", row))
+        self.assertEqual(m.record(), before)
+        self.assertEqual(m.read(15, 15), 1)
+        self.assertEqual(m.call("TestEditorLabelChar", 19, 0), 0)
+        self.assertEqual(m.call("TestEditorLabelChar", 21, 0), 0)
 
 
 class ActionCueTests(unittest.TestCase):
@@ -717,13 +777,15 @@ class ActionCueTests(unittest.TestCase):
         self.assertEqual(self.show(4, 14, 1), self.GREEN)
         self.assertEqual(bytes(m.cpu.mem_read(ptr, 0x180)), bytes(native))
 
-    def test_missed_cancel_flash_uses_landing_entry_result_and_four_ticks(self):
+    def test_missed_cancel_pulses_through_landing_then_stops(self):
         m = self.m
         m.call("Settings_Set", 11, 4, 0)
         m.call("Settings_Set", 11, 3, 1)
         m.call("TestCueState", 0, 70, 0, 40, 100)
         m.call("TestCueMissed", 0, 7)
-        self.assertEqual([self.show(i, 70, i) for i in range(5)], [self.RED] * 4 + [0])
+        self.assertEqual([self.show(i, 70, i) for i in range(25)],
+                         [0xFF282800 | m.call("TMCue_RedAlpha", i) for i in range(25)])
+        self.assertEqual(self.show(25, 14, 0), 0)
         m.call("ActionCues_Clear")
         m.call("TestCueMissed", 0, 6)
         self.assertEqual(self.show(6, 70, 0), 0)
@@ -737,13 +799,33 @@ class ActionCueTests(unittest.TestCase):
             m.call("ActionCues_Clear")
             self.assertEqual(self.show(1, state, 0), 0)
         m.call("ActionCues_Clear")
-        self.assertEqual([self.show(i, 19, i) for i in range(5)], [self.RED] * 4 + [0])
+        self.assertEqual([self.show(i, 19, i) for i in range(25)],
+                         [0xFF282800 | m.call("TMCue_RedAlpha", i) for i in range(25)])
         self.assertEqual(self.show(6, 14, 0), 0)
         self.assertEqual(self.show(7, 19, 0), self.RED)
         m.call("Settings_Set", 11, 6, 0)
         m.call("Settings_Set", 11, 3, 1)
         m.call("TestCueDraw", 0)
         self.assertEqual(m.call("TestCueDrawColor", 0), 0)
+
+    def test_red_pulse_holds_phase_in_pause_hitlag_and_stops_at_state_exit(self):
+        m = self.m
+        m.call("Settings_Set", 11, 4, 0)
+        m.call("Settings_Set", 11, 3, 1)
+        m.call("TestCueState", 0, 70, 0, 40, 100)
+        m.call("TestCueMissed", 0, 7)
+        self.assertEqual(self.show(1, 70, 0), self.RED)
+        pulse = self.show(2, 70, 1)
+        self.assertEqual(pulse, 0xFF282894)
+        self.assertEqual(self.show(2, 70, 1), pulse)
+        m.call("TestCueFrozen", 0, 1)
+        self.assertEqual(self.show(3, 70, 1), pulse)
+        self.assertEqual(self.show(4, 70, 1), pulse)
+        m.call("TestCueFrozen", 0, 0)
+        self.assertEqual(self.show(5, 70, 2), 0xFF282874)
+        self.assertEqual(self.show(6, 14, 0), 0)
+        for phase in range(12):
+            self.assertEqual(m.call("TMCue_RedAlpha", phase), m.call("TMCue_RedAlpha", phase + 12))
 
     def test_pause_hitlag_restore_and_subfighters(self):
         m = self.m
@@ -835,7 +917,7 @@ class ActionCueTests(unittest.TestCase):
             m.call("Settings_Set", 11, flag, 0)
         m.call("TestEditorInit")
         m.write(14, 20, 6)
-        for cursor, row, flag in [(7, 7, 3), (10, 11, 4), (20, 17, 6), (26, 23, 5)]:
+        for cursor, row, flag in [(24, 7, 3), (26, 11, 4), (25, 17, 6), (27, 23, 5)]:
             m.call("TestEditorInput", 0x200, cursor)
             self.assertEqual(m.read(11, flag), 1)
             m.call("TestEditorAnimate", cursor)
@@ -843,7 +925,7 @@ class ActionCueTests(unittest.TestCase):
         fresh = Machine()
         fresh.put(m.record())
         fresh.call("TestEditorInit")
-        for cursor, flag in [(7, 3), (10, 4), (20, 6), (26, 5)]:
+        for cursor, flag in [(24, 3), (26, 4), (25, 6), (27, 5)]:
             self.assertEqual(fresh.call("Settings_Get", 11, flag), 1)
         self.assertEqual(fresh.read(14, 20), 6)
 
@@ -921,9 +1003,9 @@ class ActionCueTests(unittest.TestCase):
         self.assertEqual(m.read(11, 7), 0)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
         m.call("TestEditorInit")
-        m.call("TestEditorInput", 0x200, 27)  # Native row ID 25.
-        m.call("TestEditorAnimate", 27)
-        m.write(16, 25, m.call("TestEditorCache", 27))
+        m.call("TestEditorInput", 0x200, 28)  # Protection at final grouped row.
+        m.call("TestEditorAnimate", 28)
+        m.write(16, 25, m.call("TestEditorCache", 28))
         self.assertEqual(m.record()[40:44], b"\xFFABC")
         fresh = Machine()
         fresh.put(m.record())

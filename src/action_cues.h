@@ -19,7 +19,8 @@ typedef struct TMCueState {
 int TMCue_Remaining(float frame, float rate, float boundary);
 int TMCue_ScriptIASA(const TMCueScript *source, float rate);
 unsigned TMCue_Update(TMCueState *cue, int state, float frame, unsigned instance,
-                      int remaining, int frozen, int timing, int red_entry);
+                      int remaining, int frozen, int timing, int red_active);
+unsigned TMCue_RedAlpha(unsigned phase);
 void ActionCues_Clear(void);
 void ActionCues_SceneChange(void);
 void ActionCues_MatchStart(void);

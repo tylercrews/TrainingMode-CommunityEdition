@@ -56,7 +56,7 @@ static void Trails_Think(GOBJ *gobj) {
             if (data->flags.dead) continue;
             for (unsigned i = 0; i < countof(data->hitbox); ++i) {
                 ftHit *hit = &data->hitbox[i];
-                if (hit->active) add_hit(&hit->pos_prev, &hit->pos, hit->size, color, hit);
+                if (hit->active) add_hit(&hit->pos_prev, &hit->pos, hit->size, TMTrail_DamageColor(color, hit->dmg), hit);
             }
         }
     }
@@ -68,7 +68,7 @@ static void Trails_Think(GOBJ *gobj) {
             if (item->fighter_gobj == fighters[i]) { color = colors[i]; break; }
         for (unsigned i = 0; i < countof(item->hitbox); ++i) {
             itHit *hit = &item->hitbox[i];
-            if (hit->active) add_hit(&hit->pos_prev, &hit->pos, hit->size, color, hit);
+            if (hit->active) add_hit(&hit->pos_prev, &hit->pos, hit->size, TMTrail_DamageColor(color, hit->dmg), hit);
         }
     }
 }
@@ -78,7 +78,7 @@ static void Trails_GX(GOBJ *gobj, int pass) {
     for (unsigned i = 0; i < TM_TRAIL_CAPACITY; ++i) {
         TMTrailSample *sample = &bank.samples[i];
         if (sample->size <= 0 || sample->frame > bank.frame) continue;
-        unsigned alpha = TMTrail_Alpha(active_mode, bank.frame - sample->frame);
+        unsigned alpha = TMTrail_SampleAlpha(active_mode, bank.frame - sample->frame, sample->color);
         if (!alpha) continue;
         GXColor diffuse = {sample->color >> 24, sample->color >> 16, sample->color >> 8, alpha};
         Vec3 a = {sample->a.x, sample->a.y, sample->a.z};

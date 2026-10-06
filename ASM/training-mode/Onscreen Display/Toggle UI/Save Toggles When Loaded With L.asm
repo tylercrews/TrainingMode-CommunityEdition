@@ -11,7 +11,7 @@
     # Preserve palette choices/unknown IDs and respect unsupported-format fallback.
     rlwinm r3, r3, 0, 24, 31
     rlwinm r4, r4, 0, 24, 31
-    SettingsToggle 3, 4
+    SettingsToggle 3, 4, SettingsField_EditorRow
     b exit
 
 original:

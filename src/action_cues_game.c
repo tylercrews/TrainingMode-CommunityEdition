@@ -123,12 +123,13 @@ static void Cue_Think(GOBJ *gobj) {
                 continue;
             }
             int frozen = data->flags.hitlag || data->flags.freeze;
+            if (data->state_id < ASID_LANDINGAIRN || data->state_id > ASID_LANDINGAIRLW)
+                entry->missed_entry = 0; /* Latch the entry result through the entire landing state. */
             int red = (turn && data->state_id == ASID_TURNRUN ? 2 : 0) |
                       (missed && entry->missed_entry ? 1 : 0);
             if (!missed && !turn) entry->cue.red = 0;
             entry->color = TMCue_Update(&entry->cue, data->state_id, data->state.frame, data->atk_instance,
                 timing ? ActionCues_Remaining(ft) : -1, frozen, timing, red);
-            if (!frozen) entry->missed_entry = 0;
         }
 }
 static void Cue_Draw(GOBJ *gobj, int pass) {
@@ -158,6 +159,7 @@ static void Cue_Draw(GOBJ *gobj, int pass) {
     data->color[0].color_enable = 0; data->color[2].color_enable = 0;
     static const GXColor colors[] = {{0,0,0,0}, {255,240,0,220}, {80,255,90,220}, {255,40,40,180}};
     GXColor color = colors[cue];
+    if (cue == TM_CUE_RED) color.a = TMCue_RedAlpha(entry->cue.red);
     if (protected && cue != TM_CUE_YELLOW && cue != TM_CUE_GREEN) {
         Playerblock *player = Fighter_GetPlayerblock((u8)data->ply);
         uint32_t rgba = TMTrail_PlayerColor(player ? player->color_accent : 4, !player || player->p_kind == 1);

@@ -22,16 +22,16 @@
 #define TM_GLOBAL_TRAIL_VERY_FAST_ROW 2
 #define TM_GLOBAL_TRAIL_INSTANT_ROW 4
 #define TM_GLOBAL_OSDS_OFF_ROW 6
-#define TM_GLOBAL_OSDS_OFF_NAME "TURN OSDS OFF"
+#define TM_GLOBAL_OSDS_OFF_NAME "OVERRIDE: TURN ALL OSDS OFF"
 #define TM_GLOBAL_MISSED_LCANCEL_ROW 7
 #define TM_GLOBAL_ACTION_CUES_ROW 11
 #define TM_GLOBAL_RUN_TURN_ROW 17
 #define TM_GLOBAL_INFINITE_SHIELDS_ROW 23
 #define TM_GLOBAL_INVINCIBILITY_ROW 25
 #define TM_GLOBAL_INVINCIBILITY_NAME "Invincibility Overlay"
-#define TM_GLOBAL_MISSED_LCANCEL_NAME "Flash Missed L-Cancel"
+#define TM_GLOBAL_MISSED_LCANCEL_NAME "Pulse Missed L-Cancel"
 #define TM_GLOBAL_ACTION_CUES_NAME "Recovery Yellow/Green"
-#define TM_GLOBAL_RUN_TURN_NAME "Flash Run Turnaround"
+#define TM_GLOBAL_RUN_TURN_NAME "Pulse Run Turnaround"
 #define TM_GLOBAL_INFINITE_SHIELDS_NAME "Infinite Shields"
 #define TM_GLOBAL_TRAIL_VERY_FAST_NAME "Hitbox Trails Very Fast"
 #define TM_GLOBAL_TRAIL_INSTANT_NAME "Hitbox Trails Instant"
@@ -67,9 +67,12 @@ enum TMSettingsField {
     TM_SETTING_OVERLAY_HMN, TM_SETTING_OVERLAY_CPU, TM_SETTING_OSD_COLOR,
     TM_SETTING_OSD_ENABLED,
     TM_SETTING_NATIVE_ROW,
+    TM_SETTING_EDITOR_ROW, /* Native physical row ID -> grouped editor binding. */
 };
 
 extern const uint8_t TMSettings_OSDIDs[TM_SETTINGS_OSDS];
+extern const uint8_t TMSettings_EditorIDs[29];
+int TMSettings_EditorID(unsigned native_row);
 int TMSettings_NativeFlag(unsigned row);
 void TMSettings_Init(uint8_t record[TM_SETTINGS_SIZE]);
 int TMSettings_Prepare(uint8_t record[TM_SETTINGS_SIZE], int owns_save);

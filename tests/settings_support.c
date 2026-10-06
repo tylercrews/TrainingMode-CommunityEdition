@@ -29,6 +29,8 @@ static unsigned backgrounds;
 static Text editor_left, editor_right;
 static uint8_t editor_data[0x50];
 static const char *editor_choices[29];
+static const char *editor_labels[29];
+static JOBJ editor_roots[2], editor_joints[29];
 static uint32_t editor_colors[29];
 static int editor_row(Text *text, int subtext) {
     if (subtext < 1) return -1;
@@ -39,9 +41,10 @@ static int editor_row(Text *text, int subtext) {
 void Text_SetText(Text *text, int subtext, const char *format, ...) {
     int row = editor_row(text, subtext);
     if (row < 0) return;
+    if (!format[0]) { editor_choices[row] = ""; editor_labels[row] = ""; return; }
     va_list args;
     va_start(args, format);
-    va_arg(args, const char *); /* label */
+    editor_labels[row] = va_arg(args, const char *);
     editor_choices[row] = va_arg(args, const char *);
     va_end(args);
 }
@@ -76,6 +79,14 @@ unsigned TestStyleBackgrounds(void) { return backgrounds; }
 void TestEditorInit(void) {
     memset(editor_data, 0, sizeof(editor_data));
     memset(editor_choices, 0, sizeof(editor_choices));
+    memset(editor_joints, 0, sizeof(editor_joints));
+    memset(editor_roots, 0, sizeof(editor_roots));
+    editor_roots[0].child = &editor_joints[0];
+    editor_roots[1].child = &editor_joints[15];
+    for (int i = 0; i < 28; ++i)
+        if (i != 14) editor_joints[i].sibling = &editor_joints[i + 1];
+    *(JOBJ **)(editor_data + 0x2C) = &editor_roots[0];
+    *(JOBJ **)(editor_data + 0x34) = &editor_roots[1];
     *(Text **)(editor_data + 0x40) = &editor_left;
     *(Text **)(editor_data + 0x44) = &editor_right;
     OSD_EditorInit(editor_data);
@@ -85,6 +96,8 @@ unsigned TestEditorCache(unsigned row) { return editor_data[row + 2]; }
 void TestEditorAnimate(unsigned row) { editor_data[row + 2] = *(volatile uint8_t *)0x804A04F4; }
 unsigned TestEditorChoiceChar(unsigned row, unsigned offset) { return editor_choices[row][offset]; }
 uint32_t TestEditorColor(unsigned row) { return editor_colors[row]; }
+unsigned TestEditorLabelChar(unsigned row, unsigned offset) { return editor_labels[row][offset]; }
+unsigned TestEditorHidden(unsigned row) { return !!(editor_joints[row].flags & JOBJ_HIDDEN); }
 
 static GOBJ cue_manager, cue_objects[12];
 static FighterData cue_data[12];

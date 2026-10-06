@@ -77,21 +77,27 @@ int TMCue_ScriptIASA(const TMCueScript *source, float rate) {
     return 3;
 }
 unsigned TMCue_Update(TMCueState *cue, int state, float frame, unsigned instance,
-                      int remaining, int frozen, int timing, int red_entry) {
-    if (frozen) return cue->red ? TM_CUE_RED : TM_CUE_NONE;
+                      int remaining, int frozen, int timing, int red_active) {
+    if (frozen) return red_active ? TM_CUE_RED : TM_CUE_NONE;
     if (cue->seen && cue->state == state && cue->instance == instance && frame < cue->frame)
         *cue = (TMCueState){0};
     if (cue->green) cue->green--;
-    if (cue->red) cue->red--;
     int changed = !cue->seen || state != cue->state || instance != cue->instance;
     int recovered = cue->seen && cue->remaining > 0 &&
         (remaining == 0 || (changed && cue->remaining == 1 && remaining >= 0));
     if (timing && recovered) cue->green = 2;
     if (!timing || remaining < 0) cue->green = 0;
-    if (changed && red_entry) { cue->red = 4; cue->red_source = red_entry; }
+    if (red_active) {
+        cue->red = changed || cue->red_source != red_active ? 0 : (cue->red + 1) % 12;
+        cue->red_source = red_active;
+    } else { cue->red = 0; cue->red_source = 0; }
     cue->seen = 1; cue->state = state; cue->frame = frame;
     cue->instance = instance; cue->remaining = remaining;
     if (timing && (remaining == 1 || remaining == 2)) return TM_CUE_YELLOW;
     if (timing && cue->green) return TM_CUE_GREEN;
-    return cue->red ? TM_CUE_RED : TM_CUE_NONE;
+    return cue->red_source ? TM_CUE_RED : TM_CUE_NONE;
+}
+unsigned TMCue_RedAlpha(unsigned phase) {
+    static const uint8_t pulse[] = {180,148,116,84,52,20,20,52,84,116,148,180};
+    return pulse[phase % 12];
 }
