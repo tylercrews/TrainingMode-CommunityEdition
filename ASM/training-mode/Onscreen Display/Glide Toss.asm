@@ -37,7 +37,8 @@
 
 Text:
     blrl
-    .string "Glide Toss\nFrame %d"
+    .string "Glide Toss\n%df"
+    .align 2
 
 Exit:
     restoreall

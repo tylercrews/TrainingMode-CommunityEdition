@@ -377,6 +377,7 @@ typedef struct MsgData
     unsigned timing_best;
     unsigned timing_hitlag; // snapshot at creation; never read later match context while drawing
     int timing_prefix; // separate neutral-colored prefix; -1 when absent
+    int queue_num; // player ownership for live CPU suppression; 6 = general feedback
 } MsgData;
 void OSD_ApplyMessageStyle(MsgData *msg);
 void OSD_MessageGX(GOBJ *gobj, int pass);

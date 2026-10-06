@@ -238,3 +238,16 @@ The native color chooser at `0x800C0658` reads `color[0].colanim` (fighter `+0x4
 Timed messages snapshot their relevant own-fighter hitlag once. A white `Nhl ->` subtext precedes the original measured frame (including `/7` for L-cancel); frame color still compares that measurement with its technique's best frame. Wavedash shrinks both first-row runs to 70%, or uses a 55% prefix/result alongside the title when needed. Do not convert untimed outcome/angle/advantage text into actionable Frame 1. MsgData retains its original prefix and now occupies 56 bytes.
 
 Act OoWait uses actual normal-landing lag, accepts direct aerial/special landing exits, and labels supported recovery sources. It retains the native six-history-slot/13-opportunity scope; extending long recovery chains and adding actual `hs`/`ss` duration are tracked in the plan's top to-do list. Imported recording shield policy, shieldstun recovery cues, real card validation and live performance checks remain there as well.
+
+
+## Compact OSDs and CPU Suppression (October 6, second round)
+
+Numeric frame strings use Nf; ratios include both units (2f/7f). Hitlag uses Nhl->Nf because the native font dictionary has no arrow glyph. Do not feed UTF-8 to Text_ConvertToMenuText. The formatter converts its bounded ASCII prefix/result, reads native menu-font kerning and positions the runs adjacently. White prefix and result timing colors stay separate; timing colors are now Cyan/Green/Yellow/Red relative to each technique's original best interval.
+
+Act OoWait prints title/source/result. Tag bit 22 (TM_OSD_POINTER_FIRST) declares the leading source string, so the timing helper skips it with va_arg(const char *) before reading the integer; do not read a pointer as an int or parse formatted strings for timing metadata. Wavedash's third-row policy is implemented by shared export 35 and its native caller: Short Hop at 1f cyan, other Short Hop green, Full Hop red.
+
+MsgData.queue_num identifies a message's player owner. CPU suppression is checked at GX time using live Playerblock.p_kind, preserving valid GOBJ/text contracts and supporting paused toggles. Untagged CPU-owned messages are included; general queue 6 and human messages remain available. Lab's independently drawn CPU info panel checks the same flag. The ALL override keeps its existing configurable-message scope.
+
+The editor has one gap at native display row 19, ALL override row 20, CPU override row 21, then the seven shared controls. CPU logical row 29 maps to flag 8 and physical RSS row 18; never use enable-mask bit 29 for this preference. Lab insertion shifts every affected initialization/callback offset. Format 3 remains 44 bytes; byte 40 bit 2 is CPU suppression, leaving mask 0xF8 plus bytes 41-43 unassigned (29 bits). Older formats 1/2 clear the newly allocated bit during migration.
+
+LdshEggPlacement caches mode/distance in the savestate-copied event block. Reroll only from actual Fighter_PlaceOnLedge reset/reposition; regrabs, restore reconciliation and vanished-support retries reuse the cached selection and consume no placement randomness. Item identities/callback ownership stay outside the copied block. Trail current/history alpha is now 216/84; TM_TRAIL_FADE_BASE remains 200 to keep existing profile endpoints, including Instant.

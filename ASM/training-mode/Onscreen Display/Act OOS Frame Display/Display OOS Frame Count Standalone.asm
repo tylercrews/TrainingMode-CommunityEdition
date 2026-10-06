@@ -90,7 +90,7 @@ PrintMessage:
 
 OoS_String:
     blrl
-    .string "Act OoShield\nFrame %d"
+    .string "Act OoShield\n%df"
     .align 2
 
 ##############################

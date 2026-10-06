@@ -72,7 +72,7 @@ PrintMessage:
 
 ActOoHitstun_String:
     blrl
-    .string "Act OoHitstun\nFrame %d"
+    .string "Act OoHitstun\n%df"
     .align 2
 
 ##############################

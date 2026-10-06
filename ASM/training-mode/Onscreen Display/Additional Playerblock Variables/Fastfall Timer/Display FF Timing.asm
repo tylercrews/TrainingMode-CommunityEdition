@@ -71,7 +71,7 @@ PrintMessage:
 
 Fastfall_String:
     blrl
-    .string "Fastfall\nFrame %d"
+    .string "Fastfall\n%df"
     .align 2
 
 Colors:

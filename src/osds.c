@@ -94,7 +94,7 @@ static void RunOSD_FrameAdvantage(GOBJ *ft, GOBJ *ft_sub) {
         Message_Display(
             OSD_MessageTag(OSD_FrameAdvantage, OSD_FrameAdvantage, 0, 1, 0), ft_data->ply,
             advantage > -7 ? MSGCOLOR_GREEN : MSGCOLOR_WHITE,
-            "Frame Advantage\n%d Frames", advantage
+            "Frame Advantage\n%df", advantage
         );
 
         // Wait until GuardSetOff finishes

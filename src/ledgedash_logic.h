@@ -19,4 +19,8 @@ int LdshSurface_Target(const LdshSurface *surface, float desired_x, float ledge_
 int Ldsh_IsAttackDash(int attack_kind, int state);
 int Ldsh_LegacyResetFailure(int state, int state_frame, int dead, int grounded, int released, int pending_hard);
 int Ldsh_RandomDistance(int low, int high, unsigned roll);
+typedef struct LdshEggPlacement { int mode, distance; } LdshEggPlacement;
+/* Preserve the reset's random choice on regrabs, restores and support retries. */
+void LdshEgg_Choose(LdshEggPlacement *placement, const int *options, int reset,
+    unsigned target_roll, unsigned distance_roll);
 #endif

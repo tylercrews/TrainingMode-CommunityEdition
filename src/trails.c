@@ -39,10 +39,10 @@ unsigned TMTrail_Alpha(unsigned mode, uint32_t age) {
     unsigned lost = 0;
     if (fade[mode] && age > hold[mode]) {
         uint32_t elapsed = age - hold[mode];
-        if (elapsed >= (TM_TRAIL_CURRENT_ALPHA + fade[mode] - 1) / fade[mode]) return 0;
+        if (elapsed >= (TM_TRAIL_FADE_BASE + fade[mode] - 1) / fade[mode]) return 0;
         lost = elapsed * fade[mode];
     }
-    return (TM_TRAIL_HISTORY_ALPHA * (TM_TRAIL_CURRENT_ALPHA - lost) + TM_TRAIL_CURRENT_ALPHA / 2) / TM_TRAIL_CURRENT_ALPHA;
+    return (TM_TRAIL_HISTORY_ALPHA * (TM_TRAIL_FADE_BASE - lost) + TM_TRAIL_FADE_BASE / 2) / TM_TRAIL_FADE_BASE;
 }
 uint32_t TMTrail_DamageColor(uint32_t player_color, int damage) {
     /* Strength changes hue, never opacity. Blend the player's base toward its

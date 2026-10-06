@@ -56,7 +56,7 @@ EndSetColor:
 
 Text:
     blrl
-    .string "Frames in\nCliffwait: %d"
+    .string "Cliffwait\n%df"
     .align 2
 
 ##############################

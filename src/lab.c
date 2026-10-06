@@ -237,7 +237,7 @@ void Lab_CustomOSDsThink(void) {
 
             event_vars->Message_Display(
                 15, hmn_data->ply, 0, 
-                "%s:\n%i Frames", state_buf, hmn_data->TM.state_frame
+                "%s:\n%if", state_buf, hmn_data->TM.state_frame
             );
 
             break;
@@ -303,8 +303,8 @@ void Lab_ChangeHitboxTrails(GOBJ *menu_gobj, int value) {
 static void Lab_SetGlobalTrail(unsigned flag, int value) {
     // Change only the selected preference; another editor may have changed its sibling.
     TM_SetSetting(TM_SETTING_FLAG, flag, value);
-    LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
-    LabOptions_OSDs[TM_SETTINGS_OSDS + 2].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 2].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 3].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
     Lab_ChangeHitboxTrails(0, 0);
     Memcard_SaveIfChanged();
 }
@@ -327,7 +327,12 @@ void Lab_ChangeOSDs(GOBJ *menu_gobj, int value) {
 }
 
 void Lab_ChangeOSDsOff(GOBJ *menu_gobj, int value) {
-    TM_SetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF, value);
+    MenuData *menu = menu_gobj->userdata;
+    unsigned row = menu->curr_menu->scroll + menu->curr_menu->cursor;
+    if (menu->curr_menu != &LabMenu_OSDs || row < TM_SETTINGS_OSDS || row > TM_SETTINGS_OSDS + 1) return;
+    unsigned flag = row == TM_SETTINGS_OSDS ? TM_FLAG_OSDS_OFF : TM_FLAG_CPU_OSDS_OFF;
+    TM_SetSetting(TM_SETTING_FLAG, flag, value);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_CPU_OSDS_OFF);
     LabOptions_OSDs[TM_SETTINGS_OSDS].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF);
     Memcard_SaveIfChanged();
 }
@@ -344,11 +349,11 @@ static void Lab_RefreshShieldOverride(void) {
 void Lab_ChangeGlobalCue(GOBJ *menu_gobj, int value) {
     MenuData *menu = menu_gobj->userdata;
     unsigned row = menu->curr_menu->scroll + menu->curr_menu->cursor;
-    if (menu->curr_menu != &LabMenu_OSDs || row < TM_SETTINGS_OSDS + 3 ||
-        row >= TM_SETTINGS_OSDS + 3 + countof(global_cue_flags)) return;
-    TM_SetSetting(TM_SETTING_FLAG, global_cue_flags[row - TM_SETTINGS_OSDS - 3], value);
+    if (menu->curr_menu != &LabMenu_OSDs || row < TM_SETTINGS_OSDS + 4 ||
+        row >= TM_SETTINGS_OSDS + 4 + countof(global_cue_flags)) return;
+    TM_SetSetting(TM_SETTING_FLAG, global_cue_flags[row - TM_SETTINGS_OSDS - 4], value);
     for (unsigned i = 0; i < countof(global_cue_flags); ++i)
-        LabOptions_OSDs[TM_SETTINGS_OSDS + 3 + i].val = TM_GetSetting(TM_SETTING_FLAG, global_cue_flags[i]);
+        LabOptions_OSDs[TM_SETTINGS_OSDS + 4 + i].val = TM_GetSetting(TM_SETTING_FLAG, global_cue_flags[i]);
     Lab_RefreshShieldOverride();
     Memcard_SaveIfChanged();
 }
@@ -801,6 +806,13 @@ void InfoDisplay_Update(GOBJ *menu_gobj, EventOption menu[], GOBJ *fighter, GOBJ
 {
     InfoDisplayData *idData = menu_gobj->userdata;
     Text *text = idData->text;
+    FighterData *owner = fighter ? fighter->userdata : 0;
+    Playerblock *player = owner ? Fighter_GetPlayerblock((u8)owner->ply) : 0;
+    if (player && player->p_kind == 1 && TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_CPU_OSDS_OFF)) {
+        JOBJ_SetFlags(idData->menuModel, JOBJ_HIDDEN);
+        text->hidden = 1;
+        return;
+    }
     if (Pause_CheckStatus(1) != 2)
     {
         // get the last row enabled
@@ -872,7 +884,7 @@ void InfoDisplay_Update(GOBJ *menu_gobj, EventOption menu[], GOBJ *fighter, GOBJ
                         frameCurr = (animFrameCurr / animSpeed);
                     }
 
-                    Text_SetText(text, i, "State Frame: %d/%d", frameCurr, frameTotal);
+                    Text_SetText(text, i, "State %df/%df", frameCurr, frameTotal);
                     break;
                 }
                 case (INFDISP_SELFVEL):
@@ -6105,12 +6117,13 @@ void Event_Init(GOBJ *gobj)
     for (int i = 0; i < (int)countof(LabOSD_ID); i++)
         LabOptions_OSDs[i].val = TM_GetSetting(TM_SETTING_OSD_COLOR, LabOSD_ID[i]);
 
-    LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
-    LabOptions_OSDs[TM_SETTINGS_OSDS + 2].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 2].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 3].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
     Lab_ChangeHitboxTrails(0, 0);
     LabOptions_OSDs[TM_SETTINGS_OSDS].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_CPU_OSDS_OFF);
     for (unsigned i = 0; i < countof(global_cue_flags); ++i)
-        LabOptions_OSDs[TM_SETTINGS_OSDS + 3 + i].val = TM_GetSetting(TM_SETTING_FLAG, global_cue_flags[i]);
+        LabOptions_OSDs[TM_SETTINGS_OSDS + 4 + i].val = TM_GetSetting(TM_SETTING_FLAG, global_cue_flags[i]);
     Lab_RefreshShieldOverride();
 
     // character rng options

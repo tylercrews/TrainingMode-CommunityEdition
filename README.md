@@ -19,6 +19,14 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Shortened numeric OSD timing to Nf and compacted hitlag text to Nhl->Nf, preserving separate prefix/result colors.
+- Changed the third timing color to yellow and reordered Act OoWait to title, source, timing.
+- Kept Ledgedash randomized egg target/distance stable through ledge regrabs and restores; reroll only on reset/reposition.
+- Colored Wavedash's Short Hop cyan at 1f/green otherwise and Full Hop red at every timing.
+- Added OVERRIDE CPU OSDS OFF in both global editors, including live CPU message/background and Lab CPU info-panel suppression.
+- Renamed the master switch OVERRIDE ALL OSDS OFF; allocated byte 40 bit 2 to the CPU override, leaving 29 reserved bits.
+- Raised trail alpha to 216 live / 84 fresh history while preserving hue strength, decay lifetimes and Instant behavior.
+
 - Restored original Ledgedash reset order, failure checks and delay behavior while keeping harder criteria's protected opportunity.
 - Moved all egg controls into Egg Targets, adding random Ground/Platform targets and inclusive randomized-distance bounds.
 - Fixed global and Ledgedash protection colors using the native-selected color slot; fixed yellow/green priority during perfect invincible ledgedashes.

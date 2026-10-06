@@ -424,7 +424,7 @@ FoxFalco_ShortenEarlyPressText:
 
 FoxFalco_ShortenTypeText:
     blrl
-    .string "Shorten Press\nFrame %d/4"
+    .string "Shorten Press\n%df/4f"
     .align 2
 
 FoxFalco_ShortenLatePressText:
@@ -434,12 +434,12 @@ FoxFalco_ShortenLatePressText:
 
 FoxFalco_ActOOShineText:
     blrl
-    .string "Act OoShine\nFrame %d"
+    .string "Act OoShine\n%df"
     .align 2
     
 FoxFalco_JCShineText:
     blrl
-    .string "JC Shine\nFrame %d\n%s: %df"
+    .string "JC Shine\n%df\n%s: %df"
     .align 2
 
 ShortHopText:
@@ -462,7 +462,7 @@ GreenRedColors:
 
 Yoshi_JumpOoParryText:
     blrl
-    .string "Jump OoParry\nFrame %d"
+    .string "Jump OoParry\n%df"
     .align 2
 
 FighterSpecificTech_End:
@@ -517,7 +517,7 @@ Lockout_InLockout:
 
 LockoutText:
     blrl
-    .string "DTilt Lockout\nFrame %d"
+    .string "DTilt Lockout\n%df"
     .align 2
 
 Lockout_End:
@@ -595,7 +595,7 @@ DJL_EndColor:
     
 DJL_Text:
     blrl
-    .string "Insta Double Jump\nFrame %d"
+    .string "Insta Double Jump\n%df"
     .align 2
     
 DJL_End:

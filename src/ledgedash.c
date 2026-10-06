@@ -59,7 +59,7 @@ static char *panel_info[5] = {angle_text, galint_text, success_rate_text, criter
 static void Ledgedash_ChangeLedge(GOBJ *menu, int value);
 static void Ledgedash_ChangeCriterion(GOBJ *menu, int value);
 static void Ledgedash_ChangeEgg(GOBJ *menu, int value);
-static void Ledgedash_EggReset(LedgedashData *data);
+static void Ledgedash_EggReset(LedgedashData *data, int reroll);
 static void Ledgedash_EggThink(LedgedashData *data);
 static void Ledgedash_EggCleanup(void);
 static int Ledgedash_AttackDash(FighterData *data);
@@ -303,7 +303,7 @@ void Event_Think(GOBJ *event)
     unsigned serial = event_vars->get_restore_serial();
     if (serial != event_data->restore_serial) {
         event_data->restore_serial = serial;
-        Ledgedash_EggReset(event_data);
+        Ledgedash_EggReset(event_data, 0);
         event_data->seen_frame = 0;
     }
     unsigned frame = stc_match->time_frames;
@@ -340,7 +340,7 @@ void Ledgedash_HUDThink(LedgedashData *event_data, FighterData *hmn_data)
         int prepared = egg_target.prepared_ledge;
         Ledgedash_InitVariables(event_data);
         event_data->reset_timer = 0;
-        if (!prepared) Ledgedash_EggReset(event_data);
+        if (!prepared) Ledgedash_EggReset(event_data, 0);
         egg_target.prepared_ledge = 0; // Do not reroll a target already placed by this reset.
         event_data->tip.refresh_num++;
     }
@@ -1052,7 +1052,7 @@ SWITCH_START_POS:
 
         gobj = gobj_next;
     }
-    Ledgedash_EggReset(event_data);
+    Ledgedash_EggReset(event_data, 1);
     egg_target.prepared_ledge = hmn_data->state_id == ASID_CLIFFWAIT;
 }
 void Fighter_UpdatePosition(GOBJ *fighter)
@@ -1182,7 +1182,7 @@ void Tips_Think(LedgedashData *event_data, FighterData *hmn_data)
         Figatree *anim = Fighter_GetAnimData(hmn_data, hmn_data->action_id);
         float frame_num = anim->frame_num;
         float frames_early = frame_num - hmn_data->state.frame;
-        event_vars->Tip_Display(3 * 60, "Misinput:\nFell %d frames early.", (int)frames_early + 1);
+        event_vars->Tip_Display(3 * 60, "Misinput:\nFell %df early.", (int)frames_early + 1);
     }
 
     // check for early fall input on cliffwait frame 0
@@ -1190,7 +1190,7 @@ void Tips_Think(LedgedashData *event_data, FighterData *hmn_data)
     {
         event_data->tip.is_input_release = 1;
         event_vars->Tip_Destroy();
-        event_vars->Tip_Display(LSDH_TIPDURATION, "Misinput:\nFell 1 frame early.");
+        event_vars->Tip_Display(LSDH_TIPDURATION, "Misinput:\nFell 1f early.");
     }
 
     if (!event_data->tip.is_input_release && hmn_data->state_id == ASID_CLIFFJUMPQUICK1)
@@ -1201,7 +1201,7 @@ void Tips_Think(LedgedashData *event_data, FighterData *hmn_data)
             event_vars->Tip_Destroy();
 
             // jumped before fall
-            event_vars->Tip_Display(LSDH_TIPDURATION, "Misinput:\nJumped %d frame(s) early.", hmn_data->TM.state_frame + 1);
+            event_vars->Tip_Display(LSDH_TIPDURATION, "Misinput:\nJumped %df early.", hmn_data->TM.state_frame + 1);
         }
         else if (Fighter_IsFallBlocked(hmn_data))
         {
@@ -1454,18 +1454,19 @@ static int Ledgedash_FindEggSurface(LedgedashData *data, int platform, int dista
     }
     return found;
 }
-static void Ledgedash_EggReset(LedgedashData *data) {
+static void Ledgedash_EggReset(LedgedashData *data, int reroll) {
     Ledgedash_EggCleanup();
     if (!LdshOptions_EggMenu[EGG_ENABLE].val) return;
-    int mode = LdshOptions_EggMenu[EGG_TARGET].val;
-    if (mode == 2) mode = HSD_Randi(2);
-    int distance = LdshOptions_EggMenu[EGG_DISTANCE].val;
-    if (LdshOptions_EggMenu[EGG_RANDOM_DISTANCE].val) {
-        int low = LdshOptions_EggMenu[EGG_MIN_DISTANCE].val;
-        int high = LdshOptions_EggMenu[EGG_MAX_DISTANCE].val;
-        int span = low > high ? low - high : high - low;
-        distance = Ldsh_RandomDistance(low, high, HSD_Randi(span + 1));
+    if (reroll || data->egg_placement.distance < 5) {
+        int options[] = {LdshOptions_EggMenu[EGG_TARGET].val, LdshOptions_EggMenu[EGG_DISTANCE].val,
+            LdshOptions_EggMenu[EGG_RANDOM_DISTANCE].val, LdshOptions_EggMenu[EGG_MIN_DISTANCE].val,
+            LdshOptions_EggMenu[EGG_MAX_DISTANCE].val};
+        int span = options[3] > options[4] ? options[3] - options[4] : options[4] - options[3];
+        unsigned target_roll = options[0] == 2 ? HSD_Randi(2) : 0;
+        unsigned distance_roll = options[2] ? HSD_Randi(span + 1) : 0;
+        LdshEgg_Choose(&data->egg_placement, options, 1, target_roll, distance_roll);
     }
+    int mode = data->egg_placement.mode, distance = data->egg_placement.distance;
     Vec3 pos;
     int line = Ledgedash_FindEggSurface(data, mode == 1, distance, &pos);
     int fallback = 0;
@@ -1525,7 +1526,7 @@ static void Ledgedash_EggThink(LedgedashData *data) {
         egg_target.object = 0; egg_target.available = 0;
         sprintf(egg_text, "Unavailable"); return;
     }
-    if (!GrColl_CheckIfLineEnabled(egg_target.line)) { Ledgedash_EggReset(data); return; }
+    if (!GrColl_CheckIfLineEnabled(egg_target.line)) { Ledgedash_EggReset(data, 0); return; }
     CollLineDesc *desc = (*stc_collline)[egg_target.line].desc;
     Vec2 a = (*stc_collvert)[desc->vert_prev].pos_curr, b = (*stc_collvert)[desc->vert_next].pos_curr;
     ItemData *ip = egg_target.object->userdata;

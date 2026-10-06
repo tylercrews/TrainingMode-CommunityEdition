@@ -16,7 +16,7 @@
 
 Text:
     blrl
-    .string "DblJump OoJump\nFrame %d"
+    .string "DblJump OoJump\n%df"
     .align 2
 
 Exit:

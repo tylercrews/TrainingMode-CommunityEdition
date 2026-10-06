@@ -71,6 +71,6 @@ void OSD_ActOutWait(GOBJ *object) {
     if (!frame) return;
     const char *label = wait_source(data, source);
     if (!label) return;
-    Message_Display(OSD_MessageTag(5, OSD_ActOoWait, 1, 1, 0), data->ply, MSGCOLOR_WHITE,
-        "Act OoWait\nFrame %d\n%s", frame, label);
+    Message_Display(OSD_MessageTag(5, OSD_ActOoWait, 2, 2, 0) | TM_OSD_POINTER_FIRST, data->ply, MSGCOLOR_WHITE,
+        "Act OoWait\n%s\n%df", label, frame);
 }

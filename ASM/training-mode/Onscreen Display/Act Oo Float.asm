@@ -43,7 +43,7 @@ Display:
 
 Text:
     blrl
-    .string "Act OoFloat\nFrame %d"
+    .string "Act OoFloat\n%df"
     .align 2
 
 Exit:

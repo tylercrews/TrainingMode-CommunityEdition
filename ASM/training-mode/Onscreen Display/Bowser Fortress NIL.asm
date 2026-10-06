@@ -61,12 +61,12 @@ Display:
 
 Text_SuccessfulNIL:
     blrl
-    .string "Successful NIL\nSp Fall Frames: %d"
+    .string "Successful NIL\nSp Fall %df"
     .align 2
 
 Text_MissedNIL:
     blrl
-    .string "Missed NIL:\nSp Fall Frames: %d"
+    .string "Missed NIL:\nSp Fall %df"
     .align 2
 
 Exit:

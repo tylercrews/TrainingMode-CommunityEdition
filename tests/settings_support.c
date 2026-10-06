@@ -13,12 +13,42 @@ void memset(void *dst, int value, int size) {
     unsigned char *d = dst;
     while (size--) *d++ = value;
 }
+/* Freestanding formatting/font conversion for compact timing layout. The
+ * glyph/token/kerning tables are the actual input-DOL tables installed by tests. */
+int sprintf(char *out, const char *format, ...) {
+    va_list args; va_start(args, format);
+    char *start = out;
+    while (*format) {
+        if (format[0] == '%' && format[1] == 'd') {
+            int value = va_arg(args, int); unsigned number;
+            if (value < 0) { *out++ = '-'; number = -(unsigned)value; } else number = value;
+            char digits[12]; unsigned count = 0;
+            do { digits[count++] = '0' + number % 10; number /= 10; } while (number);
+            while (count) *out++ = digits[--count];
+            format += 2;
+        } else *out++ = *format++;
+    }
+    *out = 0; va_end(args); return out - start;
+}
+int Text_ConvertToMenuText(char *out, char *in) {
+    const u16 *dictionary = (const u16 *)0x8040C8C0, *tokens = (const u16 *)0x8040C680;
+    char *start = out;
+    while (*in) {
+        unsigned c = (u8)*in++, sjis = c >= '0' && c <= '9' ? 0x824F + c - '0' :
+            c >= 'a' && c <= 'z' ? 0x8281 + c - 'a' :
+            c == '-' ? 0x817C : c == '>' ? 0x8184 : c == '/' ? 0x815E : 0;
+        for (unsigned i = 0; i < 287; ++i) if (dictionary[i] == sjis) {
+            *out++ = tokens[i] >> 8; *out++ = tokens[i]; break;
+        }
+    }
+    *out = 0; return out - start;
+}
 int TestDirty(void) { return stc_memcard_state->memcard_changed; }
 void TestClearDirty(void) { stc_memcard_state->memcard_changed = 0; }
 int TestTimingArgument(int tag, int queue, int color, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    int result = OSD_ReadTimingArgument(args, OSD_MessageArgument(tag));
+    int result = OSD_ReadMessageTimingArgument(args, tag);
     va_end(args);
     return result;
 }
@@ -34,7 +64,11 @@ static const char *wait_label;
 static GOBJ wait_object;
 GOBJ *Message_Display(int tag, int queue, int color, char *format, ...) {
     va_list args; va_start(args, format);
-    wait_frame = va_arg(args, int); wait_label = va_arg(args, const char *);
+    if (OSD_MessagePointerFirst(tag)) {
+        wait_label = va_arg(args, const char *); wait_frame = va_arg(args, int);
+    } else {
+        wait_frame = va_arg(args, int); wait_label = va_arg(args, const char *);
+    }
     va_end(args); wait_tag = tag;
     return &wait_object;
 }
@@ -122,6 +156,7 @@ void TestStyleInit(int id, int frame, int line, int best) {
     style_object.userdata = &style_message;
 }
 void TestStyleCallerColor(int subtext, uint32_t color) { style_colors[subtext] = color; }
+void TestStyleQueue(int queue) { style_message.queue_num = queue; }
 void TestStyleDraw(void) { OSD_MessageGX(&style_object, 2); }
 uint32_t TestStyleColor(int subtext) { return style_colors[subtext]; }
 int TestStyleHidden(void) { return style_text.hidden; }

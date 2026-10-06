@@ -3,8 +3,9 @@
 #include <stdint.h>
 
 #define TM_TRAIL_CAPACITY 128
-#define TM_TRAIL_CURRENT_ALPHA 200u
-#define TM_TRAIL_HISTORY_ALPHA 72u
+#define TM_TRAIL_CURRENT_ALPHA 216u
+#define TM_TRAIL_HISTORY_ALPHA 84u
+#define TM_TRAIL_FADE_BASE 200u /* Keep decay endpoints and Instant unchanged. */
 enum TMTrailDecay {
     TM_TRAIL_NORMAL, TM_TRAIL_FAST, TM_TRAIL_VERY_FAST,
     TM_TRAIL_INSTANT, TM_TRAIL_SLOW, TM_TRAIL_NO_FADE, TM_TRAIL_DISABLED,

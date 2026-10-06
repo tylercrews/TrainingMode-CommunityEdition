@@ -52,7 +52,7 @@ EndSetColor:
 
 Text:
     blrl
-    .string "Jump Cancel\nFrame %d"
+    .string "Jump Cancel\n%df"
     .align 2
 
 ##############################

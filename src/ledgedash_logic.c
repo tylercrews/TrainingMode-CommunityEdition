@@ -10,6 +10,12 @@ int Ldsh_RandomDistance(int low, int high, unsigned roll) {
     if (low > high) { int temp = low; low = high; high = temp; }
     return low + roll % (unsigned)(high - low + 1);
 }
+void LdshEgg_Choose(LdshEggPlacement *placement, const int *options, int reset,
+    unsigned target_roll, unsigned distance_roll) {
+    if (!reset && placement->distance >= 5) return;
+    placement->mode = options[0] == 2 ? (int)(target_roll % 2) : options[0];
+    placement->distance = options[2] ? Ldsh_RandomDistance(options[3], options[4], distance_roll) : options[1];
+}
 int Ldsh_IsAttackDash(int attack_kind, int state) {
     return state == ASID_DASH || attack_kind != 1 || state == ASID_CATCH || state == ASID_CATCHDASH;
 }

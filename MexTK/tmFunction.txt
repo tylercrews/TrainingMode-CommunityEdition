@@ -33,3 +33,4 @@ OSD_EditorInput
 ActionCues_LCancel
 OSDContext_Tick
 OSD_ActOutWait
+OSD_WavedashHopColor

@@ -30,6 +30,14 @@ class Machine:
         self.cpu.mem_map(0x80000000, 0x500000)
         # Verified against the local native DOL, function 0x800C0658.
         self.cpu.mem_write(0x800C0658, bytes.fromhex("800304302c0000004182000c386304084e800020386304884e800020"))
+        dol = (ROOT / "build/Start.dol").read_bytes()
+        for address, size in [(0x8040C680,574),(0x8040C8C0,574),(0x8040CB00,640)]:
+            for section in range(18):
+                offset, base, length = [struct.unpack_from(">I",dol,at+section*4)[0] for at in (0,0x48,0x90)]
+                if base <= address and address + size <= base + length:
+                    self.cpu.mem_write(address,dol[offset+address-base:offset+address-base+size])
+                    break
+            else: raise AssertionError("Native font tables missing from input DOL")
         self.cpu.reg_write(reg.UC_PPC_REG_MSR, 1 << 13)  # Enable FPR saves in native hooks.
         elf = (ROOT / "build/settings-test.elf").read_bytes()
         shoff = struct.unpack_from(">I", elf, 0x20)[0]
@@ -265,7 +273,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(m.record()[7], 0x54)
         m.write(15, IDS[2], 1)
         self.assertEqual(m.read(14, IDS[2]), 2)  # Boolean writer preserves an enabled Red choice.
-        for field, index, value in [(4, 0, 5), (5, 0, 6), (11, 8, 1), (12, 18, 1), (14, 64, 1), (15, 32, 1)]:
+        for field, index, value in [(4, 0, 5), (5, 0, 6), (11, 9, 1), (12, 18, 1), (14, 64, 1), (15, 32, 1)]:
             before = m.record()
             self.assertEqual(m.write(field, index, value), 0)
             self.assertEqual(m.record(), before)
@@ -393,13 +401,13 @@ class TrailTests(unittest.TestCase):
 
     def test_decay_lifetimes_and_soft_history(self):
         for mode, lifetime in enumerate([65, 35, 21, 1, 130]):
-            self.assertEqual(self.m.call("TMTrail_Alpha", mode, 0), 200)
+            self.assertEqual(self.m.call("TMTrail_Alpha", mode, 0), 216)
             for age in range(1, lifetime):
                 alpha = self.m.call("TMTrail_Alpha", mode, age)
                 self.assertGreater(alpha, 0)
-                self.assertLessEqual(alpha, 72)
+                self.assertLessEqual(alpha, 84)
             self.assertEqual(self.m.call("TMTrail_Alpha", mode, lifetime), 0)
-        self.assertEqual(self.m.call("TMTrail_Alpha", 5, 0xFFFFFFFF), 72)
+        self.assertEqual(self.m.call("TMTrail_Alpha", 5, 0xFFFFFFFF), 84)
         self.assertEqual(self.m.call("TMTrail_Alpha", 99, 0), 0)
 
     def test_union_global_priority_and_player_palette(self):
@@ -447,15 +455,15 @@ class TrailTests(unittest.TestCase):
         palettes = [(0xFF4646C8,0xFF00FFC8), (0xFFE141C8,0xFF8800C8),
                     (0x4691FFC8,0x00FFFFC8), (0x4BE164C8,0x39FF14C8), (0xB4B4B4C8,0xFFFFFFC8)]
         for base, accent in palettes:
-            self.assertEqual(m.call("TMTrail_DamageColor", base, 0), base)
-            self.assertEqual(m.call("TMTrail_DamageColor", base, 3), base)
-            self.assertEqual(m.call("TMTrail_DamageColor", base, 15), accent)
-            self.assertEqual(m.call("TMTrail_DamageColor", base, 100), accent)
+            self.assertEqual(m.call("TMTrail_DamageColor", base, 0), (base & 0xFFFFFF00)|216)
+            self.assertEqual(m.call("TMTrail_DamageColor", base, 3), (base & 0xFFFFFF00)|216)
+            self.assertEqual(m.call("TMTrail_DamageColor", base, 15), (accent & 0xFFFFFF00)|216)
+            self.assertEqual(m.call("TMTrail_DamageColor", base, 100), (accent & 0xFFFFFF00)|216)
             colors = [m.call("TMTrail_DamageColor", base, d) for d in [2,3,9,12,15]]
             self.assertNotEqual(colors[2], colors[3])  # Fox nair early/late phases remain distinct.
             for color in colors:
-                self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 0, color), 200)
-                self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 1, color), 72)
+                self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 0, color), 216)
+                self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 1, color), 84)
                 self.assertEqual(m.call("TMTrail_SampleAlpha", 2, 21, color), 0)
                 self.assertEqual(m.call("TMTrail_SampleAlpha", 3, 1, color), 0)
         strong = m.call("TMTrail_DamageColor", 0x4691FFC8, 12)
@@ -559,6 +567,9 @@ class OSDContextTests(unittest.TestCase):
         self.assertEqual(m.call("TestWaitFrame"), 1)
         self.assertEqual(bytes(m.call("TestWaitLabelChar", i) for i in range(7)), b"Landing")
         self.assertEqual(m.call("OSD_MessageSettings", m.call("TestWaitTag")), 16)
+        self.assertEqual(m.call("OSD_MessageLine", m.call("TestWaitTag")), 2)
+        self.assertEqual(m.call("OSD_MessageArgument", m.call("TestWaitTag")), 2)
+        self.assertEqual(m.call("OSD_MessagePointerFirst", m.call("TestWaitTag")), 1)
         m.call("TestCueState", 0, 70, 0, 40, 100)
         m.call("TestCueMissed", 0, 6)
         m.call("TestCueState", 0, 44, 0, 40, 100)
@@ -585,7 +596,7 @@ class OSDStyleTests(unittest.TestCase):
         self.assertEqual(m.call("TestStyleX",3), 55)
         m.call("TestStyleInit", 0, 2, 0, 1)
         m.call("TestStyleFormat", 3, 1, -30)
-        self.assertEqual(m.call("TestStyleScale100", 3), 55)
+        self.assertEqual(m.call("TestStyleScale100", 3), 70)
         self.assertEqual(m.call("TestStyleY", 3), 0xFFFFFFE2)
         self.assertEqual(m.call("TestStyleY", 4), 0xFFFFFFE2)
         m.call("TestStyleDraw")
@@ -597,8 +608,8 @@ class OSDStyleTests(unittest.TestCase):
         m.write(14, 1, 1)
         m.call("TestStyleInit", 1, 4, 1, 1)
         m.call("TestStyleFormat", 7, 0, -30)
-        self.assertEqual(bytes(m.call("TestStyleStringChar",1,i) for i in range(10)), b"Frame %d/7")
-        self.assertEqual(bytes(m.call("TestStyleStringChar",3,i) for i in range(7)), b"%dhl ->")
+        self.assertEqual(bytes(m.call("TestStyleStringChar",1,i) for i in range(5)), b"4f/7f")
+        self.assertEqual(bytes(m.call("TestStyleStringChar",3,i) for i in range(5)), b"7hl->")
         self.assertEqual(m.call("TestStyleTimingLine"), 1)
         m.call("TestStyleDraw")
         self.assertEqual(m.call("TestStyleColor", 1), 0xFFA2BAFF)
@@ -619,18 +630,83 @@ class OSDStyleTests(unittest.TestCase):
         self.assertEqual(self.m.call("OSD_SameReplacement", -1, 10, -1, 10), 0)
 
     def test_timing_and_palette_colors(self):
-        for frame, expected in [(0, 0xFFA2BAFF), (1, 0x00FFFFFF), (2, 0x8DFF6EFF), (3, 0xFFFFFFFF), (4, 0xFFA2BAFF), (99, 0xFFA2BAFF)]:
+        for frame, expected in [(0, 0xFFA2BAFF), (1, 0x00FFFFFF), (2, 0x8DFF6EFF), (3, 0xFFF000FF), (4, 0xFFA2BAFF), (99, 0xFFA2BAFF)]:
             self.assertEqual(self.m.call("OSD_TimingColor", frame), expected)
         expected = [0, 0xFFFFFFFF, 0xFF4646FF, 0x8DFF6EFF, 0x4691FFFF, 0xFFF000FF, 0x00FFFFFF, 0xFF50FFFF]
         for index, rgba in enumerate(expected):
             self.assertEqual(self.m.call("OSD_PaletteColor", index), rgba)
         self.assertEqual(self.m.call("OSD_PaletteColor", 99), 0xFFFFFFFF)
 
+    def test_hop_colors_follow_hop_type_and_exact_first_frame(self):
+        for frame in [0,1,2,3,20]:
+            self.assertEqual(self.m.call("OSD_WavedashHopColor",1,frame),
+                             0x00FFFFFF if frame == 1 else 0x8DFF6EFF)
+            self.assertEqual(self.m.call("OSD_WavedashHopColor",0,frame),0xFFA2BAFF)
+
+    def test_cpu_override_hides_owned_messages_live_and_preserves_humans_and_general_feedback(self):
+        m=self.m; m.init(); m.call("TestCueInit")
+        m.write(14,20,6)
+        m.call("TestCuePlayer",2,1,1)  # CPU is identified by player type, not port number.
+        m.call("TestStyleInit",20,3,1,1); m.call("TestStyleQueue",2)
+        m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleHidden"),0)
+        self.assertEqual(m.call("TestStyleColor",1),0xFFF000FF)
+        m.write(11,8,1)
+        m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleHidden"),1)
+        self.assertEqual(m.call("TestStyleBackgrounds"),1)
+        self.assertEqual(m.read(14,20),6)
+        m.call("TestStyleQueue",0); m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleHidden"),0)
+        m.call("TestStyleInit",-1,-1,1,1); m.call("TestStyleQueue",2)
+        m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleHidden"),1)  # Untagged CPU-owned messages are covered too.
+        m.call("TestStyleQueue",6); m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleHidden"),0)
+        m.call("TestStyleQueue",2); m.write(11,8,0); m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleHidden"),0)
+        m.call("TestStyleInit",20,3,1,1); m.write(11,0,1); m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleHidden"),1)  # ALL override still independently covers humans.
+
+    def test_compact_hitlag_runs_meet_using_native_glyph_widths(self):
+        m=self.m; m.init(); m.write(14,20,1)
+        m.call("TestStyleInit",20,3,1,1); m.call("TestStyleFormat",12,0,-15)
+        self.assertEqual(bytes(m.call("TestStyleStringChar",1,i) for i in range(2)),b"3f")
+        self.assertEqual(bytes(m.call("TestStyleStringChar",3,i) for i in range(6)),b"12hl->")
+        self.assertEqual(m.call("TestStyleY",1),15)
+        self.assertEqual(m.call("TestStyleY",3),15)
+        # Verify adjacency against the actual native font dictionary and kerning.
+        dictionary=bytes(m.cpu.mem_read(0x8040C8C0,574)); tokens=bytes(m.cpu.mem_read(0x8040C680,574))
+        kern=bytes(m.cpu.mem_read(0x8040CB00,640))
+        def width(value):
+            result=0
+            for c in value:
+                code = 0x824F+ord(c)-ord('0') if c.isdigit() else (
+                    0x8281+ord(c)-ord('a') if c.isalpha() else {'-':0x817C,'>':0x8184,'/':0x815E}[c])
+                index=dictionary.index(struct.pack(">H",code))//2
+                glyph=struct.unpack_from(">H",tokens,index*2)[0]-0x2000
+                result+=34-kern[glyph*2]-kern[glyph*2+1]
+            return result*.7
+        def signed(value): return value if value < 0x80000000 else value - 0x100000000
+        right=signed(m.call("TestStyleX",3))+width("12hl->")/2
+        left=signed(m.call("TestStyleX",1))-width("3f")/2
+        self.assertLessEqual(abs(right-left),1.0)  # Native position commands round to integer pixels.
+        m.call("TestStyleDraw")
+        self.assertEqual(m.call("TestStyleColor",1),0xFFF000FF)
+        self.assertEqual(m.call("TestStyleColor",3),0xFFFFFFFF)
+
+    def test_source_first_timing_tag_reads_string_and_integer_with_their_actual_types(self):
+        m=self.m
+        source=0x80402000; m.cpu.mem_write(source,b"Landing\0")
+        tag=m.call("OSD_MessageTag",5,16,2,2,0)|(1<<22)
+        self.assertEqual(m.call("TestTimingArgument",tag,0,0,0,source,3),3)
+        self.assertEqual(m.call("OSD_MessageLine",tag),2)
+
     def test_non_one_best_frame_does_not_change_measurement(self):
         tag = self.m.call("OSD_MessageTag", 8, 8, 1, 1, 0) | (4 << 23)
         self.assertEqual(self.m.call("OSD_MessageBestFrame", tag), 5)
         self.assertEqual(self.m.call("TestTimingArgument", tag, 0, 0, 0, 5), 5)
-        for frame, color in [(4, 0xFFA2BAFF), (5, 0x00FFFFFF), (6, 0x8DFF6EFF), (7, 0xFFFFFFFF), (8, 0xFFA2BAFF)]:
+        for frame, color in [(4, 0xFFA2BAFF), (5, 0x00FFFFFF), (6, 0x8DFF6EFF), (7, 0xFFF000FF), (8, 0xFFA2BAFF)]:
             self.assertEqual(self.m.call("OSD_TimingColorFor", frame, 5), color)
 
     def test_draw_applies_late_title_and_best_frame_colors(self):
@@ -708,6 +784,23 @@ class OSDEditorTests(unittest.TestCase):
         self.m = Machine()
         self.m.init()
 
+    def test_cpu_override_editor_row_and_saved_bit_are_independent(self):
+        m=self.m
+        m.write(14,20,6); m.write(15,29,1)  # An unknown old enable bit must survive this row allocation.
+        reserved=bytearray(m.record()); reserved[40:44]=b"\xf8ABC"; m.put(reserved)
+        m.call("TestEditorInit"); m.call("TestEditorInput",0x200,21)
+        self.assertEqual(m.read(11,8),1)
+        self.assertEqual(m.record()[40:44],b"\xfcABC")
+        self.assertEqual(m.read(15,29),1)
+        self.assertEqual(m.read(14,20),6)
+        self.assertEqual(m.call("TestEditorHidden",21),0)
+        m.call("TestEditorAnimate",21); m.call("TestSettingsEditorWrite",18,m.call("TestEditorCache",21))
+        saved=m.record(); fresh=Machine(); fresh.put(saved); fresh.call("TestEditorInit")
+        self.assertEqual(fresh.call("Settings_Get",11,8),1)
+        for row,label in [(20,"OVERRIDE ALL OSDS OFF"),(21,"OVERRIDE CPU OSDS OFF")]:
+            self.assertEqual(''.join(chr(fresh.call("TestEditorLabelChar",row,i)) for i in range(len(label))),label)
+        self.assertEqual(fresh.record(),saved)
+
     def test_native_palette_cycle_and_exit_snapshot(self):
         m = self.m
         m.write(14, 20, 6)
@@ -758,7 +851,7 @@ class OSDEditorTests(unittest.TestCase):
         m = self.m
         m.call("TestEditorInit")
         before = m.record()
-        for row in [19, 21, 29, 65535]:
+        for row in [19, 29, 65535]:
             self.assertEqual(m.call("TestEditorInput", 0x200, row), 1)
             self.assertEqual(m.call("TestEditorInput", 0x10, row), 1)
         for button in [1, 2, 4, 8, 0x100, 0x400, 0x800, 0x1000]:
@@ -800,7 +893,7 @@ class OSDEditorTests(unittest.TestCase):
     def test_grouped_editor_gaps_and_native_exit_keep_every_preference(self):
         m = self.m
         physical = [0,1,2,3,4,5,6,7,8,9,11,10,24,26,28,12,13,14,15,16,17,18,19,20,21,22,23,25,27]
-        expected = IDS + [255,6,255,2,4,7,17,11,23,25]
+        expected = IDS + [255,6,29,2,4,7,17,11,23,25]
         for i, id in enumerate(IDS):
             m.write(14, id, (i % 7) + 1)
         for flag in range(8):
@@ -809,10 +902,10 @@ class OSDEditorTests(unittest.TestCase):
         m.call("TestEditorInit")
         for row, native in enumerate(physical):
             self.assertEqual(m.call("TMSettings_EditorID", native), expected[row])
-            self.assertEqual(m.call("TestEditorHidden", row), int(row in [19, 21]))
+            self.assertEqual(m.call("TestEditorHidden", row), int(row == 19))
             self.assertEqual(m.read(17, native), m.call("TestEditorCache", row))
             self.assertEqual(m.call("TestSettingsEditorRow", native), m.call("TestEditorCache", row))
-        label = "OVERRIDE OSDS OFF"
+        label = "OVERRIDE ALL OSDS OFF"
         self.assertEqual(''.join(chr(m.call("TestEditorLabelChar", 20, i)) for i in range(len(label))), label)
         m.call("TestEditorInput", 0x200, 7)  # Lockout Timers palette.
         m.call("TestEditorAnimate", 7)
@@ -824,7 +917,7 @@ class OSDEditorTests(unittest.TestCase):
         self.assertEqual(m.record(), before)
         self.assertEqual(m.read(15, 15), 1)
         self.assertEqual(m.call("TestEditorLabelChar", 19, 0), 0)
-        self.assertEqual(m.call("TestEditorLabelChar", 21, 0), 0)
+        self.assertEqual(m.call("TestEditorLabelChar", 21, 0), ord("O"))
 
 
 class ActionCueTests(unittest.TestCase):
@@ -1082,7 +1175,7 @@ class ActionCueTests(unittest.TestCase):
         m.call("TestCueTick", 2)
         self.assertEqual(struct.unpack(">f", m.cpu.mem_read(ptr + 0x1998, 4))[0], 8)
 
-    def test_version_one_migration_initializes_new_bit_and_preserves_30_reserved_bits(self):
+    def test_version_one_migration_initializes_new_bit_and_preserves_29_reserved_bits(self):
         m = self.m
         old = bytearray(m.record())
         old[10] = 0x7F
@@ -1090,11 +1183,11 @@ class ActionCueTests(unittest.TestCase):
         m.put(old)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 1)
         self.assertEqual(m.record()[10], 0xFF)
-        self.assertEqual(m.record()[40:44], b"\xFCABC")
+        self.assertEqual(m.record()[40:44], b"\xF8ABC")
         self.assertEqual(m.read(11, 6), 0)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
         m.write(16, 17, 1)
-        self.assertEqual(m.record()[40:44], b"\xFDABC")
+        self.assertEqual(m.record()[40:44], b"\xF9ABC")
         self.assertEqual(m.record()[10], 0xFF)  # Version bits do not change.
         for row, flag in [(7, 3), (11, 4), (17, 6), (23, 5)]:
             self.assertEqual(m.read(16, row), m.read(11, flag))
@@ -1224,7 +1317,7 @@ class ActionCueTests(unittest.TestCase):
         m.put(old)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 1)
         self.assertEqual(m.record()[10], 0xFF)
-        self.assertEqual(m.record()[40:44], b"\xFDABC")
+        self.assertEqual(m.record()[40:44], b"\xF9ABC")
         self.assertEqual(m.read(11, 6), 1)
         self.assertEqual(m.read(11, 7), 0)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
@@ -1232,7 +1325,7 @@ class ActionCueTests(unittest.TestCase):
         m.call("TestEditorInput", 0x200, 28)  # Protection at final grouped row.
         m.call("TestEditorAnimate", 28)
         m.write(16, 25, m.call("TestEditorCache", 28))
-        self.assertEqual(m.record()[40:44], b"\xFFABC")
+        self.assertEqual(m.record()[40:44], b"\xFBABC")
         fresh = Machine()
         fresh.put(m.record())
         self.assertEqual(fresh.call("Settings_Get", 11, 7), 1)
@@ -1351,6 +1444,25 @@ class LedgedashLogicTests(unittest.TestCase):
         for low,high in [(10,35),(35,10),(20,20)]:
             distances=[m.call("Ldsh_RandomDistance",low,high,roll) for roll in range(abs(high-low)+1)]
             self.assertEqual(distances,list(range(min(low,high),max(low,high)+1)))
+
+    def test_egg_random_choices_change_only_on_reset_and_survive_restore_recreate(self):
+        m=self.m; placement,options=0x80402000,0x80402100
+        m.cpu.mem_write(placement,bytes(8))
+        m.cpu.mem_write(options,struct.pack(">5i",2,20,1,10,35))
+        m.call("LdshEgg_Choose",placement,options,1,1,7)
+        saved=bytes(m.cpu.mem_read(placement,8))
+        self.assertEqual(struct.unpack(">2i",saved),(1,17))
+        for contact in range(50):
+            m.call("LdshEgg_Choose",placement,options,0,contact%2,contact)
+            self.assertEqual(bytes(m.cpu.mem_read(placement,8)),saved)
+        m.call("LdshEgg_Choose",placement,options,1,0,20)
+        self.assertEqual(struct.unpack(">2i",m.cpu.mem_read(placement,8)),(0,30))
+        m.cpu.mem_write(placement,saved)  # Event-data restore carries the previous choice.
+        m.call("LdshEgg_Choose",placement,options,0,0,20)
+        self.assertEqual(bytes(m.cpu.mem_read(placement,8)),saved)
+        m.cpu.mem_write(options,struct.pack(">5i",0,25,0,10,35))
+        m.call("LdshEgg_Choose",placement,options,1,1,7)
+        self.assertEqual(struct.unpack(">2i",m.cpu.mem_read(placement,8)),(0,25))
 
 
 if __name__ == "__main__":

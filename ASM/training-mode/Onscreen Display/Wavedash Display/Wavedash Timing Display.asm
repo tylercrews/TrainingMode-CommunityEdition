@@ -108,14 +108,12 @@ PrintMessage_NoHopType:
 
 CheckSetHopTypeColor:
     lwz r3, TM_ShortOrFullHop(REG_FighterData)
-    cmpwi r3, 0
-    beq SetTimingColor
-    bl Floats
-    mflr r4
-    addi r5, r4, 0xC
-    # Change Color
+    lhz r4, TM_FramesinOneASAgo(REG_FighterData)
+    rtocbl r12, TM_WavedashHopColor
+    stw r3, 0x84(sp)
     mr r3, REG_Text                 # text pointer
     li r4, 2
+    addi r5, sp, 0x84
     branchl r12, Text_ChangeTextColor
 
 SetTimingColor:
@@ -236,12 +234,12 @@ SaveAngle:
 
 Wavedash_String:
     blrl
-    .string "Wavedash Frame: %d\nAngle: %2.1f\n%s: %df"
+    .string "Wavedash %df\nAngle: %2.1f\n%s: %df"
     .align 2
 
 Wavedash_String_NoHopType:
     blrl
-    .string "Wavedash Frame: %d\nAngle: %2.1f"
+    .string "Wavedash %df\nAngle: %2.1f"
     .align 2
 
 ShortHopString:

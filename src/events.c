@@ -1766,6 +1766,7 @@ GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, 
     msg_data->timing_subtext = OSD_MessageLine(msg_kind);
     msg_data->timing_best = OSD_MessageBestFrame(msg_kind);
     msg_data->timing_prefix = -1;
+    msg_data->queue_num = queue_num;
     msg_data->state = MSGSTATE_SHIFT;
     msg_data->anim_timer = MSGTIMER_SHIFT;
     msg_jobj->scale.X = MSGJOINT_SCALE;
@@ -1797,8 +1798,7 @@ GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, 
     // build string
     char buffer[MSG_LINEMAX * MSG_CHARMAX + 1];
     va_start(args, format);
-    unsigned timing_arg = OSD_MessageArgument(msg_kind);
-    msg_data->timing_frame = OSD_ReadTimingArgument(args, timing_arg);
+    msg_data->timing_frame = OSD_ReadMessageTimingArgument(args, msg_kind);
     if (msg_data->timing_frame >= 0)
         msg_data->timing_hitlag = OSDContext_MessageHitlag(queue_num, msg_data->settings_id);
     vsprintf(buffer, format, args);

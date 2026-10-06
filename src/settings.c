@@ -8,7 +8,7 @@ const uint8_t TMSettings_OSDIDs[TM_SETTINGS_OSDS] = {
 /* Read down the left column, then the right. 255 marks a display-only gap. */
 const uint8_t TMSettings_EditorIDs[29] = {
     0,1,3,5,8,9,10,12,13,14,16,18,19,20,21,
-    22,24,26,28,255,6,255,2,4,7,17,11,23,25,
+    22,24,26,28,255,6,29,2,4,7,17,11,23,25,
 };
 int TMSettings_EditorID(unsigned native_row) {
     static const uint8_t physical[] = {
@@ -22,6 +22,7 @@ int TMSettings_EditorID(unsigned native_row) {
 int TMSettings_NativeFlag(unsigned row) {
     switch (row) {
     case TM_GLOBAL_OSDS_OFF_ROW: return TM_FLAG_OSDS_OFF;
+    case TM_GLOBAL_CPU_OSDS_OFF_ROW: return TM_FLAG_CPU_OSDS_OFF;
     case TM_GLOBAL_TRAIL_VERY_FAST_ROW: return TM_FLAG_TRAILS_VERY_FAST;
     case TM_GLOBAL_TRAIL_INSTANT_ROW: return TM_FLAG_TRAILS_INSTANT;
     case TM_GLOBAL_MISSED_LCANCEL_ROW: return TM_FLAG_MISSED_LCANCEL;
@@ -98,7 +99,7 @@ int TMSettings_Prepare(uint8_t r[TM_SETTINGS_SIZE], int owns_save) {
     if (signed_format && old_version < TM_SETTINGS_VERSION) {
         r[10] = (r[10] & 0x3F) | (TM_SETTINGS_VERSION << 6);
         /* Version 1 owns neither extension flag; version 2 already owns TurnRun. */
-        r[TM_SETTINGS_EXTRA_FLAGS_OFFSET] &= ~(old_version == 1 ? 3u : 2u);
+        r[TM_SETTINGS_EXTRA_FLAGS_OFFSET] &= ~(old_version == 1 ? 7u : 6u);
     }
     if (!signed_format) {
         /* Read both old lists before overwriting any of their overlapping bytes. */

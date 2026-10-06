@@ -37,7 +37,8 @@
 
 Text:
     blrl
-    .string "Boost Grab\nFrame %d"
+    .string "Boost Grab\n%df"
+    .align 2
 
 Exit:
     restoreall

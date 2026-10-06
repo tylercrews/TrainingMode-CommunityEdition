@@ -525,7 +525,7 @@ Reaction_TopText:
 
 Reaction_BottomText:
     blrl
-    .string "%d Frames"
+    .string "%df"
     .align 2
 
 ################################################################################
@@ -6969,7 +6969,7 @@ GrabMashOut_TopText:
 
 GrabMashOut_BottomText:
     blrl
-    .string "Frame %d/%d"
+    .string "%df/%df"
     .align 2
 
 ###########################################

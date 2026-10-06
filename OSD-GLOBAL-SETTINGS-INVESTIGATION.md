@@ -2,7 +2,7 @@
 
 **Running to-do list: audited October 6, 2026**
 
-The eleven-item correction request is implemented in section 36. These are remaining items from the earlier plan; optional extensions are identified separately. Historical sections describe the checkout at investigation time, not necessarily current behavior.
+The eleven-item correction request is implemented in section 36; the subsequent nine-item round is implemented in section 37. These are remaining items from the earlier plan; optional extensions are identified separately. Historical sections describe the checkout at investigation time, not necessarily current behavior.
 
 - [ ] Protect accurate imported-recording playback from the effective global Infinite Shields override while preserving its saved preference; show that override in Lab's local shield controls (section 15).
 - [ ] Decide whether Infinite Shields means full-health refill or literal never-break. The current implementation refills health; a single sufficiently damaging hit can still need a native break-boundary hook (section 15).
@@ -19,7 +19,7 @@ Superseded requests: Very Very Fast decay was deliberately removed, and the Fall
 
 Investigated October 4, 2026, initially against checkout `b3d6700`, with the additional filename, success-criteria, reset, and OSD investigations against `08640e8`. Steps 0-6 now have implementations: centralized V1.4.1T2 metadata, versioned outputs, the separate `TYRE01` identity, packed/migrated settings, global trails, both OSD editors, master suppression, shared flashes/shields, and the staged recovery cue. Sections 24-31 record implementation and validation. Step 6 still requires live Dolphin frame-step validation; Ledgedash is implemented in sections 35-36, and hitlag prefixes plus initial recovery-source labels are implemented in section 36. The running to-do list above records remaining work. The README contains the running Tyro-specific changelog.
 
-The requested phase-1 changes are feasible. A compact save format can accommodate the new global toggles, including Infinite Shields, OSD title colors, and a reserved phase-2 overlay inside the existing 44-byte settings area, with **30 bits still reserved for future use** after Run Turnaround and the global protection overlay each allocate one bit. No current training feature needs to be removed for that design. If persistent event high scores are deliberately retired, their **204-byte region** can become a settings extension after its score access/reset paths are changed; section 17 explains the budget and work involved. Before changing the serialized format, give Tyro Edition its own stable game/save identity so switching to upstream cannot reinterpret Tyro settings. The yellow last-non-actionable-frame overlay is feasible for specific, understood action states; an accurate implementation covering every character and action needs separate research.
+The requested phase-1 changes are feasible. A compact save format can accommodate the new global toggles, including Infinite Shields, OSD title colors, and a reserved phase-2 overlay inside the existing 44-byte settings area, with **29 bits still reserved for future use** after Run Turnaround, the global protection overlay, and CPU OSD suppression each allocate one bit. No current training feature needs to be removed for that design. If persistent event high scores are deliberately retired, their **204-byte region** can become a settings extension after its score access/reset paths are changed; section 17 explains the budget and work involved. Before changing the serialized format, give Tyro Edition its own stable game/save identity so switching to upstream cannot reinterpret Tyro settings. The yellow last-non-actionable-frame overlay is feasible for specific, understood action states; an accurate implementation covering every character and action needs separate research.
 
 **1. What “permanent memory” means in this project**
 
@@ -102,7 +102,7 @@ Retain the existing four-byte enable mask for assembly compatibility. Menu sette
 | Packed overlays, including phase-2 slot | 18 |
 | Packed OSD choices | 8 |
 | Format signature | 2 |
-| Extra flags byte (Run Turnaround bit 0, protection bit 1; six bits reserved) | 1 |
+| Extra flags byte (Run Turnaround bit 0, protection bit 1, CPU OSDs Off bit 2; five bits reserved) | 1 |
 | Fully unallocated reserve | 3 |
 | **Total** | **44** |
 
@@ -115,10 +115,10 @@ Current byte placement (format 3):
 | `0x1F30–0x1F41` | Eighteen packed overlay bytes. |
 | `0x1F42–0x1F49` | Eight packed OSD-choice bytes. |
 | `0x1F4A–0x1F4B` | Format signature. |
-| `0x1F4C` | Run Turnaround flash in bit 0, protection overlay in bit 1; bits 2-7 reserved. |
+| `0x1F4C` | Run Turnaround flash in bit 0, protection overlay in bit 1, CPU OSDs Off in bit 2; bits 3-7 reserved. |
 | `0x1F4D-0x1F4F` | Three fully reserved bytes. |
 
-Six flag bits cover TURN OSDS OFF, Very Fast trails, Instant trails, missed-L-cancel flash, two-frame yellow/green recovery cue, and Infinite Shields. Infinite Shields consumes the previously spare flag bit, so no flag bits remain free in this byte; step 6 adds Run Turnaround at byte `0x1F4C`, bit 0. **Six bits in that byte plus three full bytes remain: 30 reserved bits total.** A future independent global Very Very Fast toggle would need one of those bits, although the event-local decay preset still needs no save bytes. The flags plus version occupy one byte as a group. Use explicit masks/byte packing; an ordinary C enum can occupy four bytes, and C bitfield layout should not define a serialized format.
+Six flag bits cover TURN OSDS OFF, Very Fast trails, Instant trails, missed-L-cancel flash, two-frame yellow/green recovery cue, and Infinite Shields. Infinite Shields consumes the previously spare flag bit, so no flag bits remain free in this byte; step 6 adds Run Turnaround at byte `0x1F4C`, bit 0. **Five bits in that byte plus three full bytes remain: 29 reserved bits total.** A future independent global Very Very Fast toggle would need one of those bits, although the event-local decay preset still needs no save bytes. The flags plus version occupy one byte as a group. Use explicit masks/byte packing; an ordinary C enum can occupy four bytes, and C bitfield layout should not define a serialized format.
 
 A more direct palette indexed by all 32 bitfield IDs costs 12 bytes instead of eight. That alternative required the original four-byte reserve; after allocating Run Turnaround, it would overlap the extra flag and require a revised layout or extension. A three-bit palette allows eight values total; expanding beyond that would require a format change or additional storage.
 
@@ -858,3 +858,37 @@ Version remains **V1.4.1T2**, identity **TYRE01**, record **44 bytes / format 3*
 `src/osd_context.c` owns bounded counters/opportunity arithmetic; `osd_context_game.c` owns twelve fighter-generation entries and native adapters. PowerPC layout is **64 bytes/context + 8 bytes identity = 864 bytes** of static runtime storage. `MsgData` grows from 48 to **56 bytes** per message for its snapshot and prefix index. No native FighterData or recording layout changes. Export slots **33/34** append context sampling and Act OoWait after the existing 33 exports; no old index moves. Build fingerprints include the new header and force consistent module/ASM rebuilding.
 
 Validation: **70 compiled PowerPC regressions pass**, including actual native color selection, protected wavelanding, local highlights, freeze deduplication and episode retirement, native ordinary-landing/L-cancel labels, first-recovered-frame jump, original reset predicates, random distance bounds, compact Wavedash formatting, neutral prefixes, equal trail opacity with distinct hues, packing/migration and optimized MEX DAT relocation. The optimized C/assembly release build passes without compiler warnings and produces the updated versioned ISO/ZIP. Native frame stepping, visual fit and real card I/O remain the explicit checks above; user card files were not edited.
+
+
+**37. October 6, second round: all nine requested adjustments**
+
+This section supersedes the text/layout/opacity details in section 36. Release remains **V1.4.1T2 / TYRE01**. The CPU text override allocates **record byte 40 bit 2**, the first newly consumed reserve bit; the format remains the compatible **44-byte format 3**. All other saved fields and score storage remain unchanged.
+
+| Request | Current implementation |
+| --- | --- |
+| 1. Shorthand numeric frames | Native OSD and C display strings use **Nf** instead of Frame N, including fastfall, shine, landing, item interrupts, jump cancel, lockouts, GALINT, frame advantage, custom Lab OSDs and legacy event frame counters. Ratios retain units, e.g. **2f/7f**. Titles such as Frame Advantage retain their meaning. Measurements and technique baselines are unchanged. |
+| 2. Compact hitlag separator | **3hl->1f** uses the supported ASCII fallback with no spaces. The native 287-codepoint dictionary at `0x8040C8C0` has no right-arrow (`81A8` in Shift-JIS) or alternate arrow glyph. No unsupported UTF-8 is sent to the native converter. Prefix remains white; the result remains independently colored. Positions derive from native glyph tokens and kerning at `0x8040CB00`, so the runs meet without the old wide gap. |
+| 3. Third timing color | Best/best+1/best+2/later is now **Cyan / Green / Yellow / Red**. A best-frame-1 result displays 3f yellow. Technique-specific best intervals stay intact, including Peach's original best frame 5. Saved title-palette White remains White. |
+| 4. Act OoWait row order | **Title, recovery source, Nf**. Metadata marks a leading string pointer and second integer vararg explicitly (tag bit 22), retaining typed timing snapshots and correct third-row color/prefix. |
+| 5. Reset-only egg randomization | A cached Ground/Platform choice and distance are stored in the copied Ledgedash event data. Actual reposition/reset chooses them once. Ledge regrabs may replenish the egg at the same choice, while savestate restoration and invalid-support recreation retain it; those paths consume no placement RNG. Option changes that reposition are resets. Egg objects/callbacks remain outside the copied event block. |
+| 6. Wavedash hop line | Short Hop is **cyan at 1f**, **green at every other timing**. Full Hop is **red at every timing**. Missing-hop two-line displays stay two lines; angle colors retain their existing rules. The native producer uses appended shared export 35 (`OSD_WavedashHopColor`). |
+| 7. CPU OSD override | **OVERRIDE CPU OSDS OFF**, default Off, appears beside the all-OSD override in both editors. It hides existing/new CPU-owned queued messages and their backgrounds at GX time, including untagged CPU feedback. CPU identity comes from `Playerblock.p_kind`, not port/slot number. Lab's CPU info panel is covered too. Human messages, general event feedback, trails/body overlays and each saved category choice are preserved. |
+| 8. All-OSD label | Both editors use **OVERRIDE ALL OSDS OFF**. The original master flag and configurable-message scope are retained. |
+| 9. Slight trail-opacity increase | Current hitboxes are **216/255** (previously 200); fresh historical samples **84/255** (previously 72). Strength still changes hue instead of alpha. Decay uses the original 200-based clock, preserving all endpoints and Instant's age-zero-only behavior. |
+
+**Current reserve ledger:**
+
+| Storage | Allocation / remaining capacity |
+| --- | --- |
+| Byte 40 / `0x1F4C`, bit 0 | Run Turnaround |
+| Byte 40, bit 1 | Invincibility Overlay |
+| Byte 40, bit 2 | **OVERRIDE CPU OSDS OFF** (new; global flag ID 8) |
+| Byte 40, bits 3-7 (`0xF8`) | **5 bits free**, preserved by setters/validation |
+| Bytes 41-43 / `0x1F4D-0x1F4F` | **24 bits / 3 bytes free** |
+| **Total unassigned** | **29 bits**, down from 30 |
+
+Fresh records and unversioned migration initialize CPU suppression Off. Versions 1/2 migrate with the newly owned CPU bit Off while preserving the other 29 reserve bits. Previously generated format-3 records have this formerly unused bit zero; existing format-3 CPU choices round-trip unchanged. Older format-3 builds ignore/preserve the added flag as an unknown reserved bit, so returning to this build restores it. No signature, existing flag index, OSD ID, control offset or score region moves.
+
+The native 29-row editor now reads: nineteen OSDs, gap at row 19, ALL override at 20, CPU override at 21, then seven visual/gameplay controls at 22-28. Logical CPU row ID 29 maps to flag 8; native physical RSS row ID 18 maps to that logical row. Unknown enable-mask bit 29 is preserved. Lab's global rows are shifted coherently with all initialization/callback offsets. MsgData adds the player queue index, growing **56 -> 60 bytes** per message; Ledgedash adds **8 runtime event bytes** for cached placement. No additional save bytes are needed.
+
+Validation: **76 compiled PowerPC tests pass**. New coverage checks exact shorthand/prefix text and native-kerning adjacency, source-first varargs/third-row metadata, cyan/green/red hop policy, live CPU suppression and human/general preservation, independent CPU native-menu saves and untouched mask/reserve bits, reset-only egg choices and restore recreation, third-frame yellow, and unchanged decay endpoints at the increased opacity. The optimized release compiles C and assembly together; shortened assembly strings have explicit alignment before following instructions. Native save/card switching, on-screen typography and actual gameplay remain live Dolphin checks in the running to-do list.

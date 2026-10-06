@@ -22,6 +22,7 @@ int OSD_MessageSettings(int kind) {
 unsigned OSD_MessageArgument(int kind) { return tagged(kind) ? ((uint32_t)kind >> 16) & 7 : 0; }
 unsigned OSD_MessageLine(int kind) { return tagged(kind) ? ((uint32_t)kind >> 19) & 3 : 0; }
 unsigned OSD_MessageInline(int kind) { return tagged(kind) ? ((uint32_t)kind >> 21) & 1 : 0; }
+unsigned OSD_MessagePointerFirst(int kind) { return tagged(kind) ? ((uint32_t)kind >> 22) & 1 : 0; }
 unsigned OSD_MessageBestFrame(int kind) { return tagged(kind) ? (((uint32_t)kind >> 23) & 31) + 1 : 1; }
 int OSD_SameReplacement(int kind_a, int settings_a, int kind_b, int settings_b) {
     return kind_a != -1 && kind_a == kind_b && settings_a == settings_b;
@@ -40,6 +41,9 @@ uint32_t OSD_TimingColorFor(int frame, unsigned best) {
     if (best < 1 || best > 32) best = 1;
     if (frame == (int)best) return 0x00FFFFFF;
     if (frame == (int)best + 1) return 0x8DFF6EFF;
-    if (frame == (int)best + 2) return 0xFFFFFFFF;
+    if (frame == (int)best + 2) return 0xFFF000FF;
     return 0xFFA2BAFF;
+}
+uint32_t OSD_WavedashHopColor(int short_hop, int frame) {
+    return short_hop == 1 ? (frame == 1 ? 0x00FFFFFF : 0x8DFF6EFF) : 0xFFA2BAFF;
 }

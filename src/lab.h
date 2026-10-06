@@ -1842,6 +1842,12 @@ static EventOption LabOptions_OSDs[] = {
     },
     {
         .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_CPU_OSDS_OFF_NAME,
+        .desc = {"Hide messages belonging to CPU players in every match.", "Preserves individual OSD choices and player messages."},
+        .OnChange = Lab_ChangeOSDsOff,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
         .name = TM_GLOBAL_TRAIL_VERY_FAST_NAME,
         .desc = {"Enable Very Fast trails in every gameplay match."},
         .OnChange = Lab_ChangeGlobalVeryFast,
@@ -2291,7 +2297,7 @@ static EventOption LabOptions_CPU[OPTCPU_COUNT] = {
         .name = "Smash DI Amount",
         .desc = {"Adjust how often the CPU will alter their position",
                  "during hitstop."},
-        .format = "%d Frames",
+        .format = "%df",
     },
     {
         .kind = OPTKIND_STRING,
@@ -2348,7 +2354,7 @@ static EventOption LabOptions_CPU[OPTCPU_COUNT] = {
         .name = "Counter Delay",
         .desc = {"Adjust the amount of actionable frames before ",
                  "the CPU counters."},
-        .format = "%d Frames",
+        .format = "%df",
     },
     {
         .kind = OPTKIND_MENU,
@@ -2532,7 +2538,7 @@ static EventOption LabOptions_AdvCounter_Default[OPTCTR_COUNT] = {
         .name = "Delay (Ground)",
         .desc = {"Adjust the amount of actionable frames before ",
                  "the CPU counters on the ground."},
-        .format = "%d Frames",
+        .format = "%df",
         .disable = 1,
     },
     {
@@ -2541,7 +2547,7 @@ static EventOption LabOptions_AdvCounter_Default[OPTCTR_COUNT] = {
         .name = "Delay (Air)",
         .desc = {"Adjust the amount of actionable frames before ",
                  "the CPU counters in the air."},
-        .format = "%d Frames",
+        .format = "%df",
         .disable = 1,
     },
     {
@@ -2550,7 +2556,7 @@ static EventOption LabOptions_AdvCounter_Default[OPTCTR_COUNT] = {
         .name = "Delay (Shield)",
         .desc = {"Adjust the amount of actionable frames before ",
                  "the CPU counters in shield."},
-        .format = "%d Frames",
+        .format = "%df",
         .disable = 1,
     },
 };
@@ -2658,7 +2664,7 @@ static EventOption LabOptions_Tech[OPTTECH_COUNT] = {
         .kind = OPTKIND_INT,
         .value_num = 16,
         .name = "Tech Invisibility Delay",
-        .format = "%d Frames",
+        .format = "%df",
         .desc = {"Set the delay in frames on tech invisibility."},
     },
     {

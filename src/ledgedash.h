@@ -48,6 +48,7 @@ struct LedgedashData
         u8 refresh_displayed : 1;
         u8 is_input_release : 1;
     } tip;
+    LdshEggPlacement egg_placement; // Append: preserve existing event offsets; copied with savestates.
 };
 
 struct LedgedashAssets

@@ -52,12 +52,12 @@ Display:
 
 Text_ItemThrow:
     blrl
-    .string "Airdodge Item Throw\nFrame %d"
+    .string "Airdodge Item Throw\n%df"
     .align 2
 
 Text_ZDrop:
     blrl
-    .string "Airdodge Z-Drop\nFrame %d"
+    .string "Airdodge Z-Drop\n%df"
     .align 2
 
 Exit:

@@ -68,7 +68,7 @@ EndSetColor:
 
 Text:
     blrl
-    .string "GALINT\nFrames: %d"
+    .string "GALINT\n%df"
     .align 2
 
 ##############################

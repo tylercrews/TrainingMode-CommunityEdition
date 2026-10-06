@@ -186,7 +186,7 @@ GetLCRate:
 
 LCancel_Press:
     blrl
-    .string "L-Cancel %d%%\nFrame %d/7\n%s"
+    .string "L-Cancel %d%%\n%df/7f\n%s"
     .align 2
 
 LCancel_NoPress:
