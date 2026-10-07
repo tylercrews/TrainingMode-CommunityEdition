@@ -258,6 +258,7 @@ FoxFalco_ShineAirStartup_EndJumpInputsLoop:
     mflr r8
     li r19, 1 # save for later
 EndGetHopTypeText:
+    mr r25, r9 # Preserve printed hop duration, not JC Shine timing in r7.
     
     # display
     li r3, OSD.FighterSpecificTechAlt  # ID - use alt so that Jump Out Of Shine does not overwrite
@@ -283,13 +284,13 @@ ShineWasGood:
     branchl r12, Text_ChangeTextColor
        
     # set hop type colour
-    li r4, 2
-    mr r3, r19
-    bl GreenRedColors
-    mflr r5
-    mulli r3, r3, 4
-    add r5, r5, r3
+    xori r3, r19, 1 # Helper takes short_hop=1, full_hop=0.
+    mr r4, r25
+    rtocbl r12, TM_WavedashHopColor
+    stw r3, 0x84(sp)
     mr r3, r20
+    li r4, 2
+    addi r5, sp, 0x84
     branchl r12, Text_ChangeTextColor
     
     b FighterSpecificTech_End

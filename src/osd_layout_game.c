@@ -22,6 +22,23 @@ static const char *category_names[TM_SETTINGS_OSDS] = {
     "Act OoWait", "Act OoAirborne", "Jump Cancel", "Fastfall", "Frame Advantage",
     "Combo Counter", "Grab Breakout", "Ledgedash", "Act OoHitstun",
 };
+static const char *slot_name(unsigned key) {
+    unsigned slot = key % TM_OSD_SLOTS;
+    if (slot == TM_SETTINGS_OSDS) return "JC Shine";
+    if (slot == 4 && (layout.map.split_owners & (1u << (key / TM_OSD_SLOTS)))) return "Jump Out Of Shine";
+    return category_names[slot];
+}
+static void sync_split_owners(void) {
+    unsigned mask = 0;
+    for (unsigned q = 0; q < TM_OSD_PLAYERS; ++q) {
+        GOBJ *object = Fighter_GetSubcharGObj(q, 0);
+        FighterData *data = object ? object->userdata : 0;
+        if (data && (data->kind == FTKIND_FOX || data->kind == FTKIND_FALCO)) mask |= 1u << q;
+    }
+    if (layout.map.split_owners != mask)
+        for (unsigned i = 0; i < TM_OSD_GRID_CELLS; ++i) layout.empty_key[i] = -1;
+    TMOSD_MapSplitOwners(&layout.map, mask);
+}
 static GXColor muted = {180, 190, 205, 255};
 static void bar_hidden(JOBJ *joint, int hidden) {
     if(hidden)joint->flags |= JOBJ_HIDDEN; else joint->flags &= ~JOBJ_HIDDEN;
@@ -65,8 +82,8 @@ static void observe_owner(unsigned q) {
     FighterData *data = fighter ? fighter->userdata : 0;
     if (layout.fighter[q] && (layout.fighter[q] != fighter || !data ||
             layout.spawn[q] != data->spawn_num || data->flags.dead)) {
-        for (unsigned slot = 0; slot < TM_SETTINGS_OSDS; ++slot) {
-            unsigned key = q * TM_SETTINGS_OSDS + slot;
+        for (unsigned slot = 0; slot < TM_OSD_SLOTS; ++slot) {
+            unsigned key = q * TM_OSD_SLOTS + slot;
             if (layout.latest[key]) Message_FreeObject(layout.latest[key]);
             layout.latest[key] = 0; memset(&layout.history[key], 0, sizeof(layout.history[key]));
         }
@@ -76,7 +93,7 @@ static void observe_owner(unsigned q) {
 int Message_LayoutAdd(GOBJ *object, int queue) {
     MsgData *msg = object->userdata;
     if (!current_mode()) return 0;
-    int key = TMOSD_Key(queue, msg->settings_id);
+    int key = TMOSD_MessageKey(queue, msg->settings_id, msg->kind);
     if (key < 0 || !Settings_Get(TM_SETTING_OSD_COLOR, msg->settings_id)) return 0;
     observe_owner(queue); /* Clear the previous generation before installing its new result. */
     Playerblock *player = Fighter_GetPlayerblock(queue);
@@ -98,13 +115,14 @@ int Message_LayoutAdd(GOBJ *object, int queue) {
     msg->state = MSGSTATE_WAIT; msg->anim_timer = 0;
     /* Position immediately too, for producers scheduled after priority 21. */
     TMOSD_MapOwners(&layout.map, eligible());
+    sync_split_owners();
     Message_LayoutGeometry(object);
     return 1;
 }
 int Message_LayoutImport(GOBJ *object, int queue) {
     if (!current_mode()) return 0;
     MsgData *incoming = object->userdata;
-    int key = TMOSD_Key(queue, incoming->settings_id);
+    int key = TMOSD_MessageKey(queue, incoming->settings_id, incoming->kind);
     MsgData *previous = key >= 0 && layout.latest[key] ? layout.latest[key]->userdata : 0;
     if (previous && layout.latest[key] != object && (previous->native_frame > incoming->native_frame ||
             (previous->native_frame == incoming->native_frame && previous->layout_owned == 1))) {
@@ -190,7 +208,7 @@ void Message_LayoutRecent(void) {
         msg->layout_owned = 0; msg->layout_key = -1;
         msg->layout_captured = 0;
         msg->state = MSGSTATE_WAIT; msg->anim_timer = 0;
-        Message_Add(object, key / TM_SETTINGS_OSDS);
+        Message_Add(object, key / TM_OSD_SLOTS);
     }
     memset(layout.history, 0, sizeof(layout.history));
 }
@@ -244,7 +262,7 @@ static void footer(GOBJ *object, unsigned mode) {
         for (const char *p = part; *p; ++p) line[used++] = *p;
         if (mode == TM_OSD_PANEL) {
             Text_SetText(msg->layout_footer, 7, "%s", part);
-            const char *title = msg->layout_title[0] ? msg->layout_title : category_names[msg->layout_key % TM_SETTINGS_OSDS];
+            const char *title = msg->layout_title[0] ? msg->layout_title : slot_name(msg->layout_key);
             panel_title(msg->layout_footer, title);
             OSD_TimingText(msg, line, 2);
             Text_SetText(msg->layout_footer, 2, "%s", msg->timing_frame >= 0 ? line : "");
@@ -300,6 +318,7 @@ void Message_LayoutUpdate(void) {
         }
     }
     TMOSD_MapOwners(&layout.map, eligible());
+    sync_split_owners();
     unsigned serial = event_vars && event_vars->get_restore_serial ? event_vars->get_restore_serial() : 0;
     unsigned frame = stc_match->time_frames;
     if (layout.seen && (frame < layout.frame || serial != layout.restore)) Message_LayoutClear();
@@ -327,11 +346,11 @@ void Message_LayoutUpdate(void) {
         Text *text = layout.empty[i];
         if (layout.empty_key[i] != (int)key || layout.empty_mode[i] != (int)mode) {
             for(unsigned row=0;row<9;++row) Text_SetText(text,row,"");
-            if(mode==TM_OSD_PANEL) panel_title(text, category_names[key % TM_SETTINGS_OSDS]);
-            else Text_SetText(text, 0, "%s", category_names[key % TM_SETTINGS_OSDS]);
+            if(mode==TM_OSD_PANEL) panel_title(text, slot_name(key));
+            else Text_SetText(text, 0, "%s", slot_name(key));
             Text_SetText(text,mode==TM_OSD_PANEL ? 2 : 1,"--");
-            Playerblock *owner = Fighter_GetPlayerblock(key / TM_SETTINGS_OSDS);
-            Text_SetText(text, mode==TM_OSD_PANEL ? 7 : 2, owner && owner->p_kind == 1 ? "CPU%d waiting" : "P%d waiting", key / TM_SETTINGS_OSDS + 1);
+            Playerblock *owner = Fighter_GetPlayerblock(key / TM_OSD_SLOTS);
+            Text_SetText(text, mode==TM_OSD_PANEL ? 7 : 2, owner && owner->p_kind == 1 ? "CPU%d waiting" : "P%d waiting", key / TM_OSD_SLOTS + 1);
             if(mode==TM_OSD_PANEL)Text_SetText(text,8,"|");
             layout.empty_key[i] = key;
             layout.empty_mode[i] = mode;
@@ -355,7 +374,7 @@ void Message_LayoutUpdate(void) {
             Text_SetPosition(text,7,0,60);Text_SetScale(text,7,.5f,.5f);
             Text_SetPosition(text,8,325,0);Text_SetScale(text,8,.6f,2.3f);
         }
-        Playerblock *owner = Fighter_GetPlayerblock(key / TM_SETTINGS_OSDS);
+        Playerblock *owner = Fighter_GetPlayerblock(key / TM_OSD_SLOTS);
         text->hidden = Settings_Get(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF) ||
             (owner && owner->p_kind == 1 && Settings_Get(TM_SETTING_FLAG, TM_FLAG_CPU_OSDS_OFF));
     }

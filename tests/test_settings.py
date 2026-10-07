@@ -845,12 +845,15 @@ class OSDLayoutTests(unittest.TestCase):
         for player in range(6):
             for slot, category in enumerate(IDS):
                 key = m.call("TMOSD_Key",player,category)
-                self.assertEqual(key,player*19+slot)
+                self.assertEqual(key,player*20+slot)
                 self.assertEqual(m.call("TMOSD_Category",key),category)
                 for mode, capacity in [(1,10),(2,9)]:
-                    self.assertEqual(m.call("TestLayoutCell",ptr,key,mode,0),key//capacity)
-                    self.assertEqual(m.call("TestLayoutCell",ptr,key,mode,1),key%capacity)
-        for player, category in [(-1,0),(6,0),(0,2),(0,64)]:
+                    index=player*19+slot
+                    self.assertEqual(m.call("TestLayoutCell",ptr,key,mode,0),index//capacity)
+                    self.assertEqual(m.call("TestLayoutCell",ptr,key,mode,1),index%capacity)
+        self.assertEqual(m.call("TMOSD_Key",0,64),19)
+        self.assertEqual(m.call("TestLayoutCell",ptr,19,1,0),0xFFFFFFFF) # Non-space-animal roster has no JC slot.
+        for player, category in [(-1,0),(6,0),(0,2)]:
             self.assertEqual(m.call("TMOSD_Key",player,category),0xFFFFFFFF)
 
     def test_new_owner_appends_without_moving_existing_slots(self):
@@ -953,13 +956,13 @@ class OSDLayoutTests(unittest.TestCase):
     def test_recent_imports_from_one_update_keep_queue_recency(self):
         self.start(0);m=self.m
         old=m.call("TestLayoutEmit",0,8,1,8)
-        newer=m.call("TestLayoutEmit",0,8,2,64)
+        newer=m.call("TestLayoutEmit",0,8,2,8)
         m.call("Settings_Set",21,0,2)
         self.assertEqual(m.call("Message_LayoutImport",old,0),1)
         self.assertEqual(m.call("Message_LayoutImport",newer,0),1)
         m.call("TestLayoutTick",1)
         self.assertEqual(m.call("TestLayoutFreed"),1)
-        self.assertIn(b"2f",self.footer(newer));self.assertNotIn(b"1f",self.footer(newer))
+        self.assertIn(b"2f",self.footer(newer));self.assertIn(b"1f",self.footer(newer)) # Same-technique prior timing remains history.
 
     def test_compact_panel_large_result_and_vertical_previous_scores(self):
         self.start(2);m=self.m
@@ -977,6 +980,42 @@ class OSDLayoutTests(unittest.TestCase):
         map_ptr=0x80406000;m.call("TMOSD_MapReset",map_ptr,sum(1<<id for id in IDS));m.call("TMOSD_MapOwners",map_ptr,1)
         for key in range(5):self.assertEqual(m.call("TestLayoutCell",map_ptr,key,1,3),1800)
         self.assertEqual(m.call("TestLayoutCell",map_ptr,5,1,3),1100)
+
+    def test_fox_falco_child_slots_keep_independent_results_history_and_shared_setting(self):
+        for mode in (1,2):
+            for kind in (1,22):
+                self.m=Machine();self.m.init();self.start(mode,(8,))
+                m=self.m;m.call('TestCueKind',0,kind);m.call('TestLayoutTick',1)
+                out=m.call('TestLayoutEmit',0,8,1,8)
+                jc=m.call('TestLayoutEmit',0,8,2,64);m.call('TestLayoutTick',2)
+                self.assertEqual(m.call('TestLayoutFreed'),0)
+                self.assertEqual(m.call('TestLayoutVisible',out),1);self.assertEqual(m.call('TestLayoutVisible',jc),1)
+                self.assertNotEqual((m.call('TestLayoutX100',out),m.call('TestLayoutY100',out)),
+                                    (m.call('TestLayoutX100',jc),m.call('TestLayoutY100',jc)))
+                jc=m.call('TestLayoutEmit',0,8,3,64);m.call('TestLayoutTick',3)
+                self.assertEqual(m.call('TestLayoutFreed'),1)
+                self.assertEqual(m.call('TestLayoutVisible',out),1)
+                if mode==2:
+                    self.assertIn(b'2f',self.footer(jc));self.assertNotIn(b'1f',self.footer(jc))
+                    self.assertNotIn(b'2f',self.footer(out))
+                m.call('Settings_Set',11,0,1);m.call('TestLayoutTick',4)
+                m.call('Settings_Set',11,0,0);m.write(14,8,0);m.call('TestLayoutTick',5)
+                self.assertEqual(m.call('TestLayoutFreed'),3) # Disabling the one setting removes both.
+
+    def test_split_mapping_reserves_child_before_any_result_and_changes_only_space_animals(self):
+        m=self.m;ptr=0x80406000
+        m.call('TMOSD_MapReset',ptr,(1<<8)|(1<<20));m.call('TMOSD_MapOwners',ptr,3)
+        m.call('TMOSD_MapSplitOwners',ptr,1)
+        self.assertEqual(m.call('TMOSD_Count',ptr),5)
+        parent=m.call('TMOSD_MessageKey',0,8,8);child=m.call('TMOSD_MessageKey',0,8,64)
+        self.assertEqual(m.call('TestLayoutCell',ptr,parent,1,1),0)
+        self.assertEqual(m.call('TestLayoutCell',ptr,child,1,1),1)
+        self.assertEqual(m.call('TestLayoutCell',ptr,m.call('TMOSD_Key',0,20),1,1),2)
+        self.assertEqual(m.call('TMOSD_Category',child),8)
+        self.assertEqual(m.call('TestLayoutCell',ptr,m.call('TMOSD_Key',1,64),1,0),0xFFFFFFFF)
+        m.call('TMOSD_MapSplitOwners',ptr,63);m.call('TMOSD_MapReset',ptr,sum(1<<i for i in IDS))
+        m.call('TMOSD_MapOwners',ptr,63);m.call('TMOSD_MapSplitOwners',ptr,63)
+        self.assertEqual(m.call('TMOSD_Count',ptr),120)
 
     def test_switching_back_to_recent_releases_stable_ownership(self):
         self.start(2);m=self.m
@@ -1466,6 +1505,32 @@ class OSDStyleTests(unittest.TestCase):
             self.assertEqual(m.call("TestWaveFrame"),wave)
             self.assertEqual(m.call("TestWaveHop"),held)
             self.assertEqual(m.call("TestStyleColor",2),expected)
+
+    def test_real_jc_shine_assembly_uses_actual_hop_duration_and_preserves_registers(self):
+        for kind in (1,22):
+            for jc,held,expected in [(1,2,0x8DFF6EFF),(2,1,0x00FFFFFF),(1,3,0xFFA2BAFF)]:
+                m=Machine();m.init();m.call('TestCueInit');m.write(14,8,6)
+                m.call('TestCueKind',0,kind);m.call('TestCueState',0,365,1,40,100)
+                data=m.call('TestCueData',0);obj=m.call('TestCueObject',0)
+                m.cpu.mem_write(data+0x23FC,struct.pack('>H',25)) # Ground JumpF.
+                m.cpu.mem_write(data+0x2408,struct.pack('>H',jc))
+                m.cpu.mem_write(data+0x685,bytes([held]))
+                m.cpu.mem_write(data+0x2438,b'\x04\0') # Jump button held in newest input sample.
+                m.cpu.mem_write(data+0x148,struct.pack('>f',3.0))
+                m.cpu.reg_write(gpr(13),0x804D6D5C)
+                m.cpu.mem_write(0x804D3EE0,struct.pack('>I',0x8045A6C0))
+                m.cpu.mem_write(0x80300000-0x6758,struct.pack('>Q',0x4330000080000000))
+                m.cpu.mem_write(0x8006B7F8,bytes.fromhex('4e800020'))
+                address=m.symbols['Text_SetColor']
+                m.cpu.mem_write(0x803A74F0,struct.pack('>4I',0x3D800000|(address>>16),0x618C0000|(address&65535),0x7D8903A6,0x4E800420))
+                for slot,name in [(21,'Message_Display'),(35,'OSD_WavedashHopColor'),(36,'OSD_ShineBeforeIASA')]:
+                    m.cpu.mem_write(0x80300000-200+slot*4,struct.pack('>I',m.symbols[name]))
+                m.cpu.reg_write(gpr(30),obj);m.cpu.reg_write(gpr(31),data);m.cpu.reg_write(gpr(25),0x12345678)
+                m.symbols['NativeJCProducer']=m.install_hook(0x8006B7F4,0x80481000)
+                m.call('NativeJCProducer')
+                self.assertEqual(m.call('TestWaveFrame'),jc);self.assertEqual(m.call('TestWaveHop'),held)
+                self.assertEqual(m.call('TestStyleColor',2),expected)
+                self.assertEqual(m.cpu.reg_read(gpr(25)),0x12345678)
 
     def test_cpu_override_hides_owned_messages_live_and_preserves_humans_and_general_feedback(self):
         m=self.m; m.init(); m.call("TestCueInit")

@@ -86,6 +86,10 @@ GOBJ *Message_Display(int tag, int queue, int color, char *format, ...) {
             (void)va_arg(args, double);
             (void)va_arg(args, const char *);
             wave_hop = va_arg(args, int);
+        } else if (id == 8 && OSD_MessageKind(tag) == 64) {
+            wave_frame = wait_frame;
+            (void)va_arg(args, const char *);
+            wave_hop = va_arg(args, int);
         }
     }
     va_end(args); wait_tag = tag;

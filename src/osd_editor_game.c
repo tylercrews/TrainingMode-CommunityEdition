@@ -85,6 +85,7 @@ int OSD_EditorInput(void *data, unsigned buttons, unsigned row) {
          * remain available through the common pause-menu L/R controls. */
         unsigned count = 0, mask = Settings_Get(TM_SETTING_OSD_MASK, 0);
         for (unsigned i = 0; i < TM_SETTINGS_OSDS; ++i) count += !!(mask & (1u << TMSettings_OSDIDs[i]));
+        if (mask & (1u << 8)) ++count; /* Reserve preview capacity for the Fox/Falco child before CSS. */
         unsigned capacity = TMOSD_Capacity(Settings_Get(TM_SETTING_OSD_LAYOUT, 0));
         unsigned pages = count ? (count + capacity - 1) / capacity : 1;
         page = (page + ((buttons & HSD_TRIGGER_R) ? 1 : pages - 1)) % pages;
