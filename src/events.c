@@ -2491,3 +2491,12 @@ AllowedCharacters *GetEventCharList(int eventID,int pageID) {
     EventDesc *desc = GetEventDesc(pageID, eventID);
     return &desc->allowed_characters;
 }
+
+void Settings_EventCharacters(unsigned save) {
+    unsigned page = Settings_Get(TM_SETTING_EVENT_PAGE, 0);
+    unsigned event = stc_memcard->EventBackup.event;
+    if (page >= sizeof(EventPages) / sizeof(EventPages[0]) || event >= (unsigned)EventPages[page]->eventNum) return;
+    EventDesc *desc = GetEventDesc(page, event);
+    Settings_Characters(save, desc->allowed_characters.hmn, desc->allowed_characters.cpu,
+        desc->CSSType == SLCHRKIND_TRAINING && desc->cpuKind == -1);
+}

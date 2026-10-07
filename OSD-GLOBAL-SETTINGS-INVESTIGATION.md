@@ -2,6 +2,9 @@
 
 **Running to-do list: audited October 6, 2026**
 
+- [x] Remember human/CPU character choices across unrestricted events and saved sessions inside the existing record (section 51).
+- [ ] Confirm character persistence with a cold boot in Dolphin, including a restricted event between unrestricted events and Return-to-Event-Select autosaving.
+
 The eleven-item correction request is implemented in section 36; the subsequent nine-item round is implemented in section 37, with its follow-up Wavedash/layout/shine corrections in section 38, native text-pointer fixes in sections 39-40, and final menu grouping in section 41. The user now reports that things look stable. That is useful gameplay feedback, although the exhaustive frame/card/performance checks below are not yet documented as complete. Sections 42-44 record the audit and requested next steps; section 45 implements the first reserved-bit event preferences and **section 46 implements Fixed Grid and Practice Panel**. Historical sections describe the checkout at investigation time, not necessarily current behavior or the current storage budget.
 
 - [ ] Protect accurate imported-recording playback from the effective global Infinite Shields override while preserving its saved preference (section 15). Lab's local shield controls **already show the global override**; that part is complete.
@@ -29,7 +32,7 @@ Superseded requests: Very Very Fast decay was deliberately removed, and the Fall
 
 Investigated October 4, 2026, initially against checkout `b3d6700`, with the additional filename, success-criteria, reset, and OSD investigations against `08640e8`. Steps 0-6 now have implementations: centralized V1.4.1T2 metadata, versioned outputs, the separate `TYRE01` identity, packed/migrated settings, global trails, both OSD editors, master suppression, shared flashes/shields, and the staged recovery cue. Sections 24-31 record implementation and validation. Step 6 still requires live Dolphin frame-step validation; Ledgedash is implemented in sections 35-36, and hitlag prefixes plus initial recovery-source labels are implemented in section 36. The running to-do list above records remaining work. The README contains the running Tyro-specific changelog.
 
-The global features, first saved event preferences and layouts fit inside the existing **44-byte format-3 settings record**. Global additions originally left 29 bits; section 45 assigns **25** to event preferences/initialization, and section 46 assigns **two** to layout choice, leaving **two reserved bits**. No high-score storage has been reclaimed. Broader event persistence may need the audited **204-byte score region** or a separate preferences file; section 17 explains that conditional budget. Tyro's stable **TYRE01** identity is implemented. Actionable cues cover the documented ordinary attack/landing states; accurate coverage of further states remains separate research.
+The global features, first saved event preferences and layouts fit inside the existing **44-byte format-3 settings record**. Global additions originally left 29 bits; section 45 assigns **25** to event preferences/initialization, and section 46 assigns **two** to layout choice, leaving **two reserved bits**. Section 51 audits additional unused recommended-byte and palette capacity, using 12 bits for character persistence and leaving two palette bits alongside the two reserved bits. No high-score storage has been reclaimed. Broader event persistence may need the audited **204-byte score region** or a separate preferences file; section 17 explains that conditional budget. Tyro's stable **TYRE01** identity is implemented. Actionable cues cover the documented ordinary attack/landing states; accurate coverage of further states remains separate research.
 
 **1. What “permanent memory” means in this project**
 
@@ -1180,3 +1183,26 @@ The panel's hitlag/turnaround prefixes are no longer tiny text beneath the final
 Runtime MsgData grows **140 -> 144 bytes** for the timing Text pointer; the static bank remains **6,456 bytes**. Timing/presentation Texts are created only for visible panel rows and reclaimed on replacement, page hiding, reset and layout transition. This uses **no new save bits**: 44-byte format 3 still has two reserve bits. The deferred native-card fix remains intact.
 
 **126 compiled PowerPC tests pass**, including native parser/setter traversal for full timing streams, enlarged title metrics, empty status/prefix rows, transitions and repeated-allocation bounds. The optimized release and packaged modules are verified separately. On-screen spacing and long timing/context combinations still need Dolphin visual checks.
+
+
+**51. Global saved character choices**
+
+Implemented October 7, 2026. Native CSS backups at RAM offsets `0xD78` (human) and `0xD9C` (CPU) are outside the serialized main payload, so existing backup/restore hooks alone cannot persist characters across sessions. A confirmed unrestricted event CSS now stores the selected external IDs through the shared settings service. Subsequent event CSS entry restores them before the native match/door setup. The save is queued through the existing deferred card lifecycle; return to Event Select and allow autosave to complete before quitting Dolphin.
+
+Both choices fit in the current **44-byte format-3 record**. This extends the previously audited budget by packing the one-bit recommended flag and allocating unused color padding, without consuming either explicit reserved bit or any score bytes:
+
+| Location | Allocation |
+| --- | --- |
+| `0x1F2A` / record byte 6 bit 0 | Existing recommended flag; reads/writes now mask this bit |
+| Byte 6 bits 1-5 | Human external ID + 1; zero means unset |
+| Byte 6 bits 6-7 | Extension marker `10`, distinguishing previously valid 0/1 bytes |
+| `0x1F49` / byte 37 bit 0 | Existing last OSD color bit, unchanged |
+| Byte 37 bits 1-5 | CPU external ID + 1; zero means unset |
+| Byte 37 bits 6-7 | Two unused palette bits remain |
+| Byte 40 bit 7 / byte 43 bit 7 | Two explicit reserved bits remain |
+
+Cost: **10 character bits + 2 marker bits = 12 bits**, zero added bytes/card blocks. Available audited capacity after this change is **four bits** (two palette padding bits plus two explicit reserves). Values are bounded to external IDs 0-25; Random/None/nonplayable selections do not overwrite remembered choices. Old saves have no valid extension marker, so old palette padding cannot become a CPU choice. The first explicit character write initializes both codes. Invalid codes repair to unset; legacy/foreign/unsupported format handling remains. An older Tyro build that validates this byte as 0/1 can discard remembered characters on downgrade; other settings and upstream save isolation remain unchanged.
+
+Event whitelists are applied using CSS icon IDs, including Sheik's shared Zelda icon. Required/restricted events use a local allowed selection, retain the global choice and restore it when returning to an unrestricted event. The former restricted-human initialization that always cleared the selection is removed; the restore service already chooses an allowed fighter. Required opponents remain governed by existing event preload/match logic. Only CPU-selectable, unrestricted events update the CPU preference. Costumes remain RAM-only, reused when the fighter matches and reset to default when it changes; costume persistence is not allocated here. No-score storage reclamation and Training Lab option persistence remain separate work.
+
+Validation: **132 PowerPC regressions pass**, including every playable character pair across record reloads, OSD palette/recommended/event/layout edits, unset/invalid/foreign inputs, restricted exercise fallback, costume reset/reuse and native assembled CSS backup/restore hooks. Native card hardware is not exercised by these tests. Live Dolphin cold boot, controller ports, restricted-event round trips and successful card autosaves remain gameplay checks. Release payload verification is recorded with the build result.

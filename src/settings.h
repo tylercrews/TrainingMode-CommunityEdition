@@ -14,6 +14,9 @@
 #define TM_SETTINGS_FLAGS_OFFSET 10
 #define TM_SETTINGS_OVERLAYS_OFFSET 12
 #define TM_SETTINGS_COLORS_OFFSET 30
+/* Previously unused capacity: byte 6 bits 1-5 human ID+1, bits 6-7 marker 10;
+ * byte 37 bits 1-5 CPU ID+1. Palette occupies byte 37 bit 0 only.
+ * Byte 37 bits 6-7 and the two explicit reserved bits remain unused. */
 #define TM_SETTINGS_SIGNATURE_OFFSET 38
 #define TM_SETTINGS_RESERVED_OFFSET 40
 #define TM_SETTINGS_EXTRA_FLAGS_OFFSET 40 /* Bits 0/1/2: TurnRun/protection/CPU OSD override. */
@@ -87,6 +90,7 @@ enum TMSettingsField {
     TM_SETTING_OSD_LAYOUT,
     TM_SETTING_OSD_DISPLAY, /* Composite editor choice: four Recent anchors, Fixed, Panel. */
     TM_SETTING_OSD_PAGE, /* Runtime-only manual page; no memory-card allocation. */
+    TM_SETTING_CHARACTER, /* Index 0 human / 1 CPU; external ID, UINT32_MAX = unset. */
 };
 enum TMOSDLayout { TM_OSD_RECENT, TM_OSD_FIXED, TM_OSD_PANEL, TM_OSD_LAYOUT_COUNT };
 
@@ -126,5 +130,7 @@ uint32_t Settings_Get(unsigned field, unsigned index);
 void Settings_Set(unsigned field, unsigned index, uint32_t value);
 int Settings_Status(void);
 void Settings_CommitPending(void);
+void Settings_Characters(unsigned save, int hmn_mask, int cpu_mask, int cpu_selectable);
+void Settings_EventCharacters(unsigned save);
 
 #endif

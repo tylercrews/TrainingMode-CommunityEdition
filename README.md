@@ -19,6 +19,9 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Remember the last human and CPU characters across unrestricted events and saved sessions; required event fighters use local fallbacks without replacing those choices.
+- Pack character selections into 12 previously unused bits within the existing 44-byte settings record; scores and the two explicit reserved bits remain untouched.
+
 - Enlarged Practice Panel titles/detail text and removed New/Last/player status lines from both stable layouts.
 - Combined hitlag/turnaround prefixes and the main result into one uniformly large, fitted timing row; retained separate colored history and detail rows.
 

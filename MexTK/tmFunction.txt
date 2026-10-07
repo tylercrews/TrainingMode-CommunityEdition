@@ -37,3 +37,4 @@ OSD_WavedashHopColor
 OSD_ShineBeforeIASA
 OSD_ShineAfterIASA
 Settings_CommitPending
+Settings_EventCharacters

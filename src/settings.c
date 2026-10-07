@@ -132,7 +132,13 @@ void TMSettings_Init(uint8_t r[TM_SETTINGS_SIZE]) {
 static void validate_prefix(uint8_t *r) {
     if (r[4] >= 4) r[4] = 1;
     if (r[5] >= 3) r[5] = 1;
-    if (r[6] >= 2) r[6] = 0;
+    /* Old writers only produce 0/1 here. 10 in the top bits identifies the
+     * character extension, so old palette padding cannot initialize it.
+     * Codes 1..26 are playable external IDs + 1; 0 is unset. */
+    if ((r[6] & 0xC0) == 0x80) {
+        if (((r[6] >> 1) & 31) > 26) r[6] &= 0xC1;
+        if (((r[37] >> 1) & 31) > 26) r[37] &= 0xC1;
+    } else if (r[6] >= 2) r[6] = 0;
     if ((r[7] & 15) >= 5) r[7] &= 0xF0;
     if ((r[7] >> 4) >= 6) r[7] &= 0x0F;
     if ((r[8] & 15) >= 2) r[8] &= 0xF0;
@@ -153,6 +159,7 @@ int TMSettings_Prepare(uint8_t r[TM_SETTINGS_SIZE], int owns_save) {
     uint8_t before[TM_SETTINGS_SIZE];
     memcpy(before, r, sizeof(before));
     if (signed_format && old_version < TM_SETTINGS_VERSION) {
+        if (r[6] >= 2) r[6] = 0; /* Older formats cannot own this extension. */
         r[10] = (r[10] & 0x3F) | (TM_SETTINGS_VERSION << 6);
         /* Version 1 owns neither extension flag; version 2 already owns TurnRun. */
         r[TM_SETTINGS_EXTRA_FLAGS_OFFSET] &= ~(old_version == 1 ? 7u : 6u);
@@ -162,6 +169,7 @@ int TMSettings_Prepare(uint8_t r[TM_SETTINGS_SIZE], int owns_save) {
         r[43] &= ~TM_SETTINGS_LAYOUT_MASK;
     }
     if (!signed_format) {
+        if (r[6] >= 2) r[6] = 0;
         /* Read both old lists before overwriting any of their overlapping bytes. */
         uint8_t legacy[32];
         memcpy(legacy, r + 12, sizeof(legacy));
@@ -203,7 +211,12 @@ uint32_t TMSettings_Read(const uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsi
     case TM_SETTING_OSD_MASK: return read_mask(r);
     case TM_SETTING_OSD_POSITION: return r[4];
     case TM_SETTING_EVENT_PAGE: return r[5];
-    case TM_SETTING_RECOMMENDED: return r[6];
+    case TM_SETTING_RECOMMENDED: return r[6] & 1;
+    case TM_SETTING_CHARACTER: {
+        if (index > 1 || (r[6] & 0xC0) != 0x80) return UINT32_MAX;
+        unsigned code = (r[index ? 37 : 6] >> 1) & 31;
+        return code && code <= 26 ? code - 1 : UINT32_MAX;
+    }
     case TM_SETTING_ADVANCE: return r[7] & 15;
     case TM_SETTING_DECREMENT: return r[7] >> 4;
     case TM_SETTING_DPAD_UP: return r[8] & 15;
@@ -245,6 +258,19 @@ uint32_t TMSettings_Read(const uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsi
 
 int TMSettings_Write(uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsigned index, uint32_t value) {
     if (r[38] != 'T' || r[39] != 'Y' || (r[10] >> 6) != TM_SETTINGS_VERSION) return 0;
+    if (field == TM_SETTING_CHARACTER) {
+        if (index > 1 || (value >= 26 && value != UINT32_MAX)) return 0;
+        uint8_t before[TM_SETTINGS_SIZE];
+        memcpy(before, r, sizeof(before));
+        if ((r[6] & 0xC0) != 0x80) {
+            r[6] = (r[6] & 1) | 0x80;
+            r[37] &= 0xC1; /* Ignore pre-extension palette padding. */
+        }
+        unsigned byte = index ? 37 : 6;
+        unsigned code = value == UINT32_MAX ? 0 : value + 1;
+        r[byte] = (r[byte] & 0xC1) | (code << 1);
+        return bytes_differ(before, r);
+    }
     if (field == TM_SETTING_OSD_DISPLAY) {
         if (value >= 6) return 0;
         int changed = TMSettings_Write(r, TM_SETTING_OSD_LAYOUT, 0, value >= 4 ? value - 3 : TM_OSD_RECENT);
@@ -293,7 +319,7 @@ int TMSettings_Write(uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsigned index
     switch (field) {
     case TM_SETTING_OSD_POSITION: byte = 4; count = 4; break;
     case TM_SETTING_EVENT_PAGE: byte = 5; count = 3; break;
-    case TM_SETTING_RECOMMENDED: byte = 6; count = 2; break;
+    case TM_SETTING_RECOMMENDED: byte = 6; width = 1; count = 2; break;
     case TM_SETTING_ADVANCE: byte = 7; width = 4; count = 5; break;
     case TM_SETTING_DECREMENT: byte = 7; width = 4; shift = 4; count = 6; break;
     case TM_SETTING_DPAD_UP: byte = 8; width = 4; count = 2; break;

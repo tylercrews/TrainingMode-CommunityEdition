@@ -85,3 +85,39 @@ void Settings_CommitPending(void) {
     stc_memcard_state->memcard_changed = true;
     queued_to_native = 1;
 }
+
+/* These native CSS backups are RAM-only (outside the card manifest). Keep
+ * costumes during a session when the character matches; otherwise use default.
+ * The whitelist uses CSS icon IDs, not external fighter IDs. Sheik shares Zelda. */
+static const u8 character_css_id[26] = {
+    7,6,10,22,13,3,16,2,1,23,21,11,4,19,12,20,14,5,15,15,9,17,0,24,18,8,
+};
+static int character_allowed(unsigned kind, int mask) {
+    return kind < 26 && (mask == -1 || ((u32)mask & (1u << character_css_id[kind])));
+}
+void Settings_Characters(unsigned save, int hmn_mask, int cpu_mask, int cpu_selectable) {
+    u8 *backup = (u8 *)stc_memcard + 3344;
+    for (unsigned player = 0; player < 2; ++player) {
+        unsigned offset = player ? 140 : 104, costume = player ? 143 : 107;
+        int mask = player ? cpu_mask : hmn_mask;
+        if (save) {
+            /* Fixed/restricted events are exercises, not a new general choice.
+             * Never persist None/Random/nonplayable IDs from a closed door. */
+            if (mask == -1 && (!player || cpu_selectable) && backup[offset] < 26)
+                Settings_Set(TM_SETTING_CHARACTER, player, backup[offset]);
+            continue;
+        }
+        unsigned kind = Settings_Get(TM_SETTING_CHARACTER, player);
+        if (kind >= 26) kind = backup[offset];
+        if (!character_allowed(kind, mask)) {
+            kind = 2; /* Fox for an uninitialized unrestricted backup. */
+            if (mask != -1) {
+                for (kind = 0; kind < 26; ++kind)
+                    if (character_allowed(kind, mask)) break;
+                if (kind == 26) continue; /* Empty whitelist: leave native behavior. */
+            }
+        }
+        if (kind != backup[offset]) backup[costume] = 0;
+        backup[offset] = kind;
+    }
+}

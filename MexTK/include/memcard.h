@@ -2040,7 +2040,7 @@ struct Memcard
     u32 TM_OSDEnabled;     // 0x1F24
     u8 TM_OSDPosition;     // 0x1F28
     u8 TM_EventPage;       // 0x1F29
-    u8 TM_OSDRecommended;  // 0x1F2A
+    u8 TM_OSDRecommended;  // 0x1F2A: bit 0 recommended; bits 1-5 human code; bits 6-7 character marker
     u8 TM_LabFrameAdvanceButton;    // 0x1F2B - advance idx in low half, decrement idx in high half
     u8 TM_LabDPadUD;       // 0x1F2C - Up in low half, Down in high half
     u8 TM_LabDPadLR;       // 0x1F2D - Left in low half, Right in high half

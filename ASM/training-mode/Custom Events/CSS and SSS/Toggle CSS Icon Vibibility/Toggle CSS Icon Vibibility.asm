@@ -52,16 +52,8 @@
     cmpwi REG_HmnWhitelist, -1
     beq Original
 
-    # Make P1 Undecided
-    lwz r20, CSS_Data(r13)      # CSS Match Info
-    addi r4, r20, 0x70          # Get Player Info Start
-    lhz r5, 0x0(r20)            # Get Player in control of CSS
-    subi r5, r5, 1              # Zero index cause Yasuyuki Nagashima is dumb
-    mulli r5, r5, 36
-    add r4, r4, r5              # r4 now contains the players info
-    # Check if 0x21(N/A)
-    li r3, 0x21
-    stb r3, 0x0(r4)
+    # The event CSS restore service has already selected an allowed fighter.
+    # Keep that selection instead of clearing it on every restricted event.
     b Original
 
 #######################

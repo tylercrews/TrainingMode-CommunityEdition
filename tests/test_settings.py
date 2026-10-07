@@ -262,8 +262,8 @@ class RelocatedDATSettingsTests(unittest.TestCase):
         self.m.cpu.mem_write(self.base, bytes(payload))
         for i in range(num_exports):
             index, offset = struct.unpack_from(">II", dat, 32 + exports + i * 8)
-            if index in [27, 28, 38]:
-                self.m.symbols[{27:"DAT_Get",28:"DAT_Set",38:"DAT_Commit"}[index]] = self.base + offset
+            if index in [27, 28, 38, 39]:
+                self.m.symbols[{27:"DAT_Get",28:"DAT_Set",38:"DAT_Commit",39:"DAT_Characters"}[index]] = self.base + offset
         # Native memcpy is an external SDK dependency; use the tested PPC stub.
         address = self.m.symbols["memcpy"]
         self.m.cpu.mem_write(0x800031F4, struct.pack(">4I", 0x3D800000 | (address >> 16),
@@ -273,6 +273,23 @@ class RelocatedDATSettingsTests(unittest.TestCase):
         address = self.m.symbols["memset"]
         self.m.cpu.mem_write(native_memset, struct.pack(">4I", 0x3D800000 | (address >> 16),
             0x618C0000 | (address & 0xFFFF), 0x7D8903A6, 0x4E800420))
+
+    def test_character_export_after_real_dat_relocation_and_event_switch(self):
+        m=self.m;m.init();backup=0x8045A6C0+3344
+        m.cpu.mem_write(0x8045A6C0+0x535,b'\0') # General Tech / Lab.
+        m.cpu.mem_write(backup+104,b'\x14');m.cpu.mem_write(backup+140,b'\x09')
+        m.call('DAT_Characters',1)
+        self.assertEqual((m.call('DAT_Get',24,0),m.call('DAT_Get',24,1)),(20,9))
+        m.cpu.mem_write(backup+104,b'\x21');m.cpu.mem_write(backup+140,b'\x21')
+        m.call('DAT_Characters',0)
+        self.assertEqual(bytes(m.cpu.mem_read(backup+104,1)),b'\x14')
+        self.assertEqual(bytes(m.cpu.mem_read(backup+140,1)),b'\x09')
+        # Ledgedash has no selectable CPU; its incidental backup must not stick.
+        m.cpu.mem_write(0x8045A6C0+0x535,b'\x02');m.cpu.mem_write(backup+140,b'\x0C')
+        m.call('DAT_Characters',1)
+        self.assertEqual(m.call('DAT_Get',24,1),9)
+        m.cpu.mem_write(0x8045A6C0+0x535,b'\xFF')
+        before=m.record();m.call('DAT_Characters',1);self.assertEqual(m.record(),before)
 
     def test_new_save_identity_and_repeated_reads_after_real_dat_relocation(self):
         m = self.m
@@ -651,6 +668,103 @@ class SettingsTests(unittest.TestCase):
         m.call("TestSettingsWrite", IDS[5], 1)
         self.assertEqual(m.call("Settings_Get", 15, IDS[5]), 1)
         self.assertEqual(m.call("TestDirty"), 0)  # Match edit is queued, not sent to an unloaded card service.
+
+
+class CharacterPreferenceTests(unittest.TestCase):
+    def setUp(self):
+        self.m = Machine(); self.m.init()
+
+    def test_every_playable_pair_survives_reload_and_neighbor_edits(self):
+        m=self.m
+        for human in range(26):
+            for cpu in range(26):
+                m.write(24,0,human); m.write(24,1,cpu)
+                m.write(3,0,(human+cpu)%2)
+                for id in IDS: m.write(14,id,(human+cpu+id)%8)
+                m.write(18,4,human%2);m.write(19,4,cpu%2);m.write(21,0,cpu%3)
+                saved=m.record(); fresh=Machine();fresh.put(saved)
+                fresh.call('TMSettings_Prepare',RECORD,1)
+                self.assertEqual((fresh.read(24,0),fresh.read(24,1)),(human,cpu))
+                self.assertEqual(fresh.read(3),(human+cpu)%2)
+        self.assertEqual(bytes(m.cpu.mem_read(RECORD-8,8)),b'\xA5'*8)
+        self.assertEqual(bytes(m.cpu.mem_read(RECORD+44,8)),b'\xA5'*8)
+
+    def test_old_padding_invalid_ids_and_foreign_save(self):
+        m=self.m;r=bytearray(m.record());r[37]=0xFF;m.put(r)
+        self.assertEqual(m.read(24,0),0xFFFFFFFF);self.assertEqual(m.read(24,1),0xFFFFFFFF)
+
+        self.assertEqual(m.write(24,0,26),0);self.assertEqual(m.write(24,2,2),0)
+        m.write(24,0,0);self.assertEqual(m.read(24,1),0xFFFFFFFF)
+        m.write(24,1,25);m.write(24,0,0xFFFFFFFF)
+        self.assertEqual(m.read(24,0),0xFFFFFFFF);self.assertEqual(m.read(24,1),25)
+        saved=m.record();self.assertEqual(m.call('TMSettings_Prepare',RECORD,0),4)
+        self.assertEqual(m.record(),saved)
+        r=bytearray(saved);r[6]=0xBE;r[37]|=0x3E;m.put(r)
+        m.call('TMSettings_Prepare',RECORD,1)
+        self.assertEqual(m.read(24,0),0xFFFFFFFF);self.assertEqual(m.read(24,1),0xFFFFFFFF)
+
+    def test_unsupported_and_unsigned_records_reject_character_writes(self):
+        m=self.m
+        for version,signature in [(0,b'TY'),(2,b'TY'),(3,b'XX')]:
+            r=bytearray(m.record());r[10]=(r[10]&63)|(version<<6);r[38:40]=signature;m.put(r)
+            before=m.record()
+            self.assertEqual(m.write(24,0,2),0);self.assertEqual(m.write(24,1,20),0)
+            self.assertEqual(m.record(),before)
+
+    def test_restore_constraints_costumes_and_forced_events_do_not_replace_choices(self):
+        m=self.m;backup=0x8045A6C0+3344
+        m.cpu.mem_write(backup+104,b'\x21');m.cpu.mem_write(backup+140,b'\x21')
+        m.call('Settings_Characters',0,-1,-1,1)
+        self.assertEqual(bytes(m.cpu.mem_read(backup+104,1)),b'\x02')
+        self.assertEqual(bytes(m.cpu.mem_read(backup+140,1)),b'\x02')
+        m.cpu.mem_write(backup+104,b'\x14');m.cpu.mem_write(backup+140,b'\x09')
+        m.call('Settings_Characters',1,-1,-1,1)
+        saved=m.record();fresh=Machine();fresh.put(saved)
+        fresh.call('Settings_Characters',0,-1,-1,1)
+        self.assertEqual(bytes(fresh.cpu.mem_read(backup+104,1)),b'\x14')
+        self.assertEqual(bytes(fresh.cpu.mem_read(backup+140,1)),b'\x09')
+        fresh.cpu.mem_write(backup+107,b'\x03');fresh.call('Settings_Characters',0,-1,-1,1)
+        self.assertEqual(bytes(fresh.cpu.mem_read(backup+107,1)),b'\x03')
+        # Peach-only exercise and Fox-only CPU: local fallback, no global overwrite.
+        fresh.call('Settings_Characters',0,1<<4,1<<10,0)
+        self.assertEqual(bytes(fresh.cpu.mem_read(backup+104,1)),b'\x0C')
+        self.assertEqual(bytes(fresh.cpu.mem_read(backup+140,1)),b'\x02')
+        self.assertEqual(bytes(fresh.cpu.mem_read(backup+107,1)),b'\0')
+        fresh.call('Settings_Characters',1,1<<4,1<<10,0)
+        self.assertEqual((fresh.call('Settings_Get',24,0),fresh.call('Settings_Get',24,1)),(20,9))
+        fresh.call('Settings_Characters',0,-1,-1,1)
+        self.assertEqual(bytes(fresh.cpu.mem_read(backup+104,1)),b'\x14')
+        fresh.cpu.mem_write(backup+104,b'\x21');fresh.call('Settings_Characters',1,-1,-1,1)
+        self.assertEqual(fresh.call('Settings_Get',24,0),20)
+
+    def test_assembled_css_hooks_restore_and_commit_native_selected_characters(self):
+        m=self.m;dol=(ROOT/'build/Start.dol').read_bytes()
+        for section in range(18):
+            offset,base,length=[struct.unpack_from('>I',dol,at+section*4)[0] for at in (0,0x48,0x90)]
+            if base<=0x801B06B0 and 0x801B0880<=base+length:
+                m.cpu.mem_write(0x801B06B0,dol[offset+0x801B06B0-base:offset+0x801B0880-base]);break
+        # Only the unrelated native match-default initializer is stubbed.
+        m.cpu.mem_write(0x80167B50,bytes.fromhex('4e800020'))
+        m.cpu.mem_write(0x80300000-200+39*4,struct.pack('>I',m.symbols['TestEventCharacters']))
+        m.cpu.reg_write(gpr(13),0x804D6D5C)
+        m.cpu.mem_write(0x804D6D5C-30656,struct.pack('>I',0x8045A6C0))
+        # CSS_Data is separate from the native scene controller pointer.
+        globals_text=(ROOT/'ASM/Globals.s').read_text()
+        import re
+        css_offset=int(re.search(r'\.set CSS_Data,\s*(-?0x[\da-fA-F]+)',globals_text).group(1),16)
+        m.cpu.mem_write((0x804D6D5C+css_offset)&0xFFFFFFFF,struct.pack('>I',0x80497758))
+        m.cpu.reg_write(gpr(31),0x8045A6C0+1328)
+        m.cpu.mem_write(0x8045A6C0+1328+6,b'\0')
+        m.write(24,0,20);m.write(24,1,9)
+        m.cpu.reg_write(gpr(4),23)
+        start=m.install_hook(0x801BAA98)
+        m.cpu.emu_start(start,0x801BAA9C,count=100000)
+        self.assertEqual(bytes(m.cpu.mem_read(0x80497758+0x70,1)),b'\x14')
+        self.assertEqual(bytes(m.cpu.mem_read(0x80497758+0x94,1)),b'\x09')
+        m.cpu.mem_write(0x80497758+0x70,b'\x02');m.cpu.mem_write(0x80497758+0x94,b'\x0C')
+        start=m.install_hook(0x801BAB18,0x80481000)
+        m.cpu.emu_start(start,0x801BAB1C,count=100000)
+        self.assertEqual((m.call('Settings_Get',24,0),m.call('Settings_Get',24,1)),(2,12))
 
 
 class EventPreferenceTests(unittest.TestCase):

@@ -355,3 +355,14 @@ Both stable layouts remove player/New/Last/waiting status text. Fixed Grid needs
 MsgData adds one timing Text pointer, **140 -> 144 bytes**. That Text is allocated only for visible timed panel results and destroyed on replacement, page hiding, clearing or transition to Fixed/Recent. Maximum supplemental presentation/timing Texts is two per visible panel row; placeholders/page remain bounded. The 44-byte save format, two remaining reserve bits and safe pending-card lifecycle are unchanged.
 
 **126 PowerPC tests pass**, including full-stream native parsing/replacement, larger title scale, missing status/prefix rows, transitions and bounded repeated timing-Text allocation. The release and packaged payloads are verified separately. Final spacing needs native Dolphin visual confirmation.
+
+
+## Global character persistence
+
+`TM_SETTING_CHARACTER` is append-only field 24, index 0 human / 1 CPU. Values are external IDs 0-25, or UINT32_MAX for unset. Byte 6 retains the recommended flag in bit 0; bits 1-5 store human ID+1 and bits 6-7 mark the extension as `10`. Byte 37 bit 0 belongs to the last title palette; bits 1-5 store CPU ID+1. Marker initialization clears unowned CPU padding before exposing it. Codec validation bounds codes and preserves adjacent palette/settings bytes. Older 0/1 recommended readers may discard this extension when downgrading, so retaining characters through an older Tyro build is not guaranteed.
+
+The record is still 44 bytes, format 3. The feature uses twelve previously unused bits; two palette bits plus the two explicit reserved bits remain (four available audited bits). No score region or save-file growth is used.
+
+`Settings_EventCharacters` appends export 39. CSS prepare/confirm hooks preserve all GPR/FPR/control state around it. The wrapper validates event/page IDs, obtains the current whitelist and CPU-selectability, and calls `Settings_Characters` to synchronize RAM-only CSS backups with the shared record. Restricted events do not overwrite general preferences. Their human selection is no longer cleared after the restore service selects an allowed fighter. Native forced-opponent preload/match rules remain effective. Deferred dirty/commit semantics stay intact; no in-match raw card write is added.
+
+132 PowerPC tests pass, including all 676 pairs through fresh record reloads, adjacent palette and recommended edits, malformed/unset/foreign data, restricted fallback, costume reuse/reset, and actual emitted native CSS hooks. Real card writes, cold boot, controller-port selection and gameplay round trips need Dolphin verification.
