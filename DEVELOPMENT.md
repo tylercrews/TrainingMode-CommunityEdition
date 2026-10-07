@@ -255,7 +255,7 @@ LdshEggPlacement caches mode/distance in the savestate-copied event block. Rerol
 
 ## Single-Row Colored Timing and Confirmed Shine Outcomes
 
-The old separate-subtext kerning estimates are superseded. OSD_FormatTiming creates one centered native row with inline colors; Wavedash uses normal 1.0 subtext scale and retains angle/hop rows. The shared ASCII converter recognizes ESC + 8 uppercase hex digits and writes native opcode 0x0C + RGBA. Bounded generated strings use this syntax; ordinary text keeps the existing converter path. Title header color remains dynamically configurable while inline commands color hitlag/turn/result components. Do not reapply a whole timing-row color when MsgData.timing_encoded is set. There are no independent centered prefix/result objects to overlap.
+The old separate-subtext kerning estimates are superseded. OSD_FormatTiming creates one centered native row with inline colors; Wavedash uses normal 1.0 subtext scale and retains angle/hop rows. The shared ASCII converter recognizes ESC + 8 uppercase hex digits and writes native opcode 0x0C + exactly three RGB bytes. The input alpha pair is consumed but never emitted as a fourth payload byte. Bounded generated strings use this syntax; ordinary text keeps the existing converter path. Title header color remains dynamically configurable while inline commands color hitlag/turn/result components. Do not reapply a whole timing-row color when MsgData.timing_encoded is set. There are no independent centered prefix/result objects to overlap.
 
 Wavedash hop coloring must use the value actually supplied to its third-row format (r9), saved in r25 across Message_Display. It must not use wavedash timing from TM_FramesinOneASAgo. Native producer regression tests deliberately make those values differ.
 
@@ -264,3 +264,10 @@ OSD_ShineBeforeIASA (export 36) samples at Generic Per Frame before the native I
 Document but do not print the normal two-step shine turnaround recovery: turn IASA is empty, so no opportunity counter advances there. Resume at 1 on the first restored loop opportunity. Preserve ground/air transfers; do not count airborne time with no jump remaining as jump delay. Hitlag, turn timing and the post-turn jump timing are separate quantities. A fresh shine, generation change, rewind or common restore/reposition clears transient state.
 
 TMShineEpisode adds 52 bytes per context; twelve entries total 1,488 bytes. MsgData is 72 bytes with previous offsets preserved. Save format stays 3/44 bytes with 29 free reserved bits. The test runner builds fresh ASM and executes emitted C2 bodies with the native DOL converter under Unicorn, in addition to model/adapter, Wavedash producer and relocated-DAT tests. These checks complement live Dolphin appearance/frame-step validation.
+
+
+## Native Text Color Payload Safety
+
+The native width parser at 0x803A8314 and renderer at 0x803A8D7C consume exactly three bytes after color opcode 0x0C. Emitting RGBA leaves alpha in the command stream; 0xFF is then interpreted as a glyph prefix and can index an invalid SIS font pointer at 0x803A8368. It also corrupts subtext traversal and can make timing content, recovery sources or titles overlap/disappear. Eight ASCII hex input digits remain supported, but the converter emits only RGB.
+
+A converter-byte test alone does not validate that stream. The regressions now execute the native width parser (0x803A8134) and the same native subtext locator (0x803A6FEC) used by text editing. Initialize the text opcode-history buffer and native constants/SIS kerning fixture when running these functions under Unicorn. Tests include an old malformed RGBA stream that must fail, and corrected RGB streams that must preserve all following row boundaries.

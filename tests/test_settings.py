@@ -11,7 +11,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "build/test-deps"))
-from unicorn import Uc, UC_ARCH_PPC, UC_MODE_32, UC_MODE_BIG_ENDIAN
+from unicorn import Uc, UcError, UC_ARCH_PPC, UC_MODE_32, UC_MODE_BIG_ENDIAN
 from unicorn import ppc_const as reg
 
 RECORD = 0x8045A6C0 + 0x1F24
@@ -41,7 +41,9 @@ class Machine:
         # Verified against the local native DOL, function 0x800C0658.
         self.cpu.mem_write(0x800C0658, bytes.fromhex("800304302c0000004182000c386304084e800020386304884e800020"))
         dol = (ROOT / "build/Start.dol").read_bytes()
-        for address, size in [(0x8040C680,574),(0x8040C8C0,574),(0x8040CB00,640),(0x803A67EC,0x3AC)]:
+        for address, size in [(0x8040C680,574),(0x8040C8C0,574),(0x8040CB00,640),
+                              (0x803A67EC,0x3AC),(0x803A6FEC,0xB4),(0x803A7684,0xE38),
+                              (0x8040C568,0xAC),(0x804DE000,0xC00)]:
             for section in range(18):
                 offset, base, length = [struct.unpack_from(">I",dol,at+section*4)[0] for at in (0,0x48,0x90)]
                 if base <= address and address + size <= base + length:
@@ -97,6 +99,43 @@ class Machine:
         assert bytes(self.cpu.mem_read(output-8,8)) == b"\xA5"*8
         assert bytes(self.cpu.mem_read(output+160,8)) == b"\xA5"*8
         return bytes(self.cpu.mem_read(output,size))
+
+    def native_width(self, encoded):
+        """Execute the native parser at the PC shown in the user's warning."""
+        stream,text,output,sis=0x80403400,0x80403600,0x80403800,0x80403A00
+        self.cpu.mem_write(stream,encoded+b"\0")
+        self.cpu.mem_write(text,bytes(0xA4))
+        self.cpu.mem_write(text+0x68,struct.pack(">IHH",0x80403C00,0,64))
+        self.cpu.mem_write(0x80403C00,bytes(64))
+        self.cpu.mem_write(text+0x78,struct.pack(">3f",0,1,1))
+        self.cpu.mem_write(text+0x9D,b"\x01")  # Native glyph kerning enabled.
+        self.cpu.mem_write(0x804D1124,struct.pack(">I",sis))
+        # Built-in 0x20xx glyphs use the menu table; ordinary 0x40xx ASCII
+        # uses bounded custom-SIS kerning. The old stray 0xFF glyph indexes
+        # beyond that mapped table, reproducing the pointer warning.
+        self.cpu.mem_write(sis,struct.pack(">2I",0,0x001FF800))
+        self.cpu.mem_write(0x001FF800,b"\x04\x08"*256)
+        self.symbols["NativeWidth"] = 0x803A8134
+        saved_r2=self.cpu.reg_read(gpr(2))
+        self.cpu.reg_write(gpr(2),0x804DF9E0)
+        self.cpu.reg_write(gpr(1),0x80400000)
+        try: self.call("NativeWidth",stream,text,output,output+4)
+        finally: self.cpu.reg_write(gpr(2),saved_r2)
+        return struct.unpack(">2f",self.cpu.mem_read(output,8))
+
+    def native_subtexts(self, rows):
+        """Use the same native locator used by SetText/Position/Scale/Color."""
+        stream=0x80404400
+        chunks=[b"\x07"+struct.pack(">2h",0,i*30)+b"\x0c\xff\xff\xff\x0e\x01\0\x01\0"+
+                row+b"\x0f\x0d" for i,row in enumerate(rows)]
+        self.cpu.mem_write(stream,b"".join(chunks)+b"\0")
+        self.symbols["NativeSubtext"] = 0x803A6FEC
+        expected=stream
+        for i,chunk in enumerate(chunks):
+            found=self.call("NativeSubtext",stream,i,0)
+            if found != expected: raise AssertionError(f"Row {i} corrupted: {found:x} != {expected:x}")
+            expected+=len(chunk)
+        return chunks
 
     def call(self, name, *args):
         for i, value in enumerate(args, 3):
@@ -725,6 +764,31 @@ class OSDStyleTests(unittest.TestCase):
     def setUp(self):
         self.m = Machine()
 
+    def test_inline_color_rgb_payload_survives_native_width_and_subtext_parsers(self):
+        m=self.m
+        # Cover zero bytes, 0xFF alpha in source, bright colors and all affected
+        # layouts; verify actual text traversal rather than only conversion.
+        rows=[]
+        for source in [b"Wavedash \x1B00FFFFFF1f",b"\x1BFFFFFFFF3hl->\x1B00FFFFFF1f",
+                       b"\x1BFFFFFFFF3hl->\x1BFFF000FF3trn->\x1BFFA2BAFF1trn",
+                       b"\x1B8DFF6EFF2f/7f",b"\x1B000000FF1f"]:
+            encoded=m.native_text(source)
+            width,height=m.native_width(encoded)
+            self.assertGreater(width,0)
+            self.assertLess(width,500)
+            self.assertGreaterEqual(height,0)
+            self.assertLessEqual(height,32)
+            rows.append(encoded)
+        m.native_subtexts([rows[0],m.native_text(b"Angle: 20.0"),m.native_text(b"Short Hop: 1f")])
+        m.native_subtexts([m.native_text(b"Act OoWait"),m.native_text(b"Landing"),rows[1]])
+        m.native_subtexts([m.native_text(b"Jump Out Of Shine"),rows[2]])
+        color_only=m.native_text(b"\x1B00FFFFFF")
+        self.assertEqual(color_only,b"\x0c\x00\xff\xff")
+        # The previous 4-byte payload leaves alpha interpreted as a glyph and
+        # fails at the native text-width parser, exactly the regression fixed.
+        old=b"\x0c\xff\xff\xff\xff"+m.native_text(b"1f")
+        with self.assertRaises(UcError): m.native_width(old)
+
     def test_wavedash_top_row_is_normal_size_and_a_single_centered_row(self):
         m = self.m; m.init(); m.write(14,0,1)
         for hitlag in [0,3]:
@@ -847,8 +911,8 @@ class OSDStyleTests(unittest.TestCase):
             self.assertEqual(m.call("TestStyleY",1),15)
             self.assertEqual(m.call("TestStylePrefix"),0xFFFFFFFF)
             encoded=m.native_text(raw)
-            self.assertIn(b"\x0c\xff\xff\xff\xff",encoded)
-            self.assertIn(b"\x0c"+colors[-1][1].to_bytes(4,"big"),encoded)
+            self.assertIn(b"\x0c\xff\xff\xff",encoded)
+            self.assertIn(b"\x0c"+colors[-1][1].to_bytes(4,"big")[:3],encoded)
 
     def test_source_first_timing_tag_reads_string_and_integer_with_their_actual_types(self):
         m=self.m

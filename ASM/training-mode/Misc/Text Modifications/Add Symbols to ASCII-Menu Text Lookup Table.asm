@@ -11,7 +11,8 @@
 
     backup
 
-    # ESC + eight hexadecimal digits: inline RGBA within a single text row.
+    # ESC + eight hexadecimal digits: RGBA input, native RGB text command.
+    # Native 0x0C consumes THREE color bytes; alpha is not a fourth payload byte.
     cmpwi r10, 0x1B
     beq InlineColor
 SearchCustomSymbols:
@@ -89,8 +90,6 @@ InlineColor_Accumulate:
     addi r9, r9, 1
     srwi r11, r29, 8
     stbx r11, r3, r9
-    addi r9, r9, 1
-    stbx r29, r3, r9
     addi r9, r9, 1
     addi r5, r5, 8
     addi r6, r6, 8

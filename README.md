@@ -19,6 +19,9 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Fixed the native text-pointer warning and corrupted hitlag/shine/Wavedash text: inline color commands now contain three RGB bytes, matching the engine parser.
+- Added regressions that reproduce the malformed four-byte payload and run native width/subtext traversal on corrected Wavedash, hitlag, landing and turnaround rows.
+
 - Corrected Wavedash hop colors to use the hop duration printed on the bottom row, independently of wavedash timing.
 - Restored normal-size Wavedash top-row text and replaced separate centered timing runs with one inline-colored row to eliminate overlap.
 - Replaced Fox/Falco Act OoShine input predictions with confirmed Jump Out Of Shine results and colored turnaround context (Nhl->Ntrn->Nf).

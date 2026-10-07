@@ -1,7 +1,7 @@
 #include "events.h"
 
-/* ESC followed by eight uppercase hex digits emits a native 0x0C color
- * command in the patched ASCII converter. One centered row owns every run. */
+/* ESC followed by eight uppercase RGBA hex digits emits native 0x0C + RGB.
+ * The native command has no alpha byte. One centered row owns every run. */
 static char *append_color(char *out, uint32_t color) {
     static const char hex[] = "0123456789ABCDEF";
     *out++ = 0x1B;
