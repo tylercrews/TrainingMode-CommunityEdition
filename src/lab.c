@@ -340,6 +340,12 @@ static const unsigned global_cue_flags[] = {
     TM_FLAG_MISSED_LCANCEL, TM_FLAG_RUN_TURNAROUND, TM_FLAG_LAST_BLOCKED_FRAME, TM_FLAG_INFINITE_SHIELDS,
     TM_FLAG_INVINCIBILITY,
 };
+static void Lab_ChangeOSDDisplay(GOBJ *menu, int value) {
+    MenuData *data = menu->userdata;
+    unsigned row = data->curr_menu->scroll + data->curr_menu->cursor;
+    if (data->curr_menu != &LabMenu_OSDDisplay || row > 1) return;
+    TM_SetSetting(row == 0 ? TM_SETTING_OSD_LAYOUT : TM_SETTING_OSD_POSITION, 0, value);
+}
 static void Lab_RefreshShieldOverride(void) {
     char *status = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_INFINITE_SHIELDS) ?
         "Global Infinite Shields: On (full health overrides local)." : "Global Infinite Shields: Off.";
@@ -6124,6 +6130,8 @@ void Event_Init(GOBJ *gobj)
     LabOptions_OSDs[TM_SETTINGS_OSDS].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_CPU_OSDS_OFF);
     for (unsigned i = 0; i < countof(global_cue_flags); ++i)
         LabOptions_OSDs[TM_SETTINGS_OSDS + 5 + i].val = TM_GetSetting(TM_SETTING_FLAG, global_cue_flags[i]);
+    LabOptions_OSDDisplay[0].val = TM_GetSetting(TM_SETTING_OSD_LAYOUT, 0);
+    LabOptions_OSDDisplay[1].val = TM_GetSetting(TM_SETTING_OSD_POSITION, 0);
     Lab_RefreshShieldOverride();
 
     // character rng options

@@ -21,7 +21,10 @@
 #define TM_SETTINGS_EVENT_DELAY_MASK 0x30 /* Byte 40 bits 4-5: Ledgedash reset delay. */
 #define TM_SETTINGS_EVENT_TIPS_MASK 0x40 /* Byte 40 bit 6: Ledgedash hints. */
 #define TM_SETTINGS_FREE_MASK 0x80 /* Byte 40 bit 7 remains reserved. */
-#define TM_SETTINGS_EGGS_FREE_MASK 0xE0 /* Byte 43 bits 5-7: three more reserve bits. */
+#define TM_SETTINGS_LAYOUT_MASK 0x60 /* Byte 43 bits 5-6: Recent / Fixed / Panel. */
+#define TM_SETTINGS_EGGS_FREE_MASK 0x80 /* Byte 43 bit 7 remains reserved. */
+#define TM_OSD_LAYOUT_NAMES "Recent", "Fixed Grid", "Practice Panel"
+#define TM_OSD_DISPLAY_NAMES "HUD", "Sides", "Top Left", "Top Right", "Fixed Grid", "Practice Panel"
 #define TM_SETTINGS_LEDGE_OFFSET 41
 #define TM_SETTINGS_EGGS_OFFSET 42
 
@@ -81,7 +84,11 @@ enum TMSettingsField {
     TM_SETTING_LEDGEDASH,
     TM_SETTING_EGGS,
     TM_SETTING_EVENT_RESET, /* Write 1, index TM_EVENT_*: reset only this event's saved fields. */
+    TM_SETTING_OSD_LAYOUT,
+    TM_SETTING_OSD_DISPLAY, /* Composite editor choice: four Recent anchors, Fixed, Panel. */
+    TM_SETTING_OSD_PAGE, /* Runtime-only manual page; no memory-card allocation. */
 };
+enum TMOSDLayout { TM_OSD_RECENT, TM_OSD_FIXED, TM_OSD_PANEL, TM_OSD_LAYOUT_COUNT };
 
 /* Stable preference IDs, independent of either event's menu row order. */
 enum TMLedgedashPreference {

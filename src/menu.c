@@ -180,6 +180,16 @@ void EventMenu_Update(GOBJ *gobj)
     menu_data->hide_menu = 0;
     HSD_Pad *pad = PadGetMaster(menu_data->controller_index);
 
+    if (TM_GetSetting(TM_SETTING_OSD_LAYOUT, 0) && (pad->down & (HSD_TRIGGER_L | HSD_TRIGGER_R))) {
+        unsigned pages = Message_LayoutPageCount();
+        unsigned page = TM_GetSetting(TM_SETTING_OSD_PAGE, 0);
+        page = (page + ((pad->down & HSD_TRIGGER_R) ? 1 : pages - 1)) % pages;
+        TM_SetSetting(TM_SETTING_OSD_PAGE, 0, page);
+        Message_LayoutUpdate();
+        SFX_PlayCommon(2);
+        return;
+    }
+
     if ((pad->held & HSD_BUTTON_Y) && menu_data->curr_menu->shortcuts) {
         ShortcutList *shortcuts = menu_data->curr_menu->shortcuts;
         for (int i = 0; i < shortcuts->count; ++i) {

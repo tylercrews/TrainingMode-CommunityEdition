@@ -975,6 +975,9 @@
 .set SettingsField_Ledgedash, 18
 .set SettingsField_Eggs, 19
 .set SettingsField_EventReset, 20
+.set SettingsField_Layout, 21
+.set SettingsField_Display, 22
+.set SettingsField_OSDPage, 23
 
 # Preserve the native hook's entire register context, including volatile FPRs,
 # r0, CR, CTR and XER. Leave ABI linkage/argument space below the saves.

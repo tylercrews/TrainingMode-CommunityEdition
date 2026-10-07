@@ -19,6 +19,9 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Added Fixed Grid and Practice Panel OSD layouts with reserved category positions, retained latest results, player labels and manual pages; Practice Panel includes the last three timing results.
+- Select layouts with X/Y in the L-button Global Settings menu or Lab's OSD Display submenu; L/R selects pages in the editor or while paused. Allocated two layout bits, leaving two reserved bits; the save record remains 44 bytes.
+
 - Saved Ledgedash Starting Position, Reset, Success Criteria, Reset Delay and Tips, plus Eggs-ercise damage threshold, scale, spawn velocity, collision display and infinite/Free Practice mode.
 - Added Reset Event Settings to both events; Eggs-ercise resets by restarting in timed mode. Settings use 25 previously reserved bits, leaving four; high scores retain their storage and Eggs-ercise local trail settings are not saved.
 

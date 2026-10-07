@@ -381,7 +381,25 @@ typedef struct MsgData
     int timing_turn; // first shine turnaround's actionable opportunity; 0 = absent
     int timing_second_turn; // terminal turnaround outcome; final marker is always red
     int timing_encoded; // color commands inside one timing row; no separate centered runs
+    int line_count; // original producer rows; native subtext indices never change for a layout
+    int layout_owned; // 1: newly emitted bank result; 2: finalized Recent import; 0: recent queue
+    int layout_key;
+    unsigned native_frame; // creation update, used to coalesce duplicate history notifications
+    Text *layout_footer; // separate text; never inserts rows ahead of native caller edits
+    int layout_footer_state;
+    int layout_captured;
 } MsgData;
+void Message_FreeObject(GOBJ *object);
+void Message_LayoutInit(int canvas);
+int Message_LayoutAdd(GOBJ *object, int queue);
+int Message_LayoutImport(GOBJ *object, int queue);
+void Message_LayoutUpdate(void);
+void Message_LayoutClear(void);
+int Message_LayoutVisible(MsgData *msg);
+void Message_LayoutGeometry(GOBJ *object);
+void Message_LayoutRecent(void);
+void Message_LayoutEndCombo(int queue);
+unsigned Message_LayoutPageCount(void);
 void OSD_ApplyMessageStyle(MsgData *msg);
 void OSD_MessageGX(GOBJ *gobj, int pass);
 void OSD_EditorInit(void *data);

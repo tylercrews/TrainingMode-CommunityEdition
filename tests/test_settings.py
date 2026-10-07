@@ -327,6 +327,21 @@ class RelocatedDATSettingsTests(unittest.TestCase):
         self.assertEqual(fresh.record(), saved)
         self.assertEqual(fresh.call("TestDirty"), 0)
 
+    def test_layout_and_runtime_page_use_relocated_accessors_without_touching_preferences(self):
+        m = self.m; m.init()
+        m.call("DAT_Set",19,4,1); m.call("DAT_Set",18,4,0)
+        before = m.record()
+        for choice in range(6):
+            m.call("DAT_Set",22,0,choice)
+            self.assertEqual(m.call("DAT_Get",22,0),choice)
+            self.assertEqual(m.call("DAT_Get",19,4),1)
+            self.assertEqual(m.call("DAT_Get",18,4),0)
+        saved=m.record()
+        m.call("DAT_Set",23,0,4)
+        self.assertEqual(m.call("DAT_Get",23,0),4)
+        self.assertEqual(m.record(),saved)
+        self.assertEqual(m.record()[40:43],before[40:43])
+
 
 class SettingsTests(unittest.TestCase):
     def setUp(self):
@@ -555,7 +570,7 @@ class EventPreferenceTests(unittest.TestCase):
     def test_old_format_three_uses_read_only_defaults_until_first_edit(self):
         m = self.m
         old = bytearray(m.record())
-        old[40:44] = b"\xf0\xff\xff\xff"  # Initialization bit clear, arbitrary old reserve payload.
+        old[40:44] = b"\xf0\xff\xff\x9f"  # Initialization bit clear; Recent layout; arbitrary preference payload.
         m.put(old)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
         self.assertEqual(self.values(m), self.defaults)
@@ -566,14 +581,14 @@ class EventPreferenceTests(unittest.TestCase):
         self.assertEqual(m.call("TestDirty"), 1)
         self.assertEqual(m.record()[:40], old[:40])
         self.assertEqual(m.record()[40] & 0x80, 0x80)
-        self.assertEqual(m.record()[43] & 0xE0, 0xE0)
+        self.assertEqual(m.record()[43] & 0x80, 0x80)
         self.assertEqual(self.values(m), {self.LEDGE: [0, 1, 0, 1, 0], self.EGGS: self.defaults[self.EGGS]})
 
     def test_every_supported_value_round_trips_without_changing_other_choices(self):
         m = self.m
         reserve = bytearray(m.record())
         reserve[40] |= 0x87
-        reserve[43] |= 0xE0
+        reserve[43] |= 0x80
         m.put(reserve)
         for field, counts in self.counts.items():
             for index, count in enumerate(counts):
@@ -584,17 +599,17 @@ class EventPreferenceTests(unittest.TestCase):
                     self.assertEqual(self.values(m), before)
                     self.assertEqual(m.record()[:40], reserve[:40])
                     self.assertEqual(m.record()[40] & 0x87, 0x87)
-                    self.assertEqual(m.record()[43] & 0xE0, 0xE0)
+                    self.assertEqual(m.record()[43] & 0x80, 0x80)
                     saved = m.record()
                     self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
                     self.assertEqual(m.record(), saved)
 
     def test_exact_packed_budget_and_free_bits(self):
         m = self.m
-        r = bytearray(m.record()); r[40] = 0x87; r[43] = 0xE0; m.put(r)
+        r = bytearray(m.record()); r[40] = 0x87; r[43] = 0x80; m.put(r)
         for field, values in [(self.LEDGE, [4, 4, 3, 3, 0]), (self.EGGS, [199, 2, 0, 1, 1])]:
             for index, value in enumerate(values): m.write(field, index, value)
-        self.assertEqual(m.record()[40:44], b"\xbf\xe4\xc7\xfa")
+        self.assertEqual(m.record()[40:44], b"\xbf\xe4\xc7\x9a")
         self.assertEqual(m.record()[10] >> 6, 3)
         self.assertEqual(len(m.record()), 44)
 
@@ -617,7 +632,7 @@ class EventPreferenceTests(unittest.TestCase):
         r = bytearray(m.record()); r[40:44] = b"\xff\xff\xff\xff"; m.put(r)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 2)
         self.assertEqual(self.values(m), {self.LEDGE: [0, 1, 3, 3, 1], self.EGGS: [12, 0, 1, 1, 1]})
-        self.assertEqual(m.record()[40:44], b"\xff\xc8\x0c\xfc")
+        self.assertEqual(m.record()[40:44], b"\xff\xc8\x0c\x9c")
         self.assertEqual(m.record()[:40], r[:40])
         saved = m.record()
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
@@ -625,7 +640,7 @@ class EventPreferenceTests(unittest.TestCase):
 
     def test_event_resets_preserve_sibling_preferences_flags_and_free_bits(self):
         m = self.m
-        r = bytearray(m.record()); r[40] = 0x87; r[43] = 0xE0; m.put(r)
+        r = bytearray(m.record()); r[40] = 0x87; r[43] = 0x80; m.put(r)
         for field, counts in self.counts.items():
             for index, count in enumerate(counts): m.write(field, index, count - 1)
         eggs = self.values(m)[self.EGGS]
@@ -636,7 +651,7 @@ class EventPreferenceTests(unittest.TestCase):
         m.write(self.RESET, 1, 1)
         self.assertEqual(self.values(m), {self.LEDGE: ledge, self.EGGS: self.defaults[self.EGGS]})
         self.assertEqual(m.record()[40] & 0x87, 0x87)
-        self.assertEqual(m.record()[43] & 0xE0, 0xE0)
+        self.assertEqual(m.record()[43] & 0x80, 0x80)
         self.assertEqual(m.record()[:40], r[:40])
 
     def test_infinite_mode_and_hints_are_independent_and_survive_fresh_service(self):
@@ -667,6 +682,202 @@ class EventPreferenceTests(unittest.TestCase):
             self.assertEqual(m.call("Settings_Get", self.LEDGE, 4), 0)
             self.assertEqual(m.record(), saved)
             self.assertEqual(m.call("TestDirty"), 0)
+
+
+class OSDLayoutTests(unittest.TestCase):
+    def setUp(self):
+        self.m = Machine(); self.m.init()
+
+    def footer(self, object):
+        return bytes(self.m.call("TestLayoutFooterChar", object, i) for i in range(120)).split(b"\0", 1)[0]
+
+    def start(self, mode=1, ids=(0,1,8,16,20)):
+        m = self.m
+        for id in ids: m.write(14, id, 6)
+        m.call("Settings_Set", 21, 0, mode)
+        m.call("TestCueInit"); m.call("TestCueState", 0, 14, 1, 40, 100)
+        m.call("TestLayoutInit"); m.call("TestLayoutTick", 0)
+
+    def test_layout_bits_composite_choices_and_preferences_survive_reload(self):
+        m = self.m
+        r = bytearray(m.record()); r[40] = 0x87; r[43] = 0x80; m.put(r)
+        m.write(18, 4, 0); m.write(19, 4, 1)
+        before = m.record()
+        for choice in range(6):
+            m.call("Settings_Set", 22, 0, choice)
+            self.assertEqual(m.call("Settings_Get", 22, 0), choice)
+            self.assertLess(m.read(1), 4)
+            self.assertEqual(m.read(18, 4), 0); self.assertEqual(m.read(19, 4), 1)
+            self.assertEqual(m.record()[40:], bytes([before[40], before[41], before[42],
+                (before[43] & ~0x60) | (max(0,choice-3) << 5)]))
+            fresh = Machine(); fresh.put(m.record())
+            self.assertEqual(fresh.call("Settings_Get", 22, 0), choice)
+        m.call("Settings_Set", 21, 0, 2)
+        self.assertEqual(m.call("Settings_Get", 22, 0), 5)
+        m.write(20, 1, 1)
+        self.assertEqual(m.read(21), 2)  # Egg reset cannot reset global layout.
+        invalid = bytearray(m.record()); invalid[43] |= 0x60; m.put(invalid)
+        self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 2)
+        self.assertEqual(m.read(21), 0)
+        self.assertEqual(m.record()[43] & 0x80, 0x80)
+
+    def test_page_selection_is_runtime_only_and_invalid_modes_are_rejected(self):
+        m = self.m; before = m.record()
+        m.call("Settings_Set", 23, 0, 12)
+        self.assertEqual(m.call("Settings_Get", 23, 0), 12)
+        self.assertEqual(m.record(), before); self.assertEqual(m.call("TestDirty"), 0)
+        m.call("Settings_Set", 23, 0, 19)
+        self.assertEqual(m.call("Settings_Get", 23, 0), 12)
+        for field, value in [(21,3),(22,6)]: self.assertEqual(m.write(field,0,value),0)
+        self.assertEqual(m.record(), before)
+
+    def test_canonical_grid_and_panel_mapping_of_all_players_and_categories(self):
+        m = self.m; ptr = 0x80406000
+        m.call("TMOSD_MapReset",ptr,sum(1<<id for id in IDS))
+        m.call("TMOSD_MapOwners",ptr,63)
+        self.assertEqual(m.call("TMOSD_Count",ptr),114)
+        self.assertEqual(m.call("TMOSD_PageCount",ptr,1),13)
+        self.assertEqual(m.call("TMOSD_PageCount",ptr,2),19)
+        for player in range(6):
+            for slot, category in enumerate(IDS):
+                key = m.call("TMOSD_Key",player,category)
+                self.assertEqual(key,player*19+slot)
+                self.assertEqual(m.call("TMOSD_Category",key),category)
+                for mode, capacity in [(1,9),(2,6)]:
+                    self.assertEqual(m.call("TestLayoutCell",ptr,key,mode,0),key//capacity)
+                    self.assertEqual(m.call("TestLayoutCell",ptr,key,mode,1),key%capacity)
+        for player, category in [(-1,0),(6,0),(0,2),(0,64)]:
+            self.assertEqual(m.call("TMOSD_Key",player,category),0xFFFFFFFF)
+
+    def test_new_owner_appends_without_moving_existing_slots(self):
+        m = self.m; ptr = 0x80406000
+        m.call("TMOSD_MapReset",ptr,(1<<0)|(1<<20));m.call("TMOSD_MapOwners",ptr,5)
+        key = m.call("TMOSD_Key",2,20)
+        before = [m.call("TestLayoutCell",ptr,key,1,i) for i in range(4)]
+        m.call("TMOSD_MapOwners",ptr,7)
+        self.assertEqual([m.call("TestLayoutCell",ptr,key,1,i) for i in range(4)],before)
+        m.call("TMOSD_MapOwners",ptr,1)
+        self.assertEqual(m.call("TMOSD_Count",ptr),6)  # Hidden owners retain their cells.
+
+    def test_repeated_results_retain_positions_and_do_not_expire_in_both_styles(self):
+        for mode in (1,2):
+            self.m = Machine();self.m.init();self.start(mode)
+            m = self.m
+            wave=m.call("TestLayoutEmit",0,0,1,0);fast=m.call("TestLayoutEmit",0,20,2,20)
+            m.call("TestLayoutTick",1)
+            before=[m.call("TestLayoutX100",wave),m.call("TestLayoutY100",wave)]
+            for frame in range(2,125):m.call("TestLayoutTick",frame)
+            self.assertEqual(m.call("TestLayoutAge",wave),120)
+            self.assertEqual(m.call("TestLayoutVisible",wave),1)
+            self.assertIn(b"last",self.footer(wave))
+            self.assertEqual(m.call("TestLayoutFreed"),0)
+            m.call("TestLayoutEmit",0,20,3,20);m.call("TestLayoutTick",125)
+            self.assertEqual([m.call("TestLayoutX100",wave),m.call("TestLayoutY100",wave)],before)
+            self.assertEqual(m.call("TestLayoutFreed"),1)
+
+    def test_manual_pages_do_not_follow_new_results_or_expiration(self):
+        self.start(1,IDS);m=self.m
+        object=m.call("TestLayoutEmit",0,14,1,14);m.call("TestLayoutTick",1)
+        self.assertEqual(m.call("TestLayoutVisible",object),0)
+        self.assertEqual(m.call("Settings_Get",23,0),0)
+        m.call("Settings_Set",23,0,1);m.call("TestLayoutTick",2)
+        self.assertEqual(m.call("TestLayoutVisible",object),1)
+        for frame in range(3,130):m.call("TestLayoutTick",frame)
+        self.assertEqual(m.call("Settings_Get",23,0),1)
+        self.assertLessEqual(m.call("TestLayoutLiveText"),19)
+        m.call("Settings_Set",23,0,18);m.call("TestLayoutTick",130)
+        self.assertEqual(m.call("Settings_Get",23,0),2)  # Clamp invalid explicit page, no cycling.
+
+    def test_pause_duplicate_ticks_and_stock_generation_preserve_new_result(self):
+        self.start(2);m=self.m
+        old=m.call("TestLayoutEmit",0,20,1,20);m.call("TestLayoutTick",1)
+        age=m.call("TestLayoutAge",old)
+        for _ in range(4):m.call("TestLayoutTick",1)
+        self.assertEqual(m.call("TestLayoutAge",old),age)
+        m.call("TestLayoutPause",2);m.call("TestLayoutTick",2)
+        self.assertEqual(m.call("TestLayoutAge",old),age)
+        m.call("TestLayoutPause",0);m.call("TestLayoutSpawn",0,7)
+        fresh=m.call("TestLayoutEmit",0,20,2,20);m.call("TestLayoutTick",3)
+        self.assertEqual(m.call("TestLayoutFreed"),1)
+        self.assertEqual(m.call("TestLayoutVisible",fresh),1)
+        self.assertNotIn(b"1f",self.footer(fresh))
+        m.call("Message_LayoutClear")
+        fresh=m.call("TestLayoutEmit",0,20,3,20);m.call("TestLayoutTick",0)
+        self.assertEqual(m.call("TestLayoutVisible",fresh),1)
+        self.assertNotIn(b"2f",self.footer(fresh))
+
+    def test_panel_history_is_bounded_deduplicated_typed_and_cleared_for_subtypes(self):
+        self.start(2);m=self.m
+        for frame, result in enumerate([1,2,3,4],1):
+            m.call("TestLayoutTick",frame)
+            object=m.call("TestLayoutEmit",0,20,result,20);m.call("TestLayoutTick",frame)
+        text=self.footer(object)
+        self.assertNotIn(b"1f",text); self.assertIn(b"2f",text);self.assertIn(b"3f",text);self.assertIn(b"4f",text)
+        self.assertIn(b"\x1bFFF000FF3f",text)  # Third timing remains yellow.
+        encoded=m.native_text(text);m.native_width(encoded);m.native_subtexts([encoded])
+        # Same callback update/value must not add another history item.
+        object=m.call("TestLayoutEmit",0,20,4,20);m.call("TestLayoutTick",4)
+        self.assertEqual(self.footer(object).count(b"4f"),1)
+        object=m.call("TestLayoutEmit",0,20,1,64);m.call("TestLayoutTick",5)
+        self.assertNotIn(b"2f",self.footer(object));self.assertNotIn(b"4f",self.footer(object))
+
+    def test_all_and_cpu_overrides_preserve_human_slot_coordinates(self):
+        self.start(1);m=self.m
+        human=m.call("TestLayoutEmit",0,20,1,20);m.call("TestLayoutTick",1)
+        before=[m.call("TestLayoutX100",human),m.call("TestLayoutY100",human)]
+        m.call("Settings_Set",11,0,1);m.call("OSD_MessageGX",human,2)
+        m.call("Settings_Set",11,0,0);m.call("TestLayoutTick",2)
+        self.assertEqual([m.call("TestLayoutX100",human),m.call("TestLayoutY100",human)],before)
+        m.call("TestCueState",2,14,1,40,100);m.call("TestCuePlayer",1,1,1)
+        cpu=m.call("TestLayoutEmit",1,0,1,0);m.call("TestLayoutTick",3)
+        m.call("Settings_Set",11,8,1);m.call("OSD_MessageGX",cpu,2)
+        m.call("TestLayoutTick",4)
+        self.assertEqual([m.call("TestLayoutX100",human),m.call("TestLayoutY100",human)],before)
+        self.assertIn(b"CPU2",self.footer(cpu))
+
+    def test_importing_old_recent_result_cannot_overwrite_a_fresh_native_result(self):
+        self.start(0);m=self.m
+        old=m.call("TestLayoutEmit",0,20,1,20)
+        m.call("Settings_Set",21,0,2)
+        fresh=m.call("TestLayoutEmit",0,20,2,20)
+        self.assertEqual(m.call("Message_LayoutImport",old,0),1)
+        m.call("TestLayoutTick",1)
+        self.assertEqual(m.call("TestLayoutFreed"),1)
+        self.assertEqual(m.call("TestLayoutVisible",fresh),1)
+        self.assertIn(b"2f",self.footer(fresh));self.assertNotIn(b"1f",self.footer(fresh))
+
+    def test_recent_imports_from_one_update_keep_queue_recency(self):
+        self.start(0);m=self.m
+        old=m.call("TestLayoutEmit",0,8,1,8)
+        newer=m.call("TestLayoutEmit",0,8,2,64)
+        m.call("Settings_Set",21,0,2)
+        self.assertEqual(m.call("Message_LayoutImport",old,0),1)
+        self.assertEqual(m.call("Message_LayoutImport",newer,0),1)
+        m.call("TestLayoutTick",1)
+        self.assertEqual(m.call("TestLayoutFreed"),1)
+        self.assertIn(b"2f",self.footer(newer));self.assertNotIn(b"1f",self.footer(newer))
+
+    def test_switching_back_to_recent_releases_stable_ownership(self):
+        self.start(2);m=self.m
+        one=m.call("TestLayoutEmit",0,0,1,0);two=m.call("TestLayoutEmit",0,20,2,20)
+        m.call("TestLayoutTick",1);m.call("Settings_Set",21,0,1);m.call("TestLayoutTick",2)
+        self.assertEqual(m.call("TestLayoutVisible",one),1)
+        m.call("Settings_Set",21,0,0);m.call("TestLayoutTick",3)
+        self.assertEqual(m.call("TestLayoutRecent"),2)
+        self.assertEqual(m.call("TestLayoutVisible",one),1)
+        m.call("TestLayoutTick",4)
+        self.assertEqual(m.call("TestLayoutRecent"),2)
+
+    def test_native_editor_paging_does_not_use_the_opening_l_press_or_save_bits(self):
+        m=self.m
+        for id in IDS:m.write(14,id,6)
+        m.call("Settings_Set",21,0,1);m.call("TestEditorInit")
+        saved=m.record()
+        m.call("TestEditorInput",0x40,0)  # Opening L is consumed without paging.
+        self.assertEqual(m.call("Settings_Get",23,0),0)
+        m.call("TestEditorInput",0x20,0)
+        self.assertEqual(m.call("Settings_Get",23,0),1)
+        self.assertEqual(m.record(),saved)
 
 
 class TrailTests(unittest.TestCase):
@@ -1623,11 +1834,11 @@ class ActionCueTests(unittest.TestCase):
         m.put(old)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 1)
         self.assertEqual(m.record()[10], 0xFF)
-        self.assertEqual(m.record()[40:44], b"\xF0ABC")
+        self.assertEqual(m.record()[40:44], b"\xF0AB\x03")
         self.assertEqual(m.read(11, 6), 0)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
         m.write(16, 17, 1)
-        self.assertEqual(m.record()[40:44], b"\xF1ABC")
+        self.assertEqual(m.record()[40:44], b"\xF1AB\x03")
         self.assertEqual(m.record()[10], 0xFF)  # Version bits do not change.
         for row, flag in [(7, 3), (11, 4), (17, 6), (23, 5)]:
             self.assertEqual(m.read(16, row), m.read(11, flag))
@@ -1757,7 +1968,7 @@ class ActionCueTests(unittest.TestCase):
         m.put(old)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 1)
         self.assertEqual(m.record()[10], 0xFF)
-        self.assertEqual(m.record()[40:44], b"\xF1ABC")
+        self.assertEqual(m.record()[40:44], b"\xF1AB\x03")
         self.assertEqual(m.read(11, 6), 1)
         self.assertEqual(m.read(11, 7), 0)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
@@ -1765,7 +1976,7 @@ class ActionCueTests(unittest.TestCase):
         m.call("TestEditorInput", 0x200, 28)  # Protection at final grouped row.
         m.call("TestEditorAnimate", 28)
         m.write(16, 25, m.call("TestEditorCache", 28))
-        self.assertEqual(m.record()[40:44], b"\xF3ABC")
+        self.assertEqual(m.record()[40:44], b"\xF3AB\x03")
         fresh = Machine()
         fresh.put(m.record())
         self.assertEqual(fresh.call("Settings_Get", 11, 7), 1)

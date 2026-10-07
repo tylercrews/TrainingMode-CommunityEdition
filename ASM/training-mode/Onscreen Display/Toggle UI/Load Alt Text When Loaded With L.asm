@@ -97,10 +97,10 @@ IncLoopLeft:
     bl OSDPositionText
     mflr r4
     lwz r5, MemcardData(r13)
-    SettingsRead SettingsField_Position, 5
+    SettingsRead SettingsField_Display, 5
 
     # Fix value if invalid from removed max osd setting
-    cmpwi r5, 4
+    cmpwi r5, 6
     blt EndFixInvalidOSDPosition
     li r5, 0
 EndFixInvalidOSDPosition:
@@ -113,6 +113,10 @@ EndFixInvalidOSDPosition:
     beql OSDPositionTextTopLeft
     cmpwi r5, 3
     beql OSDPositionTextTopRight
+    cmpwi r5, 4
+    beql OSDPositionTextFixed
+    cmpwi r5, 5
+    beql OSDPositionTextPanel
     mflr r5
 
     lfs f1, 0x1C(TextProp)
@@ -270,7 +274,7 @@ TextProperties:
 
 OSDPositionText:
     blrl
-    .string "OSD Position: %s"
+    .string "OSD Display: %s"
     .align 2
 
 OSDPositionTextHUD:
@@ -293,9 +297,18 @@ OSDPositionTextTopRight:
     .string "Top Right"
     .align 2
 
+OSDPositionTextFixed:
+    blrl
+    .string "Fixed Grid"
+    .align 2
+OSDPositionTextPanel:
+    blrl
+    .string "Practice Panel"
+    .align 2
+
 XYText:
     blrl
-    .string "X/Y: Position  B/Z: Color"
+    .string "X/Y: Display  L/R: Page  B/Z: Color"
     .align 2
 
 FDDRecommended:

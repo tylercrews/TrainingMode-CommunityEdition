@@ -12,6 +12,7 @@ static u8 fallback[TM_SETTINGS_SIZE];
 static int seen;
 static int last_owns;
 static int status;
+static unsigned osd_page;
 
 /* Keep pointers as runtime arguments. Inlining this against low-memory identity
  * can make GCC emit a symbol-minus-0x80000000 relocation; the MEX loader does
@@ -39,10 +40,12 @@ static u8 *settings_view(void) {
 }
 
 uint32_t Settings_Get(unsigned field, unsigned index) {
+    if (field == TM_SETTING_OSD_PAGE) return osd_page;
     return TMSettings_Read(settings_view(), field, index);
 }
 
 void Settings_Set(unsigned field, unsigned index, uint32_t value) {
+    if (field == TM_SETTING_OSD_PAGE) { if (value < 19) osd_page = value; return; }
     u8 *view = settings_view();
     if (TMSettings_Write(view, field, index, value) && view != fallback) {
         stc_memcard_state->memcard_changed = true;

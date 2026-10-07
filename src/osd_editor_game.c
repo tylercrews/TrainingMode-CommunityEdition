@@ -12,6 +12,14 @@ static const char *row_names[] = {
     TM_GLOBAL_INFINITE_SHIELDS_NAME, TM_GLOBAL_INVINCIBILITY_NAME,
 };
 static const char *color_names[] = { TM_OSD_COLOR_NAMES };
+static const char *display_names[] = { TM_OSD_DISPLAY_NAMES };
+static int editor_armed;
+static void refresh_display(void *data) {
+    Text *text = *(Text **)((uint8_t *)data + 0x40);
+    unsigned subtext = ((uint8_t *)data)[0x48];
+    Text_SetText(text, subtext, "OSD Display: %s | page %d", display_names[Settings_Get(TM_SETTING_OSD_DISPLAY, 0)],
+        Settings_Get(TM_SETTING_OSD_PAGE, 0) + 1);
+}
 static void hide_tree(JOBJ *joint) {
     joint->flags |= JOBJ_HIDDEN;
     for (JOBJ *child = joint->child; child; child = child->sibling) hide_tree(child);
@@ -50,6 +58,7 @@ static void refresh_row(void *data, unsigned row) {
 }
 
 void OSD_EditorInit(void *data) {
+    editor_armed = 0;
     for (unsigned row = 0; row < sizeof(row_ids); ++row)
         if (row_names[row]) {
             refresh_row(data, row);
@@ -60,12 +69,28 @@ void OSD_EditorInit(void *data) {
             ((uint8_t *)data)[row + 2] = 0;
         }
     hide_gaps(data);
+    refresh_display(data);
 }
 
 /* Return whether B/Z was consumed, including on unused rows. A/Start still exit,
  * D-pad/stick still navigate and X/Y still choose the screen position. */
 int OSD_EditorInput(void *data, unsigned buttons, unsigned row) {
     hide_gaps(data); /* Native initialization can clear the model's hidden flags. */
+    int armed = editor_armed; editor_armed = 1;
+    if (Settings_Get(TM_SETTING_OSD_LAYOUT, 0) && (buttons & (HSD_TRIGGER_L | HSD_TRIGGER_R))) {
+        if (!armed) return 1; /* Do not treat the L press that opened this menu as paging. */
+        unsigned page = Settings_Get(TM_SETTING_OSD_PAGE, 0);
+        /* ESS previews one owner's selection. Additional live-player pages
+         * remain available through the common pause-menu L/R controls. */
+        unsigned count = 0, mask = Settings_Get(TM_SETTING_OSD_MASK, 0);
+        for (unsigned i = 0; i < TM_SETTINGS_OSDS; ++i) count += !!(mask & (1u << TMSettings_OSDIDs[i]));
+        unsigned capacity = Settings_Get(TM_SETTING_OSD_LAYOUT, 0) == TM_OSD_PANEL ? 6 : 9;
+        unsigned pages = count ? (count + capacity - 1) / capacity : 1;
+        page = (page + ((buttons & HSD_TRIGGER_R) ? 1 : pages - 1)) % pages;
+        Settings_Set(TM_SETTING_OSD_PAGE, 0, page);
+        refresh_display(data);
+        return 1;
+    }
     if (!(buttons & (HSD_BUTTON_B | HSD_TRIGGER_Z))) return 0;
     if (row >= sizeof(row_ids) || !row_names[row]) return 1;
     unsigned id = row_ids[row];

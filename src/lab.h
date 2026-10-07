@@ -22,6 +22,8 @@ static EventMenu LabMenu_CustomOSDs;
 static EventMenu LabMenu_SlotManagement;
 static EventMenu LabMenu_AlterInputs;
 static EventMenu LabMenu_OSDs;
+static EventMenu LabMenu_OSDDisplay;
+static void Lab_ChangeOSDDisplay(GOBJ *menu, int value);
 static EventMenu LabMenu_ActionLog;
 static EventMenu LabMenu_HitboxTrails;
 
@@ -1892,6 +1894,10 @@ static EventOption LabOptions_OSDs[] = {
         .desc = {"Show protected fighters in their translucent trail color.", "Includes moves, dodges, respawn, ledge and Yoshi jump armor.", "Actionable Yellow/Green takes priority while active."},
         .OnChange = Lab_ChangeGlobalCue,
     },
+    {
+        .kind = OPTKIND_MENU, .name = "OSD Display", .menu = &LabMenu_OSDDisplay,
+        .desc = {"Choose Recent, Fixed Grid or Practice Panel.", "Stable styles retain results; paused L/R changes page."},
+    },
 };
 
 static EventMenu LabMenu_OSDs = {
@@ -1899,6 +1905,20 @@ static EventMenu LabMenu_OSDs = {
     .option_num = sizeof(LabOptions_OSDs) / sizeof(EventOption),
     .options = LabOptions_OSDs,
 };
+static const char *LabOSD_LayoutNames[] = { TM_OSD_LAYOUT_NAMES };
+static const char *LabOSD_PositionNames[] = {"HUD", "Sides", "Top Left", "Top Right"};
+static EventOption LabOptions_OSDDisplay[] = {
+    {.kind = OPTKIND_STRING, .name = "Display Style", .value_num = TM_OSD_LAYOUT_COUNT,
+     .values = LabOSD_LayoutNames, .OnChange = Lab_ChangeOSDDisplay,
+     .desc = {"Recent slides; Fixed reserves grid cells.", "Practice Panel keeps compact rows and timing history."}},
+    {.kind = OPTKIND_STRING, .name = "Recent Position", .value_num = 4,
+     .values = LabOSD_PositionNames, .OnChange = Lab_ChangeOSDDisplay,
+     .desc = {"Anchor for the Recent queue; stable styles use the top left."}},
+    {.kind = OPTKIND_INFO, .name = "L/R: OSD Page",
+     .desc = {"Use L/R while paused to choose a page.", "The OSD footer shows the page after unpausing.", "Pages never rotate automatically."}},
+};
+static EventMenu LabMenu_OSDDisplay = {.name = "OSD Display", .option_num = countof(LabOptions_OSDDisplay),
+    .options = LabOptions_OSDDisplay};
 
 // ACTION LOG --------------------------------------------------------------
 

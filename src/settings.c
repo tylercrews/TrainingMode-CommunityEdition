@@ -69,7 +69,7 @@ typedef struct EventPreference {
     uint8_t byte, shift, width, count, default_value;
 } EventPreference;
 /* 24 value bits + one initialization bit. Bytes are explicit, never C bitfields.
- * Keep byte 40's low three flags and the four remaining reserve bits independent. */
+ * Keep byte 40's low three flags and byte 43's layout/free bits independent. */
 static const EventPreference ledge_preferences[TM_LEDGE_PREF_COUNT] = {
     {41, 0, 3, 5, 0}, /* Starting Position: Ledge */
     {41, 3, 3, 5, TM_LEDGE_DEFAULT_RESET}, /* Reset: Same Side */
@@ -140,6 +140,7 @@ static void validate_prefix(uint8_t *r) {
     if ((r[9] & 15) >= 2) r[9] &= 0xF0;
     if ((r[9] >> 4) >= 2) r[9] &= 0x0F;
     if (r[11] >= 4) r[11] = 0;
+    if (((r[43] & TM_SETTINGS_LAYOUT_MASK) >> 5) >= TM_OSD_LAYOUT_COUNT) r[43] &= ~TM_SETTINGS_LAYOUT_MASK;
 }
 
 int TMSettings_Prepare(uint8_t r[TM_SETTINGS_SIZE], int owns_save) {
@@ -158,6 +159,7 @@ int TMSettings_Prepare(uint8_t r[TM_SETTINGS_SIZE], int owns_save) {
         /* These formats predate event preferences. Ignore their unowned payload;
          * initialize it only on the first explicit event preference write. */
         r[40] &= ~TM_SETTINGS_EVENT_INITIALIZED;
+        r[43] &= ~TM_SETTINGS_LAYOUT_MASK;
     }
     if (!signed_format) {
         /* Read both old lists before overwriting any of their overlapping bytes. */
@@ -209,6 +211,11 @@ uint32_t TMSettings_Read(const uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsi
     case TM_SETTING_DPAD_LEFT: return r[9] & 15;
     case TM_SETTING_DPAD_RIGHT: return r[9] >> 4;
     case TM_SETTING_INPUT_DISPLAY: return r[11];
+    case TM_SETTING_OSD_LAYOUT: return (r[43] & TM_SETTINGS_LAYOUT_MASK) >> 5;
+    case TM_SETTING_OSD_DISPLAY: {
+        unsigned layout = TMSettings_Read(r, TM_SETTING_OSD_LAYOUT, 0);
+        return layout ? 3 + layout : r[4];
+    }
     case TM_SETTING_FLAG:
         if (index >= TM_FLAG_RUN_TURNAROUND && index < TM_FLAG_COUNT)
             return (r[TM_SETTINGS_EXTRA_FLAGS_OFFSET] >> (index - TM_FLAG_RUN_TURNAROUND)) & 1;
@@ -238,6 +245,12 @@ uint32_t TMSettings_Read(const uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsi
 
 int TMSettings_Write(uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsigned index, uint32_t value) {
     if (r[38] != 'T' || r[39] != 'Y' || (r[10] >> 6) != TM_SETTINGS_VERSION) return 0;
+    if (field == TM_SETTING_OSD_DISPLAY) {
+        if (value >= 6) return 0;
+        int changed = TMSettings_Write(r, TM_SETTING_OSD_LAYOUT, 0, value >= 4 ? value - 3 : TM_OSD_RECENT);
+        if (value < 4) changed |= TMSettings_Write(r, TM_SETTING_OSD_POSITION, 0, value);
+        return changed;
+    }
     if (field == TM_SETTING_LEDGEDASH || field == TM_SETTING_EGGS || field == TM_SETTING_EVENT_RESET) {
         const EventPreference *p = event_preference(field, index);
         if (field == TM_SETTING_EVENT_RESET) {
@@ -288,6 +301,7 @@ int TMSettings_Write(uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsigned index
     case TM_SETTING_DPAD_LEFT: byte = 9; width = 4; count = 2; break;
     case TM_SETTING_DPAD_RIGHT: byte = 9; width = 4; shift = 4; count = 2; break;
     case TM_SETTING_INPUT_DISPLAY: byte = 11; count = 4; break;
+    case TM_SETTING_OSD_LAYOUT: byte = 43; shift = 5; width = 2; count = TM_OSD_LAYOUT_COUNT; break;
     case TM_SETTING_FLAG:
         if (index >= TM_FLAG_COUNT) return 0;
         byte = index >= TM_FLAG_RUN_TURNAROUND ? TM_SETTINGS_EXTRA_FLAGS_OFFSET : 10;

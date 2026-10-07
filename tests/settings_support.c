@@ -2,6 +2,7 @@
 #include "../src/events.h"
 #include "../src/ledgedash_logic.h"
 #include "../src/osd_context.h"
+#include "../src/osd_layout.h"
 #include <stddef.h>
 
 void memcpy(void *dst, const void *src, int size) {
@@ -25,6 +26,10 @@ int sprintf(char *out, const char *format, ...) {
             char digits[12]; unsigned count = 0;
             do { digits[count++] = '0' + number % 10; number /= 10; } while (number);
             while (count) *out++ = digits[--count];
+            format += 2;
+        } else if (format[0] == '%' && format[1] == 's') {
+            const char *text = va_arg(args, const char *);
+            while (*text) *out++ = *text++;
             format += 2;
         } else *out++ = *format++;
     }
@@ -54,6 +59,14 @@ static GOBJ style_object;
 static uint32_t style_colors[8];
 static float style_scales[8][2], style_positions[8][2];
 static char style_strings[8][112];
+static struct { Text text; char body[3][128]; int live, count; } layout_texts[32];
+static struct { GOBJ object; JOBJ joint; MsgData message; Text text; int live; } layout_results[32];
+static unsigned layout_freed, layout_recent;
+static int layout_pause;
+static int layout_text_index(Text *text) {
+    for (unsigned i = 0; i < countof(layout_texts); ++i) if (&layout_texts[i].text == text) return i;
+    return -1;
+}
 static int style_count, wait_frame, wait_tag;
 static const char *wait_label;
 static GOBJ wait_object;
@@ -113,6 +126,19 @@ static int editor_row(Text *text, int subtext) {
     return -1;
 }
 void Text_SetText(Text *text, int subtext, const char *format, ...) {
+    int layout_index = layout_text_index(text);
+    if (layout_index >= 0 && (unsigned)subtext < 3) {
+        va_list args; va_start(args, format);
+        char *out = layout_texts[layout_index].body[subtext];
+        while (*format) {
+            if (format[0] == '%' && format[1] == 's') {
+                const char *in = va_arg(args, const char *); while (*in) *out++ = *in++; format += 2;
+            } else if (format[0] == '%' && format[1] == 'd') {
+                out += sprintf(out, "%d", va_arg(args, int)); format += 2;
+            } else *out++ = *format++;
+        }
+        *out = 0; va_end(args); return;
+    }
     int row = editor_row(text, subtext);
     if (text == &style_text && (unsigned)subtext < 8) {
         /* Capture format and integer args without depending on a host libc. */
@@ -134,7 +160,8 @@ void Text_SetPosition(Text *text, int subtext, float x, float y) {
     if (text == &style_text && (unsigned)subtext < 8) { style_positions[subtext][0] = x; style_positions[subtext][1] = y; }
 }
 int Text_AddSubtext(Text *text, float x, float y, char *format, ...) {
-    int subtext = style_count++;
+    int i = layout_text_index(text);
+    int subtext = i >= 0 ? layout_texts[i].count++ : style_count++;
     Text_SetPosition(text, subtext, x, y); Text_SetText(text, subtext, format);
     return subtext;
 }
@@ -323,4 +350,63 @@ void TestCueScript(unsigned slot, const uint32_t *script, int timer100, int fram
 }
 int TestLdshSurface(LdshSurface *surface, int desired100, int ledge100, int platform, float *result) {
     return LdshSurface_Target(surface, desired100 / 100.f, ledge100 / 100.f, platform, &result[0], &result[1]);
+}
+
+Text *Text_CreateText(int sis, int canvas) {
+    for (unsigned i = 0; i < countof(layout_texts); ++i) if (!layout_texts[i].live) {
+        memset(&layout_texts[i], 0, sizeof(layout_texts[i])); layout_texts[i].live = 1;
+        return &layout_texts[i].text;
+    }
+    return 0;
+}
+void Text_Destroy(Text *text) { int i = layout_text_index(text); if (i >= 0) layout_texts[i].live = 0; }
+void JOBJ_SetMtxDirtySub(JOBJ *joint) {}
+void JOBJ_GetChild(JOBJ *joint, JOBJ **out, int index, ...) { *out = 0; }
+void Message_FreeObject(GOBJ *object) {
+    ++layout_freed;
+    MsgData *msg = object->userdata;
+    if (msg->layout_footer) Text_Destroy(msg->layout_footer);
+    for (unsigned i = 0; i < countof(layout_results); ++i) if (&layout_results[i].object == object) layout_results[i].live = 0;
+}
+void Message_Add(GOBJ *object, int queue) { if (!Message_LayoutAdd(object, queue)) ++layout_recent; }
+void TestLayoutInit(void) {
+    memset(layout_results, 0, sizeof(layout_results)); memset(layout_texts, 0, sizeof(layout_texts));
+    layout_freed = layout_recent = 0;
+    layout_pause = 0;
+    Message_LayoutInit(0);
+}
+int Pause_CheckStatus(int kind) { return layout_pause; }
+void TestLayoutPause(int value) { layout_pause = value; }
+GOBJ *TestLayoutEmit(int queue, int id, int frame, int kind) {
+    for (unsigned i = 0; i < countof(layout_results); ++i) if (!layout_results[i].live) {
+        memset(&layout_results[i], 0, sizeof(layout_results[i])); layout_results[i].live = 1;
+        GOBJ *object = &layout_results[i].object;
+        object->userdata = &layout_results[i].message; object->hsd_object = &layout_results[i].joint;
+        MsgData *msg = object->userdata;
+        *msg = (MsgData){.text = &layout_results[i].text, .settings_id = id, .queue_num = queue,
+            .timing_frame = frame, .timing_best = 1, .kind = kind, .line_count = 3,
+            .layout_key = -1, .native_frame = stc_match->time_frames, .lifetime = MSG_LIFETIME};
+        Message_Add(object, queue); return object;
+    }
+    return 0;
+}
+void TestLayoutTick(unsigned frame) { stc_match->time_frames = frame; Message_LayoutUpdate(); }
+int TestLayoutVisible(GOBJ *object) { return Message_LayoutVisible(object->userdata); }
+int TestLayoutAge(GOBJ *object) { return ((MsgData *)object->userdata)->alive_timer; }
+int TestLayoutX100(GOBJ *object) { return ((MsgData *)object->userdata)->text->trans.X * 100; }
+int TestLayoutY100(GOBJ *object) { return ((MsgData *)object->userdata)->text->trans.Y * 100; }
+unsigned TestLayoutFreed(void) { return layout_freed; }
+unsigned TestLayoutRecent(void) { return layout_recent; }
+unsigned TestLayoutLiveText(void) { unsigned count=0; for(unsigned i=0;i<countof(layout_texts);++i) count+=layout_texts[i].live; return count; }
+unsigned TestLayoutFooterChar(GOBJ *object, unsigned index) {
+    int i = layout_text_index(((MsgData *)object->userdata)->layout_footer);
+    return i >= 0 ? (unsigned char)layout_texts[i].body[0][index] : 0;
+}
+void TestLayoutSpawn(unsigned slot, int spawn) { cue_data[slot].spawn_num = spawn; }
+void TestLayoutHistory(TMOSDHistory *history, int kind, int frame, int turn, unsigned native_frame) {
+    TMOSD_HistoryPush(history, kind, frame, OSD_TimingColor(frame), turn, native_frame);
+}
+int TestLayoutCell(TMOSDMap *map, int key, unsigned mode, unsigned member) {
+    TMOSDCell cell = TMOSD_Cell(map, key, mode);
+    return member == 0 ? cell.page : member == 1 ? cell.cell : member == 2 ? cell.x * 100 : cell.y * 100;
 }

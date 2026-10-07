@@ -770,7 +770,7 @@ static const TMSettingsAPI settings_api = { Settings_Get, Settings_Set, Settings
 static const TMTrailAPI trails_api = { Trails_Configure, Trails_Clear };
 static unsigned restore_serial;
 static unsigned Events_RestoreSerial(void) { return restore_serial; }
-void Events_NotifyRestore(void) { restore_serial++; }
+void Events_NotifyRestore(void) { restore_serial++; Message_LayoutClear(); }
 
 EventVars stc_event_vars = {
     .event_desc = 0,
@@ -1744,6 +1744,7 @@ void Message_Init(void)
 
     // store gobj pointer
     stc_msgmgr = mgr_gobj;
+    Message_LayoutInit(canvas);
 }
 GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, ...)
 {
@@ -1767,6 +1768,8 @@ GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, 
     msg_data->timing_best = OSD_MessageBestFrame(msg_kind);
     msg_data->timing_prefix = -1;
     msg_data->queue_num = queue_num;
+    msg_data->layout_key = -1;
+    msg_data->native_frame = stc_match->time_frames;
     msg_data->state = MSGSTATE_SHIFT;
     msg_data->anim_timer = MSGTIMER_SHIFT;
     msg_jobj->scale.X = MSGJOINT_SCALE;
@@ -1827,6 +1830,7 @@ GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, 
     // get last lines length
     msg_cursor_curr = strchr(msg_cursor_prev, 0);
     line_length_arr[line_num - 1] = msg_cursor_curr - msg_cursor_prev;
+    msg_data->line_count = line_num;
 
     // copy each line to an individual char array
     for (int i = 0; i < line_num; i++)
@@ -1865,6 +1869,22 @@ GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, 
 void Message_Manager(GOBJ *mngr_gobj)
 {
     MsgMngrData *mgr_data = mngr_gobj->userdata;
+
+    /* Move existing configurable results into the bank when choosing a stable
+     * style. Detach first; Message_LayoutAdd owns replacement/destruction. */
+    if (Settings_Get(TM_SETTING_OSD_LAYOUT, 0)) {
+        for (int q = 0; q < MSGQUEUE_GENERAL; ++q) {
+            GOBJ **queue = mgr_data->msg_queue[q];
+            for (int j = MSGQUEUE_SIZE - 1; j >= 0; --j) {
+                GOBJ *object = queue[j];
+                if (!object || ((MsgData *)object->userdata)->settings_id < 0) continue;
+                if (!Message_LayoutImport(object, q)) continue;
+                for (int k = j; k < MSGQUEUE_SIZE - 1; ++k) queue[k] = queue[k + 1];
+                queue[MSGQUEUE_SIZE - 1] = 0;
+            }
+        }
+    }
+    Message_LayoutUpdate();
 
     // Iterate through each queue
     for (int i = 0; i < MSGQUEUE_NUM; i++)
@@ -2044,6 +2064,7 @@ void Message_Manager(GOBJ *mngr_gobj)
 }
 void Message_EndCombo(int queue_num) {
     if ((unsigned)queue_num >= MSGQUEUE_NUM) return;
+    Message_LayoutEndCombo(queue_num);
     MsgMngrData *manager = stc_msgmgr->userdata;
     for (unsigned i = 0; i < MSGQUEUE_SIZE; ++i) {
         GOBJ *gobj = manager->msg_queue[queue_num][i];
@@ -2055,18 +2076,15 @@ void Message_EndCombo(int queue_num) {
         Text_SetColor(msg->text, 1, &stc_msg_colors[MSGCOLOR_GREEN]);
     }
 }
+void Message_FreeObject(GOBJ *object) {
+    MsgData *msg = object->userdata;
+    if (msg->layout_footer) Text_Destroy(msg->layout_footer);
+    if (msg->text) Text_Destroy(msg->text);
+    GObj_Destroy(object);
+}
 void Message_Destroy(GOBJ **msg_queue, int msg_num)
 {
-    GOBJ *msg_gobj = msg_queue[msg_num];
-    MsgData *msg_data = msg_gobj->userdata;
-
-    // Destroy text
-    Text *text = msg_data->text;
-    if (text)
-        Text_Destroy(text);
-
-    // Destroy GOBJ
-    GObj_Destroy(msg_gobj);
+    Message_FreeObject(msg_queue[msg_num]);
 
     // shift others
     for (int i = msg_num; i < MSGQUEUE_SIZE - 1; i++)
@@ -2087,6 +2105,8 @@ void Message_Destroy(GOBJ **msg_queue, int msg_num)
 
 void Message_Add(GOBJ *msg_gobj, int queue_num)
 {
+    if ((unsigned)queue_num >= MSGQUEUE_NUM) { assert("queue_num over!"); return; }
+    if (Message_LayoutAdd(msg_gobj, queue_num)) return;
     MsgData *msg_data = msg_gobj->userdata;
     MsgMngrData *mgr_data = stc_msgmgr->userdata;
     GOBJ **msg_queue = mgr_data->msg_queue[queue_num];

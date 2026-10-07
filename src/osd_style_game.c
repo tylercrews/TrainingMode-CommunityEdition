@@ -59,15 +59,17 @@ void OSD_ApplyMessageStyle(MsgData *msg) {
 }
 void OSD_MessageGX(GOBJ *gobj, int pass) {
     MsgData *msg = gobj->userdata;
-    int visible = msg->settings_id < 0 ||
+    int visible = Message_LayoutVisible(msg) && (msg->settings_id < 0 ||
         (!Settings_Get(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF) &&
-         Settings_Get(TM_SETTING_OSD_COLOR, msg->settings_id) != TM_COLOR_OFF);
+         Settings_Get(TM_SETTING_OSD_COLOR, msg->settings_id) != TM_COLOR_OFF));
     if (visible && (unsigned)msg->queue_num < 6 && Settings_Get(TM_SETTING_FLAG, TM_FLAG_CPU_OSDS_OFF)) {
         Playerblock *player = Fighter_GetPlayerblock(msg->queue_num);
         if (player && player->p_kind == 1) visible = 0;
     }
     msg->text->hidden = !visible;
+    if (msg->layout_footer) msg->layout_footer->hidden = !visible;
     if (!visible) return; /* Preserve the valid GOBJ contract even when a category is Off. */
     OSD_ApplyMessageStyle(msg); /* After all legacy caller recoloring, before the text GX pass. */
+    Message_LayoutGeometry(gobj);
     GXLink_Common(gobj, pass);
 }
