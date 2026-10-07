@@ -29,7 +29,7 @@
     li r0, OSD.ActOoHitstun         # PowerShield ID
     # lwz r4, -0xdbc(rtoc) #get frame data toggle bits
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -62,7 +62,7 @@ PrintMessage:
     mflr r6
     lhz r7, TM_PostHitstunFrameCount(REG_FighterData)
     addi r7, r7, 1
-    Message_Display
+    Message_DisplayOSD 28, 1, 1, 0
 
     b Exit
 
@@ -72,7 +72,7 @@ PrintMessage:
 
 ActOoHitstun_String:
     blrl
-    .string "Act OoHitstun\nFrame %d"
+    .string "Act OoHitstun\n%df"
     .align 2
 
 ##############################

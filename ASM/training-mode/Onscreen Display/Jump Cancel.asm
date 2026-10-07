@@ -17,7 +17,7 @@
     li r0, OSD.ActOoJumpSquat                     # OSD Menu ID
     # lwz r4, -0xdbc(rtoc) #get frame data toggle bits
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -42,7 +42,7 @@ EndSetColor:
     lhz r7, 0x2408(playerdata)
     bl Text
     mflr r6
-    Message_Display
+    Message_DisplayOSD 19, 1, 1, 0
 
     b Exit
 
@@ -52,7 +52,7 @@ EndSetColor:
 
 Text:
     blrl
-    .string "Jump Cancel\nFrame %d"
+    .string "Jump Cancel\n%df"
     .align 2
 
 ##############################

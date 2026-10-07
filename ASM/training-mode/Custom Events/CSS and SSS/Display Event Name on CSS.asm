@@ -17,7 +17,7 @@
 
     # Check For Custom Event
     lwz r3, MemcardData(r13)
-    lbz r3, CurrentEventPage(r3)
+    SettingsRead SettingsField_Page, 3
     lwz r4, MemcardData(r13)
     lbz r4, 0x0535(r4)          # get event ID
     rtocbl r12, TM_GetEventName

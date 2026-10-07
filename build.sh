@@ -2,6 +2,13 @@
 
 set -Eeo pipefail
 
+source scripts/project-config.sh
+
+if [ "${1}" = "--version" ]; then
+    printf '%s\nGame ID: %s\nOutput: %s\n' "${tyro_version}" "${tyro_game_id}" "${tyro_output_iso}"
+    exit 0
+fi
+
 # ensure an iso was passed
 if [ -z "${1}" ]; then
     echo "Usage:"
@@ -49,11 +56,6 @@ else
     exit 1
 fi
 
-# fn to kill all processes everywhere
-kill_all() {
-    trap "kill -- -$$" EXIT
-}
-
 # fn to build mex executable
 mex_build() {
     local sym="${1}"
@@ -77,32 +79,54 @@ mex_build() {
     fi
 
     warn="-Wall -Wextra -Wno-char-subscripts -Wno-builtin-declaration-mismatch -Wno-unused-parameter"
-    ${hmex} -q -l "MexTK/melee.link" -f "${warn} ${opt}" -s "${sym}" -t "MexTK/${sym}.txt" -o "${out}" -i ${src} ${dat} || kill_all
+    ${hmex} -q -l "MexTK/melee.link" -f "${warn} ${opt}" -s "${sym}" -t "MexTK/${sym}.txt" -o "${out}" -i ${src} ${dat} || return 1
     echo built ${out}
 }
 
 # make build directory if necessary
 mkdir -p build
+tyro_write_build_metadata
+settings_abi_stamp="$(cksum src/settings.h src/trails.h src/osd_style.h src/osd_layout.h src/osd_context.h src/action_cues.h src/ledgedash_logic.h src/events.h MexTK/tmFunction.txt MexTK/include/memcard.h MexTK/include/fighter.h MexTK/include/item.h MexTK/melee.link ASM/Globals.s)"
+
+# A partial build must not pair a new version/identity with old eventMenu or ASM code.
+if [[ -n "${mode}" ]] && { [[ "$(cat build/version-stamp 2>/dev/null || true)" != "${tyro_metadata_stamp}" ]] || \
+    [[ "$(cat build/settings-abi-stamp 2>/dev/null || true)" != "${settings_abi_stamp}" ]]; }; then
+    echo "Version/identity/shared ABI changed or build is incomplete; rebuilding all modules."
+    mode=""
+fi
+
+build_jobs=()
+queue_mex_build() {
+    mex_build "${@}" &
+    build_jobs+=("$!")
+}
 
 # compile code in parallel
-mex_build "tmFunction" "build/eventMenu.dat" "src/events.c src/menu.c src/osds.c src/savestate_v1.c" "dats/eventMenu.dat" &
-mex_build "cssFunction" "build/labCSS.dat" "src/lab_css.c" "dats/labCSS.dat" &
-mex_build "evFunction" "build/lab.dat" "src/lab.c" "dats/lab.dat" &
-mex_build "evFunction" "build/lcancel.dat" "src/lcancel.c" &
-mex_build "evFunction" "build/ledgedash.dat" "src/ledgedash.c" &
-mex_build "evFunction" "build/wavedash.dat" "src/wavedash.c" "dats/wavedash.dat" &
-mex_build "evFunction" "build/powershield.dat" "src/powershield.c" &
-mex_build "evFunction" "build/dthrowknee.dat" "src/dthrowknee.c" &
-mex_build "evFunction" "build/edgeguard.dat" "src/edgeguard.c" &
-mex_build "evFunction" "build/fc.dat" "src/fc.c" &
-mex_build "evFunction" "build/sweetspot.dat" "src/sweetspot.c" &
-mex_build "evFunction" "build/laserland.dat" "src/laserland.c" &
-mex_build "evFunction" "build/eggs.dat" "src/eggs.c" &
-mex_build "evFunction" "build/techchase.dat" "src/techchase.c" &
-mex_build "evFunction" "build/slalom.dat" "src/slalom.c" "dats/wavedash.dat" &
+queue_mex_build "tmFunction" "build/eventMenu.dat" "src/events.c src/menu.c src/osds.c src/savestate_v1.c src/settings.c src/settings_game.c src/trails.c src/trails_game.c src/osd_context.c src/osd_context_game.c src/osd_style.c src/osd_style_game.c src/osd_layout.c src/osd_layout_game.c src/osd_editor_game.c src/action_cues.c src/action_cues_game.c" "dats/eventMenu.dat"
+queue_mex_build "cssFunction" "build/labCSS.dat" "src/lab_css.c" "dats/labCSS.dat"
+queue_mex_build "evFunction" "build/lab.dat" "src/lab.c" "dats/lab.dat"
+queue_mex_build "evFunction" "build/lcancel.dat" "src/lcancel.c"
+queue_mex_build "evFunction" "build/ledgedash.dat" "src/ledgedash.c src/ledgedash_logic.c"
+queue_mex_build "evFunction" "build/wavedash.dat" "src/wavedash.c" "dats/wavedash.dat"
+queue_mex_build "evFunction" "build/powershield.dat" "src/powershield.c"
+queue_mex_build "evFunction" "build/dthrowknee.dat" "src/dthrowknee.c"
+queue_mex_build "evFunction" "build/edgeguard.dat" "src/edgeguard.c"
+queue_mex_build "evFunction" "build/fc.dat" "src/fc.c"
+queue_mex_build "evFunction" "build/sweetspot.dat" "src/sweetspot.c"
+queue_mex_build "evFunction" "build/laserland.dat" "src/laserland.c"
+queue_mex_build "evFunction" "build/eggs.dat" "src/eggs.c"
+queue_mex_build "evFunction" "build/techchase.dat" "src/techchase.c"
+queue_mex_build "evFunction" "build/slalom.dat" "src/slalom.c" "dats/wavedash.dat"
 
 # wait for compilation to finish
-wait
+build_failed=false
+for build_job in "${build_jobs[@]}"; do
+    if ! wait "${build_job}"; then build_failed=true; fi
+done
+if [ "${build_failed}" = true ]; then
+    echo "Error: compilation failed; ISO was not updated." >&2
+    exit 1
+fi
 
 # compile asm
 if [[ -z "${mode}" || "${mode}" = "build/codes.gct" ]]; then
@@ -115,10 +139,10 @@ ${gc_fst} read "${iso}" Start.dol build/ISOStart.dol
 ${xdelta} -dfs build/ISOStart.dol "Build TM Start.dol/${patch}" build/Start.dol
 
 # copy iso over
-if [ ! -f TM-CE.iso ]; then cp "${iso}" TM-CE.iso; fi
+if [ ! -f "${tyro_output_iso}" ]; then cp "${iso}" "${tyro_output_iso}"; fi
 
 # add TM files to iso
-${gc_fst} fs TM-CE.iso \
+${gc_fst} fs "${tyro_output_iso}" \
     delete MvHowto.mth \
     delete MvOmake15.mth \
     delete MvOpen.mth \
@@ -139,14 +163,31 @@ ${gc_fst} fs TM-CE.iso \
     insert TM/slalom.dat build/slalom.dat \
     insert codes.gct build/codes.gct \
     insert Start.dol build/Start.dol \
-    insert opening.bnr opening.bnr
-${gc_fst} set-header TM-CE.iso "GTME01" "Training Mode Community Edition"
+    insert opening.bnr build/opening.bnr
+${gc_fst} set-header "${tyro_output_iso}" "${tyro_game_id}" "${tyro_disc_title}"
 
-echo "built TM-CE.iso"
+printf '%s\n' "${tyro_metadata_stamp}" > build/version-stamp
+printf '%s\n' "${settings_abi_stamp}" > build/settings-abi-stamp
+echo "built ${tyro_output_iso} (${tyro_game_id})"
 
 # build release
 if [ "${2}" = "release" ]; then
-    ${xdelta} -fs "${iso}" -e "TM-CE.iso" "TM-CE/patch.xdelta"
-    zip -r TM-CE.zip TM-CE/
-    echo "built TM-CE.zip"
+    tyro_release_dir="build/releases/${tyro_release_name}"
+    mkdir -p "${tyro_release_dir}"
+    cp "TM-CE/DRAG VANILLA MELEE HERE.bat" TM-CE/build_linux_and_mac.sh TM-CE/xdelta3.exe "${tyro_release_dir}/"
+    cp "build/${tyro_game_id}.map" "${tyro_release_dir}/"
+    tyro_write_release_config "${tyro_release_dir}"
+    ${xdelta} -fs "${iso}" -e "${tyro_output_iso}" "${tyro_release_dir}/patch.xdelta"
+    if command -v zip > /dev/null; then
+        (cd build/releases && zip -r "${tyro_project_root}/${tyro_release_archive}" "${tyro_release_name}/")
+    elif [[ "$(uname)" =~ "MSYS" ]] && command -v powershell.exe > /dev/null; then
+        powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass \
+            -File "$(cygpath -w "${tyro_project_root}/scripts/package-release.ps1")" \
+            -SourceDirectory "$(cygpath -w "${tyro_project_root}/${tyro_release_dir}")" \
+            -ArchivePath "$(cygpath -w "${tyro_project_root}/${tyro_release_archive}")"
+    else
+        echo "Error: install zip to package a release." >&2
+        exit 1
+    fi
+    echo "built ${tyro_release_archive}"
 fi

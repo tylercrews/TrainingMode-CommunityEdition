@@ -3,6 +3,12 @@
 
     backup
 
+    # Match scenes can unload card resources. Requeue settings only after the
+    # native ESS card archive/work state is initialized; its autosave polls next.
+    SettingsBackup
+    rtocbl r12, TM_SettingsCommitPending
+    SettingsRestore
+
     # This checks and stores if triggers were pressed this frame in r27 (L), r28 (R)
     # We need to only process trigger events on press, not hold.
     # But a lot of people DONT have hard press on triggers, only analog press. And they complained a lot.
@@ -279,9 +285,9 @@ SwitchPage:
     mr r6, r3
     # Change page
     lwz r4, MemcardData(r13)
-    lbz r3, CurrentEventPage(r4)
+    SettingsRead SettingsField_Page, 3
     add r3, r3, r5
-    stb r3, CurrentEventPage(r4)
+    SettingsWrite SettingsField_Page, 3
 
 # Check if within page bounds
 SwitchPage_CheckHigh:
@@ -289,7 +295,7 @@ SwitchPage_CheckHigh:
     ble SwitchPage_CheckLow
     # Stay on current page
     subi r3, r3, 1
-    stb r3, CurrentEventPage(r4)
+    SettingsWrite SettingsField_Page, 3
     b exit
 
 SwitchPage_CheckLow:
@@ -297,13 +303,13 @@ SwitchPage_CheckLow:
     bge SwitchPage_ChangePage
     # Stay on current page
     li r3, 0
-    stb r3, CurrentEventPage(r4)
+    SettingsWrite SettingsField_Page, 3
     b exit
 
 SwitchPage_ChangePage:
     # Get Page Name string
     lwz r3, MemcardData(r13)
-    lbz r3, CurrentEventPage(r3)
+    SettingsRead SettingsField_Page, 3
     rtocbl r12, TM_GetPageName
     # Update Page Name
     mr r5, r3

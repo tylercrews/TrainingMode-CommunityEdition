@@ -6,7 +6,7 @@
 
     # Get number of events on this page
     lwz r3, MemcardData(r13)
-    lbz r3, CurrentEventPage(r3)
+    SettingsRead SettingsField_Page, 3
     rtocbl r12, TM_GetPageEventNum
 
     # Get current event

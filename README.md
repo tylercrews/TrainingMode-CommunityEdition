@@ -11,6 +11,125 @@ Join [the discord](https://discord.gg/2Khb8CVP7A) to discuss changes, new featur
 ## Development
 Please read [DEVELOPMENT.md](DEVELOPMENT.md).
 
+The Tyro version and stable game/save identity live in [version.h](version.h). Update `TM_VERSION` for a new release; keep `TM_GAME_ID` stable. Run `./build.sh --version` to see the version, game ID, and output filename.
+
+## Tyro branch changelog
+
+This section records Tyro-specific changes. Add a bullet under the matching Tyro version whenever a change is implemented; keep the newest version first. Proposed gameplay changes stay in the [investigation and implementation plan](OSD-GLOBAL-SETTINGS-INVESTIGATION.md) until implemented.
+
+### T2 (V1.4.1T2, unreleased)
+
+- Shrink `->` arrows to 75% of the surrounding OSD text size while preserving full-size frame counts, colors and single-row alignment in all layouts.
+- Exclude post-shine hitlag from JC Shine timing; Jump Out Of Shine retains its relevant hitlag context.
+
+- Remember the last human and CPU characters across unrestricted events and saved sessions; required event fighters use local fallbacks without replacing those choices.
+- Pack character selections into 12 previously unused bits within the existing 44-byte settings record; scores and the two explicit reserved bits remain untouched.
+
+- Enlarged Practice Panel titles/detail text and removed New/Last/player status lines from both stable layouts.
+- Combined hitlag/turnaround prefixes and the main result into one uniformly large, fitted timing row; retained separate colored history and detail rows.
+
+- Reserved separate adjacent Jump Out Of Shine and JC Shine slots for Fox/Falco in Fixed Grid and Practice Panel, with independent histories under the shared character-specific setting.
+- Matched JC Shine hop colors to Wavedash using the printed hop duration: Short Hop 1f cyan, other Short Hops green, all Full Hops red.
+
+- Fixed event-setting crashes from native autosave using unloaded card icon/work resources; defer pending settings until Event Select's initialized card service can accept the save.
+- Guarded native save polling and synchronous save waits, and corrected the SDK's two native word-sized card flags; added regressions reproducing the exact reported PC/null read.
+
+- Reworked Practice Panel into smaller rows with stacked titles, a separator, a large latest result and three previous results vertically at the right; retained hitlag/turn context and native detail colors.
+- Expanded Fixed Grid to five OSDs per row, ten per page.
+- Added red FAIL for Jump Out Of Shine after fifteen unfrozen opportunities without a jump or second turn, including released shines; jumps/second turns at the boundary win.
+
+- Added Fixed Grid and Practice Panel OSD layouts with reserved category positions, retained latest results, player labels and manual pages; Practice Panel includes the last three timing results.
+- Select layouts with X/Y in the L-button Global Settings menu or Lab's OSD Display submenu; L/R selects pages in the editor or while paused. Allocated two layout bits, leaving two reserved bits; the save record remains 44 bytes.
+
+- Saved Ledgedash Starting Position, Reset, Success Criteria, Reset Delay and Tips, plus Eggs-ercise damage threshold, scale, spawn velocity, collision display and infinite/Free Practice mode.
+- Added Reset Event Settings to both events; Eggs-ercise resets by restarting in timed mode. Settings use 25 previously reserved bits, leaving four; high scores retain their storage and Eggs-ercise local trail settings are not saved.
+
+- Renamed the recovery control Actionable Yellow>Green and regrouped both Global Settings menus as OSDs, CPU override, ALL override, separator, then overlays/shared controls.
+
+- Fixed the remaining hitlag pointer warnings and duplicate/blank shine text by teaching the native setter to count inline RGB commands when replacing an existing row.
+- Deferred shine formatting until turnaround/hitlag context is attached, avoiding a second rewrite of an already-colored row; added end-to-end native setter/position/scale/color regressions.
+
+- Fixed the native text-pointer warning and corrupted hitlag/shine/Wavedash text: inline color commands now contain three RGB bytes, matching the engine parser.
+- Added regressions that reproduce the malformed four-byte payload and run native width/subtext traversal on corrected Wavedash, hitlag, landing and turnaround rows.
+
+- Corrected Wavedash hop colors to use the hop duration printed on the bottom row, independently of wavedash timing.
+- Restored normal-size Wavedash top-row text and replaced separate centered timing runs with one inline-colored row to eliminate overlap.
+- Replaced Fox/Falco Act OoShine input predictions with confirmed Jump Out Of Shine results and colored turnaround context (Nhl->Ntrn->Nf).
+- Complete two-turn shine sequences as Ntrn->Ntrn with the second marker red; exclude native turn recovery and unavailable air jumps from jump timing.
+- Added native assembly/converter regressions and documented the invisible two-frame turn recovery; persistent settings remain 44 bytes with 29 reserved bits.
+
+- Shortened numeric OSD timing to Nf and compacted hitlag text to Nhl->Nf, preserving separate prefix/result colors.
+- Changed the third timing color to yellow and reordered Act OoWait to title, source, timing.
+- Kept Ledgedash randomized egg target/distance stable through ledge regrabs and restores; reroll only on reset/reposition.
+- Colored Wavedash's Short Hop cyan at 1f/green otherwise and Full Hop red at every timing.
+- Added OVERRIDE CPU OSDS OFF in both global editors, including live CPU message/background and Lab CPU info-panel suppression.
+- Renamed the master switch OVERRIDE ALL OSDS OFF; allocated byte 40 bit 2 to the CPU override, leaving 29 reserved bits.
+- Raised trail alpha to 216 live / 84 fresh history while preserving hue strength, decay lifetimes and Instant behavior.
+
+- Restored original Ledgedash reset order, failure checks and delay behavior while keeping harder criteria's protected opportunity.
+- Moved all egg controls into Egg Targets, adding random Ground/Platform targets and inclusive randomized-distance bounds.
+- Fixed global and Ledgedash protection colors using the native-selected color slot; fixed yellow/green priority during perfect invincible ledgedashes.
+- Included ordinary landing and direct recovery exits in Act OoWait, using actual normal lag and recovery-source labels.
+- Shortened the Ledgedash action legend to Act and restored compact Wavedash top-row fonts.
+- Changed the global master label to OVERRIDE OSDS OFF.
+- Added own-fighter hitlag prefixes to timed OSDs, preserving actionable measurements, timing colors and L-cancel outcomes.
+- Replaced damage-scaled trail opacity with fixed translucent history and player-to-alternate hue blending: red/magenta, yellow/orange, blue/cyan, green/neon green, gray/white.
+- Audited the original plan and added a running list of remaining work at its top; these corrections consume no save bits (30 remain).
+
+- Fixed lost fighter draw callbacks across death/respawn and stopped wrapping native renderers when overlays are all Off.
+- Fixed missed L-cancel detection using the native integer input window and a landing-entry fallback; shortened red pulses to eight simulation frames.
+- Renamed the diagnostic controls to Missed L Cancel / Run Turnaround and moved the shortened Global Settings title to the right.
+- Implemented Ledgedash Attack/Dash, Ledge selection, Protection Highlight and all four Success Criteria with criterion-aware HUD statistics.
+- Added Ledgedash ground/platform egg targets, distance/pop-damage controls, safe ground fallback and restore/scene cleanup.
+- Extended protection detection to all protected hurtboxes for rolls and moves, while preserving the Yoshi jump-armor exception.
+
+- Renamed the recovery cue setting to Actionable Yellow/Green.
+
+- Shortened the global OSD master label to OVERRIDE OSDS OFF.
+
+- Regrouped Global Settings - OSDs and Overlays: ordered OSDs, a gap, OVERRIDE OSDS OFF, another gap, then shared controls in the bottom right.
+- Changed missed L-cancel and Run Turnaround diagnostics to repeat a red opacity pulse throughout their action states.
+- Removed Very Very Fast from both local decay menus.
+
+- Fixed repeated invalid reads after creating a save by preventing an unsupported MEX relocation in the game-ID comparison; added optimized DAT relocation regressions.
+- Added a global translucent player-colored invincibility/intangibility overlay for ledge, respawn, dodges and moves, including Yoshi's active double-jump armor.
+- Allocated byte 40, bit 1 for protection and migrated settings to format 3; 30 reserved bits remain.
+
+- Added global Actionable Yellow/Green: two frames before normal landing/attack recovery and a two-frame completion pulse, with priority over missed L-cancel red.
+- Added global Run Turnaround and missed L-cancel red flashes, plus full-health Infinite Shields for all main/subfighters.
+- Allocated reserved byte 40, bit 0 to Run Turnaround; migrated packed settings to format 2 while retaining the other 31 reserved bits.
+
+- Added color selection in the L-button OSD editor (B forward / Z backward), with saved color names and previews alongside each row.
+- Added TURN OSDS OFF to both OSD editors; it hides global message text/backgrounds while preserving individual colors, trails and event feedback.
+- Added saved Off/White/Red/Green/Blue/Yellow/Cyan/Magenta title choices in Lab's OSD editor, with canonical identities across C/native messages.
+- Added best-frame-relative timing colors (Cyan/Green/White/Red) while retaining measured frame numbers and technique baselines, including Peach's frame-5 instant double jump.
+- Separated overlapping message queue identities, preserved outcome/angle colors, split Wavedash title/timing runs within the existing three lines, and added explicit L-cancel Success/Missed feedback.
+- Finalized shared global trail-row labels/bindings, independent edits, and an explicit Both On status in local trail menus; verified all four saved toggle combinations.
+- Added global Very Fast and Instant hitbox trails to the L-button OSD menu and Lab OSD menu, with a shared renderer across gameplay matches.
+- Added softer historical trails, player/team-accent colors, and gray CPU trails.
+- Included subfighters and owner-colored projectiles; removed duplicate event renderers and cleared shared history on scene/retry/restore/rewind boundaries.
+- Prevented duplicate drawing when both global modes are enabled and repeated translucent samples during stationary hitlag.
+- Added shared C/native settings accessors, explicit 44-byte packing, validation, and migration of Tyro's existing settings.
+- Saved every Lab overlay condition instead of limiting each actor to eight enabled conditions; reserved space for global flags and OSD title colors.
+- Preserved unrepresented OSD enable bits and existing colors when using the current Boolean menus; added in-memory defaults for unsupported/foreign settings without rewriting their record.
+- Corrected Ledgedash's frame-advance button lookup to read its own nibble independently of the decrement button.
+- Centralized version and identity metadata in root-level `version.h` and incremented the version to V1.4.1T2.
+- Separated Tyro's disc/save identity (`TYRE01`) from upstream (`GTME01`), with a Tyro save caption and banner selection.
+- Added versioned ISO and release ZIP names, including `TM-Tyro-V1.4.1T2.iso`, and matching Windows/Linux/macOS release patchers.
+- Added generated banner titles and a Tyro-named Dolphin symbol map while preserving the existing banner artwork and credits.
+- Made partial builds rebuild all modules when version/identity metadata changes, and stop before updating the ISO if any C module fails to compile.
+- Added the investigation and implementation plan for global OSD settings, hitbox trails, Ledgedash improvements, save capacity, and a separate Tyro save identity.
+- Expanded the plan with versioned ISO filenames, selectable Ledgedash success criteria, Falling-start reset investigation, hitlag-aware OSD timing, and recovery-state labels for Act OoWait.
+- Initialized this Tyro branch changelog.
+
+### T1 (v1.4.1 T1)
+
+- Added hitbox trails to Eggs-ercise.
+- Added Very Fast and Instant hitbox-trail decay options to Training Lab and Eggs-ercise.
+- Added Tyro Edition names and version labels.
+- Added Tyro banners and corrected the in-game banner colors.
+- Removed the restriction on AI-assisted contributions from the development guidelines.
+
 ## Changes From the Original
 - New Training Lab Features:
     - Recording:

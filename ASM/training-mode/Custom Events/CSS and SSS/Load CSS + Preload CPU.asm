@@ -18,7 +18,7 @@
     lbz EventID, 0x0535(r4)
     # Get Current Page in
     lwz r4, MemcardData(r13)
-    lbz PageID, CurrentEventPage(r4)
+    SettingsRead SettingsField_Page, PageID
 
     # Set ko pointer
     addi r4, r13, -0x4F70

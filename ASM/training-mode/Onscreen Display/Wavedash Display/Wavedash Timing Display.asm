@@ -16,7 +16,7 @@
     # CHECK IF OSD IS ENABLED
     li r0, OSD.Wavedash             # wavedash ID
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -85,12 +85,13 @@ EndJumpInputsLoop:
     b PrintMessage
 
 PrintMessage:
+    mr r25, r9                     # Preserve the hop count actually printed on row 3.
     li r3, 0                        # Message Kind
     lbz r4, 0xC(REG_FighterData)    # Message Queue
     li r5, MSGCOLOR_WHITE
     bl Wavedash_String
     mflr r6
-    Message_Display
+    Message_DisplayOSD 0, 1, 0, 1
     lwz r3, 0x2C(r3)
     lwz REG_Text, MsgData_Text(r3)
     b CheckSetHopTypeColor
@@ -101,21 +102,19 @@ PrintMessage_NoHopType:
     li r5, MSGCOLOR_WHITE
     bl Wavedash_String_NoHopType
     mflr r6
-    Message_Display
+    Message_DisplayOSD 0, 1, 0, 1
     lwz r3, 0x2C(r3)
     lwz REG_Text, MsgData_Text(r3)
     b SetTimingColor
 
 CheckSetHopTypeColor:
     lwz r3, TM_ShortOrFullHop(REG_FighterData)
-    cmpwi r3, 0
-    beq SetTimingColor
-    bl Floats
-    mflr r4
-    addi r5, r4, 0xC
-    # Change Color
+    mr r4, r25                     # Hop duration, independent of wavedash timing (r7).
+    rtocbl r12, TM_WavedashHopColor
+    stw r3, 0x84(sp)
     mr r3, REG_Text                 # text pointer
     li r4, 2
+    addi r5, sp, 0x84
     branchl r12, Text_ChangeTextColor
 
 SetTimingColor:
@@ -236,12 +235,12 @@ SaveAngle:
 
 Wavedash_String:
     blrl
-    .string "Wavedash Frame: %d\nAngle: %2.1f\n%s: %df"
+    .string "Wavedash %df\nAngle: %2.1f\n%s: %df"
     .align 2
 
 Wavedash_String_NoHopType:
     blrl
-    .string "Wavedash Frame: %d\nAngle: %2.1f"
+    .string "Wavedash %df\nAngle: %2.1f"
     .align 2
 
 ShortHopString:

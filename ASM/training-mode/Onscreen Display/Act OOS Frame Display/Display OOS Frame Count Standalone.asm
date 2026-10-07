@@ -26,7 +26,7 @@
     li r0, OSD.ActOoS                           # wavedash ID
     # lwz r4, -0xdbc(rtoc) #get frame data toggle bits
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r5, 1
     slw r0, r5, r0
     and. r0, r0, r4
@@ -80,7 +80,7 @@ PrintMessage:
     mflr r6
     lhz r7, TM_ShieldFrames(REG_FighterData)    # get shield stun frames left
     addi r7, r7, 1
-    Message_Display
+    Message_DisplayOSD 3, 1, 1, 0
 
     b Exit
 
@@ -90,7 +90,7 @@ PrintMessage:
 
 OoS_String:
     blrl
-    .string "Act OoShield\nFrame %d"
+    .string "Act OoShield\n%df"
     .align 2
 
 ##############################

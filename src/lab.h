@@ -22,6 +22,8 @@ static EventMenu LabMenu_CustomOSDs;
 static EventMenu LabMenu_SlotManagement;
 static EventMenu LabMenu_AlterInputs;
 static EventMenu LabMenu_OSDs;
+static EventMenu LabMenu_OSDDisplay;
+static void Lab_ChangeOSDDisplay(GOBJ *menu, int value);
 static EventMenu LabMenu_ActionLog;
 static EventMenu LabMenu_HitboxTrails;
 
@@ -112,8 +114,9 @@ void Lab_ChangeActionNumber(GOBJ *menu_gobj, int value);
 void Lab_SetActionLogState(GOBJ *menu_gobj);
 void ActionLog_GX(GOBJ *gobj, int pass);
 void ActionLog_Think(void);
-void HitboxTrails_GX(GOBJ *gobj, int pass);
-void HitboxTrails_Think(void);
+void Lab_ChangeHitboxTrails(GOBJ *menu_gobj, int value);
+void Lab_ChangeGlobalVeryFast(GOBJ *menu_gobj, int value);
+void Lab_ChangeGlobalInstant(GOBJ *menu_gobj, int value);
 void DIDraw_Init(void);
 void DIDraw_Reset(int ply);
 void DIDraw_Update(void);
@@ -1251,8 +1254,8 @@ static EventOption LabOptions_General[OPTGEN_COUNT] = {
     {
         .kind = OPTKIND_MENU,
         .menu = &LabMenu_OSDs,
-        .name = "OSD Menu",
-        .desc = {"Enable/disable OSDs"},
+        .name = "Global Settings",
+        .desc = {"Choose global OSD colors, overlays and other shared controls."},
     },
 };
 static EventMenu LabMenu_General = {
@@ -1698,109 +1701,224 @@ static u8 LabOSD_ID[] = {
 };
 
 // Must match LabOSD_ID order
+static const char *LabOSD_ColorNames[] = { TM_OSD_COLOR_NAMES };
 static EventOption LabOptions_OSDs[] = {
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Wavedash",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "L-Cancel",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Act OoS Frame",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Dashback",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Fighter-specific Tech",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Powershield Frame",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "SDI Inputs",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Lockout Timers",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Item Throw Interrupts",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Boost Grab",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Act OoLag",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Act OoAirborne",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Jump Cancel Timing",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Fastfall Timing",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Frame Advantage",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Combo Counter",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Grab Breakout",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Ledgedash Info",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Act OoHitstun",
         .OnChange = Lab_ChangeOSDs,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_CPU_OSDS_OFF_NAME,
+        .desc = {"Hide messages belonging to CPU players in every match.", "Preserves individual OSD choices and player messages."},
+        .OnChange = Lab_ChangeOSDsOff,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_OSDS_OFF_NAME,
+        .desc = {"Hide global OSD messages without clearing their colors.", "Trails and event feedback remain active."},
+        .OnChange = Lab_ChangeOSDsOff,
+    },
+    {
+        .kind = OPTKIND_INFO, .disable = 1, .name = "",
+        .desc = {""},
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_TRAIL_VERY_FAST_NAME,
+        .desc = {"Enable Very Fast trails in every gameplay match."},
+        .OnChange = Lab_ChangeGlobalVeryFast,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_TRAIL_INSTANT_NAME,
+        .desc = {"Show only current-frame hitboxes in every match.", "Very Fast takes precedence when both are On."},
+        .OnChange = Lab_ChangeGlobalInstant,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_MISSED_LCANCEL_NAME,
+        .desc = {"Pulse red throughout uncancelled aerial landing lag.", "Actionable Yellow/Green takes priority over this flash."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_RUN_TURN_NAME,
+        .desc = {"Pulse red throughout the Run Turnaround state.", "Standing and dash turns do not trigger this flash."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_ACTION_CUES_NAME,
+        .desc = {"Yellow: last two blocked frames. Green: recovery completes.", "Green lasts two frames, even if you start your next action.", "Covers landings, aerials and ordinary grounded attacks."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_INFINITE_SHIELDS_NAME,
+        .desc = {"Keep all players' and CPUs' shields at full health.", "Overrides event-local shield health while On."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_INVINCIBILITY_NAME,
+        .desc = {"Show protected fighters in their translucent trail color.", "Includes moves, dodges, respawn, ledge and Yoshi jump armor.", "Actionable Yellow/Green takes priority while active."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
+    {
+        .kind = OPTKIND_MENU, .name = "OSD Display", .menu = &LabMenu_OSDDisplay,
+        .desc = {"Choose Recent, Fixed Grid or Practice Panel.", "Stable styles retain results; paused L/R changes page."},
     },
 };
 
 static EventMenu LabMenu_OSDs = {
-    .name = "OSDs",
+    .name = "Global Settings",
     .option_num = sizeof(LabOptions_OSDs) / sizeof(EventOption),
     .options = LabOptions_OSDs,
 };
+static const char *LabOSD_LayoutNames[] = { TM_OSD_LAYOUT_NAMES };
+static const char *LabOSD_PositionNames[] = {"HUD", "Sides", "Top Left", "Top Right"};
+static EventOption LabOptions_OSDDisplay[] = {
+    {.kind = OPTKIND_STRING, .name = "Display Style", .value_num = TM_OSD_LAYOUT_COUNT,
+     .values = LabOSD_LayoutNames, .OnChange = Lab_ChangeOSDDisplay,
+     .desc = {"Recent slides; Fixed reserves grid cells.", "Practice Panel keeps compact rows and timing history."}},
+    {.kind = OPTKIND_STRING, .name = "Recent Position", .value_num = 4,
+     .values = LabOSD_PositionNames, .OnChange = Lab_ChangeOSDDisplay,
+     .desc = {"Anchor for the Recent queue; stable styles use the top left."}},
+    {.kind = OPTKIND_INFO, .name = "L/R: OSD Page",
+     .desc = {"Use L/R while paused to choose a page.", "The OSD footer shows the page after unpausing.", "Pages never rotate automatically."}},
+};
+static EventMenu LabMenu_OSDDisplay = {.name = "OSD Display", .option_num = countof(LabOptions_OSDDisplay),
+    .options = LabOptions_OSDDisplay};
 
 // ACTION LOG --------------------------------------------------------------
 
@@ -1920,34 +2038,23 @@ static EventMenu LabMenu_ActionLog = {
 
 // HITBOX TRAILS --------------------------------------------------------------
 
-typedef struct HitboxTrail {
-    Vec3 a;
-    Vec3 b;
-    float size;
-    GXColor color;
-    int frame_created;
-} HitboxTrail;
-
-static u32 hitbox_trail_i;
-static HitboxTrail hitbox_trails[64];
-
 enum hitbox_trails_option
 {
     OPTHITBOXTRAILS_ENABLED,
     OPTHITBOXTRAILS_DECAY,
+    OPTHITBOXTRAILS_INFO,
 
     OPTHITBOXTRAILS_COUNT
 };
 
-const u8 LabValues_HitboxTrailDecayConst[] = { 15, 10, 5, 0, 30, 0 };
-const u8 LabValues_HitboxTrailDecayFactor[] = { 4, 8, 13, 200, 2, 0 };
-const char *LabOptions_HitboxTrailDecay[] = { "Normal", "Fast", "Very Fast", "Instant", "Slow", "Off" };
+static const char *LabOptions_HitboxTrailDecay[] = { TM_TRAIL_DECAY_LABELS };
 
 static EventOption LabOptions_HitboxTrails[OPTHITBOXTRAILS_COUNT] = {
     {
         .kind = OPTKIND_TOGGLE,
-        .name = "Enable",
-        .desc = {"Enable hitbox trails."},
+        .name = "Enable (local)",
+        .desc = {"Enable trails when both global profiles are Off."},
+        .OnChange = Lab_ChangeHitboxTrails,
     },
     {
         .kind = OPTKIND_STRING,
@@ -1955,6 +2062,12 @@ static EventOption LabOptions_HitboxTrails[OPTHITBOXTRAILS_COUNT] = {
         .name = "Decay",
         .desc = {"How quickly the hitbox will fade away."},
         .values = LabOptions_HitboxTrailDecay,
+        .OnChange = Lab_ChangeHitboxTrails,
+    },
+    {
+        .kind = OPTKIND_INFO,
+        .name = "Global: Off",
+        .desc = {"Global Very Fast/Instant override local controls.", "Both On draws the Very Fast union once.", "Change global trails in the OSD menu."},
     },
 };
 
@@ -2208,7 +2321,7 @@ static EventOption LabOptions_CPU[OPTCPU_COUNT] = {
         .name = "Smash DI Amount",
         .desc = {"Adjust how often the CPU will alter their position",
                  "during hitstop."},
-        .format = "%d Frames",
+        .format = "%df",
     },
     {
         .kind = OPTKIND_STRING,
@@ -2265,7 +2378,7 @@ static EventOption LabOptions_CPU[OPTCPU_COUNT] = {
         .name = "Counter Delay",
         .desc = {"Adjust the amount of actionable frames before ",
                  "the CPU counters."},
-        .format = "%d Frames",
+        .format = "%df",
     },
     {
         .kind = OPTKIND_MENU,
@@ -2449,7 +2562,7 @@ static EventOption LabOptions_AdvCounter_Default[OPTCTR_COUNT] = {
         .name = "Delay (Ground)",
         .desc = {"Adjust the amount of actionable frames before ",
                  "the CPU counters on the ground."},
-        .format = "%d Frames",
+        .format = "%df",
         .disable = 1,
     },
     {
@@ -2458,7 +2571,7 @@ static EventOption LabOptions_AdvCounter_Default[OPTCTR_COUNT] = {
         .name = "Delay (Air)",
         .desc = {"Adjust the amount of actionable frames before ",
                  "the CPU counters in the air."},
-        .format = "%d Frames",
+        .format = "%df",
         .disable = 1,
     },
     {
@@ -2467,7 +2580,7 @@ static EventOption LabOptions_AdvCounter_Default[OPTCTR_COUNT] = {
         .name = "Delay (Shield)",
         .desc = {"Adjust the amount of actionable frames before ",
                  "the CPU counters in shield."},
-        .format = "%d Frames",
+        .format = "%df",
         .disable = 1,
     },
 };
@@ -2575,7 +2688,7 @@ static EventOption LabOptions_Tech[OPTTECH_COUNT] = {
         .kind = OPTKIND_INT,
         .value_num = 16,
         .name = "Tech Invisibility Delay",
-        .format = "%d Frames",
+        .format = "%df",
         .desc = {"Set the delay in frames on tech invisibility."},
     },
     {

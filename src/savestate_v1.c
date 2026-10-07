@@ -588,6 +588,9 @@ int Savestate_Load_v1(Savestate_v1 *savestate, int flags)
     }
     
     if (isLoaded == 1) {
+        Trails_Clear();
+        ActionCues_Clear();
+        Events_NotifyRestore();
         // restore frame
         Match *match = stc_match;
         match->time_frames = savestate->frame;

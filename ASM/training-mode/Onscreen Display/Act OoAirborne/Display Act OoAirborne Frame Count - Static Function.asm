@@ -22,7 +22,7 @@
     # CHECK IF ENABLED
     li r0, OSD.ActOoAirborne
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -121,7 +121,7 @@ RedText:
 DisplayText:
     mr r3, r10                  # message kind
     lbz r4, 0xC(playerdata)     # message queue
-    Message_Display
+    Message_DisplayOSD 18, 1, 1, 0
     b Exit
 
 

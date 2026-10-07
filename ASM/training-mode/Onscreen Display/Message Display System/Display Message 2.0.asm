@@ -44,7 +44,7 @@
 
     # Load Max Number of Windows Variable From OSD Menu
     lwz r3, MemcardData(r13)        # Get Memcard Data
-    lbz MaxWindows, 0x1f28(r3)
+    SettingsRead SettingsField_Position, MaxWindows
 
     # Get Window's Area in the Message Struct in r3
     load r3, 0x804a1f58

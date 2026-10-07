@@ -20,7 +20,7 @@
     li r0, OSD.Ledge                # Ledge Codes ID
     # lwz r4, -0xdbc(rtoc) #get frame data toggle bits
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -57,7 +57,7 @@ EndSetColor:
     lbz r4, 0xC(playerdata)     # queue
     lhz r7, 0x2416(playerdata)
     subi r7, r7, 1
-    Message_Display
+    Message_DisplayOSD 26, 0, 1, 0
 
     b Exit
 

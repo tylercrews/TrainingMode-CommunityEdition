@@ -16,7 +16,7 @@
 
 Text:
     blrl
-    .string "Special OoDblJump\nFrame %d"
+    .string "Special OoDblJump\n%df"
     .align 2
 
 Exit:

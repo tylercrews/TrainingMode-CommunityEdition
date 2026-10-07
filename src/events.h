@@ -6,8 +6,11 @@
 #include "savestate.h"
 #include <stdint.h>
 
-#define TM_VERSSHORT "TM-Tyro v1.4.1 T1"
-#define TM_VERSLONG "TrMo Tyro Edition v1.4.1 T1"
+#include "../version.h"
+#include "settings.h"
+#include "trails.h"
+#include "osd_style.h"
+#include "action_cues.h"
 #define EVENT_DATASIZE 512
 #define TM_FUNC -(50 * 4)
 
@@ -280,9 +283,22 @@ typedef struct EventVars
     Rect (*HUD_DrawActionLogBar)(u8 *action_log, GXColor *color_lookup, int log_count);
     void (*HUD_DrawActionLogKey)(char **action_names, GXColor *action_colors, int action_count);
     void (*HUD_DrawInfoPanel)(const char **label, const char **info, int count);
+    const TMSettingsAPI *settings;
+    const TMTrailAPI *trails;
+    void (*clear_action_cues)(void);
+    void (*set_local_overlay)(GOBJ *, const GXColor *);
+    unsigned (*get_restore_serial)(void);
+    int (*is_protected)(GOBJ *);
 } EventVars;
 #define event_vars_ptr_loc ((EventVars**)0x803d7054)
 #define event_vars (*event_vars_ptr_loc)
+
+static inline u32 TM_GetSetting(unsigned field, unsigned index) {
+    return event_vars->settings->get(field, index);
+}
+static inline void TM_SetSetting(unsigned field, unsigned index, u32 value) {
+    event_vars->settings->set(field, index, value);
+}
 
 // Function prototypes
 EventDesc *GetEventDesc(int page, int event);
@@ -319,6 +335,7 @@ void TM_CreateWatermark(void);
 void Message_Init(void);
 GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, ...);
 void Message_Manager(GOBJ *mngr_gobj);
+void Message_EndCombo(int queue_num);
 void Message_Destroy(GOBJ **msg_queue, int msg_num);
 void Message_Add(GOBJ *msg_gobj, int queue_num);
 void Message_CObjThink(GOBJ *gobj);
@@ -344,6 +361,7 @@ enum MsgArea
     MSGKIND_P6,
     MSGKIND_GENERAL,
 };
+#define MSG_CHARMAX 32 // characters per producer line
 typedef struct MsgData
 {
     Text *text;      // text pointer
@@ -354,7 +372,57 @@ typedef struct MsgData
     int anim_timer;  // used to track animation frame
     int lifetime;    // amount of frames after spawning to kill this message
     int alive_timer; // amount of frames this message has been alive for
+    int settings_id; // independent of kind/queue replacement identity; -1 = event-owned text
+    int timing_frame; // displayed, one-based measurement; -1 = no timing rule
+    int timing_subtext;
+    unsigned timing_best;
+    unsigned timing_hitlag; // snapshot at creation; never read later match context while drawing
+    int timing_prefix; // separate neutral-colored prefix; -1 when absent
+    int queue_num; // player ownership for live CPU suppression; 6 = general feedback
+    int timing_turn; // first shine turnaround's actionable opportunity; 0 = absent
+    int timing_second_turn; // terminal turnaround outcome; final marker is always red
+    int timing_encoded; // color commands inside one timing row; no separate centered runs
+    int line_count; // original producer rows; native subtext indices never change for a layout
+    int layout_owned; // 1: newly emitted bank result; 2: finalized Recent import; 0: recent queue
+    int layout_key;
+    unsigned native_frame; // creation update, used to coalesce duplicate history notifications
+    Text *layout_footer; // separate text; never inserts rows ahead of native caller edits
+    int layout_footer_state;
+    int layout_captured;
+    int timing_failed;
+    char layout_title[MSG_CHARMAX + 1];
+    Text *layout_timing; // One fitted large glyph stream for prefix + result in Practice Panel.
 } MsgData;
+void Message_FreeObject(GOBJ *object);
+void Message_LayoutInit(int canvas);
+int Message_LayoutAdd(GOBJ *object, int queue);
+int Message_LayoutImport(GOBJ *object, int queue);
+void Message_LayoutUpdate(void);
+void Message_LayoutClear(void);
+int Message_LayoutVisible(MsgData *msg);
+void Message_LayoutGeometry(GOBJ *object);
+void Message_LayoutRecent(void);
+void Message_LayoutEndCombo(int queue);
+unsigned Message_LayoutPageCount(void);
+void OSD_ApplyMessageStyle(MsgData *msg);
+void OSD_MessageGX(GOBJ *gobj, int pass);
+void OSD_EditorInit(void *data);
+int OSD_EditorInput(void *data, unsigned buttons, unsigned row);
+void ActionCues_LCancel(GOBJ *gobj);
+int ActionCues_Remaining(GOBJ *gobj);
+int ActionCues_CommonState(int kind, int state);
+void ActionCues_SetLocalOverlay(GOBJ *gobj, const GXColor *color);
+int ActionCues_IsProtected(GOBJ *gobj);
+void OSDContext_Clear(void);
+void OSDContext_Tick(FighterData *fighter);
+void OSDContext_LCancel(GOBJ *fighter);
+unsigned OSDContext_MessageHitlag(int queue, unsigned category);
+void OSD_ActOutWait(GOBJ *fighter);
+void OSD_FormatTiming(MsgData *message, int inline_layout, int y);
+void OSD_TimingText(MsgData *message, char *line, int part); /* 0: full, 1: prefix, 2: result */
+void OSD_ShineBeforeIASA(GOBJ *fighter);
+void OSD_ShineAfterIASA(GOBJ *fighter);
+void Events_NotifyRestore(void);
 typedef struct MsgMngrData
 {
     COBJ *cobj;
@@ -375,7 +443,6 @@ enum MsgColors
 #define MSGTIMER_DELETE 6
 #define MSG_LIFETIME (2 * 60)
 #define MSG_LINEMAX 3  // lines per message
-#define MSG_CHARMAX 32 // characters per line
 #define MSG_HUDYOFFSET 8
 #define MSGJOINT_SCALE 3
 #define MSGJOINT_X 0

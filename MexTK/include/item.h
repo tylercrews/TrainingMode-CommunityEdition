@@ -1052,4 +1052,5 @@ bool Item_RemoveFighterReference(GOBJ *item, GOBJ *fighter);
 void Item_ClearHitlagFlag(GOBJ *item);
 
 void Egg_Destroy(GOBJ *egg_gobj);
+void Egg_EnterRest(GOBJ *egg_gobj); // 80288E6C: zero velocity and enter resting egg state 0
 #endif

@@ -12,7 +12,7 @@
     # CHECK IF ENABLED
     li r0, OSD.BoostGrab
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -31,13 +31,14 @@
     bl Text
     mflr r6
     lhz r7, TM_FramesinCurrentAS(playerdata)
-    Message_Display
+    Message_DisplayOSD 14, 1, 1, 0
 
     b Exit
 
 Text:
     blrl
-    .string "Boost Grab\nFrame %d"
+    .string "Boost Grab\n%df"
+    .align 2
 
 Exit:
     restoreall

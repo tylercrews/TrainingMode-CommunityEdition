@@ -5,7 +5,7 @@
     .set Text, 30
     .set TextProp, 28
 
-    .set OptionCount, 4
+    .set OptionCount, 6
 
 # Injected into CursorMovement Check
 
@@ -28,7 +28,7 @@ CheckY:
     beq CheckX
 
     # Increase Number
-    lbz r3, 0x1f28(r20)
+    SettingsRead SettingsField_Display, 3
     addi r3, r3, 1
     # Check If Over Max
     cmpwi r3, OptionCount
@@ -37,7 +37,7 @@ CheckY:
     li r3, 0
 
 CheckY_Store:
-    stb r3, 0x1f28(r20)
+    SettingsWrite SettingsField_Display, 3
 
     b UpdateText
 
@@ -48,7 +48,7 @@ CheckX:
     beq exit
 
     # Decrease Number
-    lbz r3, 0x1f28(r20)
+    SettingsRead SettingsField_Display, 3
     subi r3, r3, 1
     # Check If Over Max
     cmpwi r3, 0
@@ -57,7 +57,7 @@ CheckX:
     li r3, OptionCount-1
 
 CheckX_Store:
-    stb r3, 0x1f28(r20)
+    SettingsWrite SettingsField_Display, 3
 
     b UpdateText
 
@@ -69,7 +69,7 @@ UpdateText:
     bl OSDPositionText
     mflr r5
 
-    lbz r6, 0x1f28(r20)
+    SettingsRead SettingsField_Display, 6
     cmpwi r6, 0
     beql OSDPositionTextHUD
     cmpwi r6, 1
@@ -78,6 +78,10 @@ UpdateText:
     beql OSDPositionTextTopLeft
     cmpwi r6, 3
     beql OSDPositionTextTopRight
+    cmpwi r6, 4
+    beql OSDPositionTextFixed
+    cmpwi r6, 5
+    beql OSDPositionTextPanel
     mflr r6
 
     branchl r12, Text_UpdateSubtextContents
@@ -88,7 +92,7 @@ UpdateText:
 
 OSDPositionText:
     blrl
-    .string "OSD Position: %s"
+    .string "OSD Display: %s"
     .align 2
 
 OSDPositionTextHUD:
@@ -109,6 +113,15 @@ OSDPositionTextTopLeft:
 OSDPositionTextTopRight:
     blrl
     .string "Top Right"
+    .align 2
+
+OSDPositionTextFixed:
+    blrl
+    .string "Fixed Grid"
+    .align 2
+OSDPositionTextPanel:
+    blrl
+    .string "Practice Panel"
     .align 2
 
 ########################################

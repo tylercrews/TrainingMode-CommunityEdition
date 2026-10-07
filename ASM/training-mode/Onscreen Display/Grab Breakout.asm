@@ -8,7 +8,7 @@
     # CHECK IF ENABLED
     li r0, OSD.GrabBreakout # OSD Menu ID
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -76,7 +76,7 @@ GrabUpdate:
     li r5, MSGCOLOR_WHITE
     bl Text
     mflr r6
-    Message_Display
+    Message_DisplayOSD 24, 0, 1, 0
     b Exit
 
 Text:

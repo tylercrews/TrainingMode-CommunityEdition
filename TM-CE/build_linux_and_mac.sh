@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 
-SCRIPT_DIR=$(dirname "$(readlink -f "$0")")
+set -eo pipefail
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 XDELTA_PATCH_PATH="$SCRIPT_DIR/patch.xdelta"
+if [[ ! -f "$SCRIPT_DIR/release-config.sh" ]]; then
+    echo "ERROR: Missing release-config.sh. Download the complete Tyro release archive."
+    exit 1
+fi
+source "$SCRIPT_DIR/release-config.sh"
 
 if command -v xdelta3 > /dev/null; then
     XDELTA_CMD="xdelta3"
@@ -22,14 +28,14 @@ if [[ ! -f "${1}" ]]; then
     exit 1
 fi
 
-if ! ${XDELTA_CMD} -f -d -s "${1}" "${XDELTA_PATCH_PATH}" TM-CE.iso; then 
-    echo "ERROR: The ISO '${1}' is not a valid v1.02 NTSC melee iso"
+if ! ${XDELTA_CMD} -f -d -s "${1}" "${XDELTA_PATCH_PATH}" "$SCRIPT_DIR/$OUTPUT_ISO"; then
+    echo "ERROR: The ISO '${1}' is not a valid source Melee iso"
     exit 1
 fi
 
-echo "############ TM-CE.iso has been successfully created ######################"
+echo "############ $OUTPUT_ISO has been successfully created ######################"
 
 if [[ ! -t 0 ]]; then
     echo "Press Enter to continue..."
-    read -r
+    read -r || true
 fi

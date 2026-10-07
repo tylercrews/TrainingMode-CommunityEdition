@@ -23,7 +23,7 @@
     li r0, OSD.Fastfall             # PowerShield ID
     # lwz r4, -0xdbc(rtoc) #get frame data toggle bits
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -49,7 +49,7 @@ PrintMessage:
     bl Fastfall_String
     mflr r6
     lhz r7, TM_CanFastfallFrameCount(REG_FighterData)
-    Message_Display
+    Message_DisplayOSD 20, 1, 1, 0
     lwz r3, 0x2C(r3)
     lwz REG_Text, MsgData_Text(r3)
 
@@ -71,7 +71,7 @@ PrintMessage:
 
 Fastfall_String:
     blrl
-    .string "Fastfall\nFrame %d"
+    .string "Fastfall\n%df"
     .align 2
 
 Colors:

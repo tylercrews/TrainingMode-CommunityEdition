@@ -43,7 +43,7 @@ CustomEvent:
 
     # Get Event Name
     lwz r3, MemcardData(r13)
-    lbz r3, CurrentEventPage(r3)
+    SettingsRead SettingsField_Page, 3
     mr r4, r27
     rtocbl r12, TM_GetEventName
 
@@ -56,7 +56,7 @@ CustomEvent:
 
     # Get event file
     lwz r3, MemcardData(r13)
-    lbz r3, CurrentEventPage(r3)
+    SettingsRead SettingsField_Page, 3
     mr r4, r27
     rtocbl r12, TM_GetEventFile
     cmpwi r3, 0

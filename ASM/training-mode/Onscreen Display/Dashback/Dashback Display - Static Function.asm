@@ -28,7 +28,7 @@
     li r0, OSD.Dashback             # wavedash ID
     # lwz r4, -0xdbc(rtoc) #get frame data toggle bits
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -81,7 +81,7 @@ PrintMessage:
     li r5, MSGCOLOR_WHITE
     mr r6, REG_String
     mr r7, REG_DBRate
-    Message_Display
+    Message_DisplayOSD 5, 0, 1, 0
     lwz r3, 0x2C(r3)
     lwz REG_Text, MsgData_Text(r3)
 
