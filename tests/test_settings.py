@@ -736,14 +736,14 @@ class OSDLayoutTests(unittest.TestCase):
         m.call("TMOSD_MapReset",ptr,sum(1<<id for id in IDS))
         m.call("TMOSD_MapOwners",ptr,63)
         self.assertEqual(m.call("TMOSD_Count",ptr),114)
-        self.assertEqual(m.call("TMOSD_PageCount",ptr,1),13)
-        self.assertEqual(m.call("TMOSD_PageCount",ptr,2),19)
+        self.assertEqual(m.call("TMOSD_PageCount",ptr,1),12)
+        self.assertEqual(m.call("TMOSD_PageCount",ptr,2),13)
         for player in range(6):
             for slot, category in enumerate(IDS):
                 key = m.call("TMOSD_Key",player,category)
                 self.assertEqual(key,player*19+slot)
                 self.assertEqual(m.call("TMOSD_Category",key),category)
-                for mode, capacity in [(1,9),(2,6)]:
+                for mode, capacity in [(1,10),(2,9)]:
                     self.assertEqual(m.call("TestLayoutCell",ptr,key,mode,0),key//capacity)
                     self.assertEqual(m.call("TestLayoutCell",ptr,key,mode,1),key%capacity)
         for player, category in [(-1,0),(6,0),(0,2),(0,64)]:
@@ -777,16 +777,16 @@ class OSDLayoutTests(unittest.TestCase):
 
     def test_manual_pages_do_not_follow_new_results_or_expiration(self):
         self.start(1,IDS);m=self.m
-        object=m.call("TestLayoutEmit",0,14,1,14);m.call("TestLayoutTick",1)
+        object=m.call("TestLayoutEmit",0,16,1,16);m.call("TestLayoutTick",1)
         self.assertEqual(m.call("TestLayoutVisible",object),0)
         self.assertEqual(m.call("Settings_Get",23,0),0)
         m.call("Settings_Set",23,0,1);m.call("TestLayoutTick",2)
         self.assertEqual(m.call("TestLayoutVisible",object),1)
         for frame in range(3,130):m.call("TestLayoutTick",frame)
         self.assertEqual(m.call("Settings_Get",23,0),1)
-        self.assertLessEqual(m.call("TestLayoutLiveText"),19)
+        self.assertLessEqual(m.call("TestLayoutLiveText"),21)
         m.call("Settings_Set",23,0,18);m.call("TestLayoutTick",130)
-        self.assertEqual(m.call("Settings_Get",23,0),2)  # Clamp invalid explicit page, no cycling.
+        self.assertEqual(m.call("Settings_Get",23,0),1)  # Clamp invalid explicit page, no cycling.
 
     def test_pause_duplicate_ticks_and_stock_generation_preserve_new_result(self):
         self.start(2);m=self.m
@@ -812,7 +812,7 @@ class OSDLayoutTests(unittest.TestCase):
             m.call("TestLayoutTick",frame)
             object=m.call("TestLayoutEmit",0,20,result,20);m.call("TestLayoutTick",frame)
         text=self.footer(object)
-        self.assertNotIn(b"1f",text); self.assertIn(b"2f",text);self.assertIn(b"3f",text);self.assertIn(b"4f",text)
+        self.assertIn(b"1f",text); self.assertIn(b"2f",text);self.assertIn(b"3f",text);self.assertIn(b"4f",text)
         self.assertIn(b"\x1bFFF000FF3f",text)  # Third timing remains yellow.
         encoded=m.native_text(text);m.native_width(encoded);m.native_subtexts([encoded])
         # Same callback update/value must not add another history item.
@@ -856,6 +856,23 @@ class OSDLayoutTests(unittest.TestCase):
         m.call("TestLayoutTick",1)
         self.assertEqual(m.call("TestLayoutFreed"),1)
         self.assertIn(b"2f",self.footer(newer));self.assertNotIn(b"1f",self.footer(newer))
+
+    def test_compact_panel_large_result_and_vertical_previous_scores(self):
+        self.start(2);m=self.m
+        for frame in range(1,5):
+            m.call("TestLayoutTick",frame)
+            object=m.call("TestLayoutEmit",0,20,frame,20);m.call("TestLayoutTick",frame)
+        self.assertEqual(m.call("TestLayoutFooterMetric",object,2,2),220)
+        self.assertEqual(m.call("TestLayoutFooterMetric",object,0,2),72)
+        for row, expected in [(4,b"3f"),(5,b"2f"),(6,b"1f")]:
+            line=bytes(m.call("TestLayoutFooterRowChar",object,row,i) for i in range(40)).split(b"\0",1)[0]
+            self.assertIn(expected,line)
+            self.assertEqual(m.call("TestLayoutFooterMetric",object,row,0),730)
+        self.assertEqual(m.call("TestLayoutFooterMetric",object,4,1),(-28)&0xFFFFFFFF)
+        self.assertEqual(m.call("TestLayoutFooterMetric",object,5,1),0)
+        map_ptr=0x80406000;m.call("TMOSD_MapReset",map_ptr,sum(1<<id for id in IDS));m.call("TMOSD_MapOwners",map_ptr,1)
+        for key in range(5):self.assertEqual(m.call("TestLayoutCell",map_ptr,key,1,3),1800)
+        self.assertEqual(m.call("TestLayoutCell",map_ptr,5,1,3),1100)
 
     def test_switching_back_to_recent_releases_stable_ownership(self):
         self.start(2);m=self.m
@@ -1077,7 +1094,7 @@ class OSDContextTests(unittest.TestCase):
 class ShineEpisodeTests(unittest.TestCase):
     def setUp(self):
         self.m=Machine(); self.episode=0x80402000
-        self.m.cpu.mem_write(self.episode,bytes(52))
+        self.m.cpu.mem_write(self.episode,bytes(60))
 
     def tick(self,frame,state,hitlag=0,dead=0):
         self.m.call("TMShine_Tick",self.episode,frame,state,hitlag,dead)
@@ -1095,6 +1112,48 @@ class ShineEpisodeTests(unittest.TestCase):
         self.tick(3,361);self.assertEqual(self.act(3,361,24),1)
         self.assertEqual(self.fields()[4:8],(2,0,0,1))
         self.assertEqual(self.act(3,361,24),0)  # No duplicate message on the same update.
+
+    def test_timeout_at_fifteen_and_boundary_jump_or_second_turn_wins(self):
+        for frame in range(1,15):self.tick(frame,361);self.assertEqual(self.act(frame,361,361),0)
+        self.tick(15,361);self.assertEqual(self.act(15,361,361),3)
+        self.assertEqual(self.act(15,361,361),0)
+        self.m.cpu.mem_write(self.episode,bytes(60))
+        for frame in range(1,15):self.tick(frame,361);self.act(frame,361,361)
+        self.tick(15,361);self.assertEqual(self.act(15,361,24),1)
+        self.m.cpu.mem_write(self.episode,bytes(60))
+        self.tick(1,361);self.act(1,361,364)
+        for frame in (2,3):self.tick(frame,364);self.act(frame,364,364)
+        for frame in range(4,17):self.tick(frame,361);self.act(frame,361,361)
+        self.tick(17,361);self.assertEqual(self.act(17,361,364),2)
+
+    def test_timeout_pauses_for_hitlag_turn_and_reflection_recovery(self):
+        self.tick(1,361);self.act(1,361,364)
+        for frame in range(2,20):self.tick(frame,364,1);self.assertEqual(self.act(frame,364,364,1),0)
+        for frame in range(20,34):self.tick(frame,361);result=self.act(frame,361,361)
+        self.assertEqual(result,3)
+        self.m.cpu.mem_write(self.episode,bytes(60))
+        self.tick(1,361);self.act(1,361,362)
+        for frame in range(2,20):self.tick(frame,362);self.assertEqual(self.act(frame,362,362),0)
+        self.tick(20,361);self.assertEqual(self.act(20,361,24),1)
+
+    def test_release_still_reports_failure_and_new_shine_cancels_pending_deadline(self):
+        self.tick(1,361);self.act(1,361,363)
+        for frame in range(2,15):self.tick(frame,14);self.assertEqual(self.act(frame,14,14),0)
+        self.tick(15,14);self.assertEqual(self.act(15,14,14),3)
+        self.tick(16,360);self.act(16,360,360)
+        self.tick(17,361);self.assertEqual(self.act(17,361,24),1)
+
+    def test_native_timeout_emits_red_fail_once_with_context(self):
+        m=self.m;m.init();m.call("TestCueInit");m.write(14,8,6);m.call("TestCueKind",0,1)
+        for frame in range(1,16):
+            m.call("TestCueState",0,361,frame,40,100);m.call("TestContextTick",0,frame)
+            m.call("TestShineBefore",0);m.call("TestShineAfter",0)
+        m.call("TestStyleFormat",0,0,-15)
+        text,_,raw=styled_ascii(m,1)
+        self.assertEqual(text,"FAIL");self.assertIn(b"\x1bFFA2BAFFFAIL",raw)
+        m.native_width(m.native_text(raw))
+        m.call("TestWaitClear");m.call("TestContextTick",0,16);m.call("TestShineBefore",0);m.call("TestShineAfter",0)
+        self.assertEqual(m.call("TestWaitFrame"),0)
 
     def test_startup_hitlag_first_turn_and_two_blocked_turn_updates(self):
         for frame in range(1,4):
@@ -1127,7 +1186,7 @@ class ShineEpisodeTests(unittest.TestCase):
         self.assertEqual(self.fields()[4],2)
         self.tick(3,366);self.assertEqual(self.act(3,366,368),0)  # B release emits no Jump OSD.
         self.tick(4,368);self.assertEqual(self.act(4,368,27),0)  # Jump during end is not a shine cancel.
-        self.tick(5,29);self.assertEqual(self.fields()[3:8],(0,0,0,0,0))
+        self.tick(5,29);self.assertEqual(self.fields()[3:8],(0,3,0,0,0))  # Pending release retains failure context.
 
     def test_no_air_jump_left_does_not_become_late_jump_time_after_landing(self):
         for frame in range(1,5):

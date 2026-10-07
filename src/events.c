@@ -1847,6 +1847,10 @@ GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, 
 
         // add null terminator
         msg_line[line_length] = '\0';
+        if (i == 0) {
+            memcpy(msg_data->layout_title, msg_line, line_length + 1);
+            if (msg_data->settings_id == 0) strcpy(msg_data->layout_title, "Wavedash");
+        }
 
         // increment msg
         msg += line_length + 1; // +1 to skip past newline

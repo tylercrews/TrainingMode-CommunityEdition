@@ -9,7 +9,7 @@ static struct {
     TMOSDHistory history[TM_OSD_KEYS];
     TMOSDMap map;
     Text *empty[TM_OSD_GRID_CELLS], *page_text;
-    int empty_key[TM_OSD_GRID_CELLS];
+    int empty_key[TM_OSD_GRID_CELLS], empty_mode[TM_OSD_GRID_CELLS];
     GOBJ *fighter[TM_OSD_PLAYERS];
     int spawn[TM_OSD_PLAYERS];
     unsigned frame, restore, mode;
@@ -23,6 +23,10 @@ static const char *category_names[TM_SETTINGS_OSDS] = {
     "Combo Counter", "Grab Breakout", "Ledgedash", "Act OoHitstun",
 };
 static GXColor muted = {180, 190, 205, 255};
+static void bar_hidden(JOBJ *joint, int hidden) {
+    if(hidden)joint->flags |= JOBJ_HIDDEN; else joint->flags &= ~JOBJ_HIDDEN;
+    for(JOBJ *child=joint->child;child;child=child->sibling)bar_hidden(child,hidden);
+}
 static unsigned current_mode(void) { return Settings_Get(TM_SETTING_OSD_LAYOUT, 0); }
 static unsigned eligible(void) {
     unsigned owners = 0;
@@ -83,8 +87,8 @@ int Message_LayoutAdd(GOBJ *object, int queue) {
          * attempts were emitted between manager updates. */
         if (!old->layout_captured) {
             TMOSD_HistoryPush(&layout.history[key], old->kind, old->timing_frame,
-                old->timing_second_turn ? 0xFFA2BAFF : OSD_TimingColorFor(old->timing_frame, old->timing_best),
-                old->timing_second_turn, old->native_frame);
+                old->timing_second_turn || old->timing_failed ? 0xFFA2BAFF : OSD_TimingColorFor(old->timing_frame, old->timing_best),
+                old->timing_failed ? 2 : old->timing_second_turn, old->native_frame);
         }
         Message_FreeObject(layout.latest[key]);
     }
@@ -130,19 +134,21 @@ void Message_LayoutGeometry(GOBJ *object) {
     Text *text = msg->text;
     JOBJ *joint = object->hsd_object;
     if (mode == TM_OSD_PANEL) {
-        text->align = 0; text->aspect.X = 520;
-        text->viewport_scale.X = text->viewport_scale.Y = 0.033f;
+        text->align = 0; text->use_aspect = 0;
+        text->viewport_scale.X = text->viewport_scale.Y = 0.019f;
         text->trans.X = cell.x; text->trans.Y = -cell.y;
         for (int i = 0; i < msg->line_count; ++i) {
-            Text_SetPosition(text, i, 0, -29.f + i * 23.f);
+            if (i == 0 || (msg->timing_frame >= 0 && i == msg->timing_subtext))
+                Text_SetPosition(text, i, -2000, 0);
+            else Text_SetPosition(text, i, 0, 28.f + (i - 1) * 18.f);
             Text_SetScale(text, i, 1.f, 1.f);
         }
-        joint->scale.X = 5.8f; joint->scale.Y = 3.f; joint->scale.Z = MSGJOINT_SCALE;
-        joint->trans.X = cell.x + 9.4f; joint->trans.Y = cell.y - 0.5f;
+        joint->scale.X = 5.8f; joint->scale.Y = 1.98f; joint->scale.Z = MSGJOINT_SCALE;
+        joint->trans.X = cell.x + 9.4f; joint->trans.Y = cell.y - 0.15f;
     } else {
-        joint->scale.X = joint->scale.Y = joint->scale.Z = MSGJOINT_SCALE;
+        joint->scale.X = 2.65f; joint->scale.Y = joint->scale.Z = MSGJOINT_SCALE;
         joint->trans.X = cell.x; joint->trans.Y = cell.y;
-        text->align = 1; text->aspect.X = MSGTEXT_BASEWIDTH;
+        text->align = 1; text->use_aspect = 1; text->aspect.X = 215;
         text->viewport_scale.X = text->viewport_scale.Y = MSGJOINT_SCALE * .01f * MSGTEXT_BASESCALE;
         text->trans.X = cell.x; text->trans.Y = -cell.y + MSGTEXT_BASEY * MSGJOINT_SCALE * .25f;
         for (int i = 0; i < msg->line_count; ++i) {
@@ -153,11 +159,11 @@ void Message_LayoutGeometry(GOBJ *object) {
     /* Stable layouts have no shrinking lifetime bar or collapsing background. */
     JOBJ *bar;
     JOBJ_GetChild(joint, &bar, 4, -1);
-    if (bar) bar->flags |= JOBJ_HIDDEN;
+    if (bar) bar_hidden(bar,1);
     JOBJ_SetMtxDirtySub(joint);
     if (msg->layout_footer) {
         msg->layout_footer->trans.X = cell.x;
-        msg->layout_footer->trans.Y = -cell.y + (mode == TM_OSD_PANEL ? 2.2f : 2.5f);
+        msg->layout_footer->trans.Y = -cell.y + (mode == TM_OSD_PANEL ? 0 : 2.5f);
         msg->layout_footer->align = mode == TM_OSD_PANEL ? 0 : 1;
     }
 }
@@ -168,13 +174,13 @@ void Message_LayoutRecent(void) {
         if (!object) continue;
         MsgData *msg = object->userdata;
         /* Restore native row geometry before returning to Recent. */
-        msg->text->align = 1; msg->text->aspect.X = MSGTEXT_BASEWIDTH;
+        msg->text->align = 1; msg->text->use_aspect = 1; msg->text->aspect.X = MSGTEXT_BASEWIDTH;
         msg->text->viewport_scale.X = msg->text->viewport_scale.Y = MSGJOINT_SCALE * .01f * MSGTEXT_BASESCALE;
         JOBJ *joint = object->hsd_object;
         joint->scale.X = joint->scale.Y = joint->scale.Z = MSGJOINT_SCALE;
         JOBJ *bar;
         JOBJ_GetChild(joint, &bar, 4, -1);
-        if (bar) bar->flags &= ~JOBJ_HIDDEN;
+        if (bar) bar_hidden(bar,0);
         for (int i = 0; i < msg->line_count; ++i) {
             Text_SetPosition(msg->text, i, 0, (msg->line_count - 1) * (-MSGTEXT_YOFFSET / 2) + i * MSGTEXT_YOFFSET);
             Text_SetScale(msg->text, i, 1.f, 1.f);
@@ -189,13 +195,26 @@ void Message_LayoutRecent(void) {
     memset(layout.history, 0, sizeof(layout.history));
 }
 unsigned Message_LayoutPageCount(void) { return TMOSD_PageCount(&layout.map, current_mode()); }
+static void panel_title(Text *text, const char *title) {
+    char first[33], second[33];
+    unsigned length = strlen(title), split = length;
+    if (length > 13) {
+        split = 0;
+        for (unsigned i = 1; i <= 13; ++i) if (title[i] == ' ') split = i;
+        if (!split) split = 13;
+    }
+    memcpy(first, title, split); first[split] = 0;
+    const char *tail = title + split; if (*tail == ' ') ++tail;
+    strcpy(second, tail);
+    Text_SetText(text, 0, "%s", first); Text_SetText(text, 1, "%s", second);
+}
 static void footer(GOBJ *object, unsigned mode) {
     MsgData *msg = object->userdata;
     TMOSDHistory *history = &layout.history[msg->layout_key];
     if (!msg->layout_captured) {
         TMOSD_HistoryPush(history, msg->kind, msg->timing_frame,
-            msg->timing_second_turn ? 0xFFA2BAFF : OSD_TimingColorFor(msg->timing_frame, msg->timing_best),
-            msg->timing_second_turn, msg->native_frame);
+            msg->timing_second_turn || msg->timing_failed ? 0xFFA2BAFF : OSD_TimingColorFor(msg->timing_frame, msg->timing_best),
+            msg->timing_failed ? 2 : msg->timing_second_turn, msg->native_frame);
         msg->layout_captured = 1;
     }
     if (!Message_LayoutVisible(msg)) {
@@ -205,13 +224,17 @@ static void footer(GOBJ *object, unsigned mode) {
     Playerblock *owner = Fighter_GetPlayerblock(msg->queue_num);
     int cpu = owner && owner->p_kind == 1;
     int state = mode * 4 + (msg->alive_timer >= MSG_LIFETIME) * 2 + cpu;
+    if (msg->layout_footer && msg->layout_footer_state >= 0 && msg->layout_footer_state / 4 != (int)mode) {
+        Text_Destroy(msg->layout_footer); msg->layout_footer = 0;
+    }
     if (!msg->layout_footer) {
         msg->layout_footer = Text_CreateText(2, layout.canvas);
         msg->layout_footer->kerning = 1; msg->layout_footer->use_aspect = 1;
         msg->layout_footer->aspect.X = mode == TM_OSD_PANEL ? 710 : 450;
         msg->layout_footer->viewport_scale.X = msg->layout_footer->viewport_scale.Y = .023f;
         msg->layout_footer->color = muted;
-        Text_AddSubtext(msg->layout_footer, 0, 0, "");
+        unsigned rows = mode == TM_OSD_PANEL ? 9 : 1;
+        for (unsigned i = 0; i < rows; ++i) Text_AddSubtext(msg->layout_footer, 0, 0, "");
         msg->layout_footer_state = -1;
     }
     if (msg->layout_footer_state != state) {
@@ -219,22 +242,50 @@ static void footer(GOBJ *object, unsigned mode) {
         sprintf(part, cpu ? "CPU%d %s" : "P%d %s", msg->queue_num + 1, msg->alive_timer >= MSG_LIFETIME ? "last" : "new");
         unsigned used = 0;
         for (const char *p = part; *p; ++p) line[used++] = *p;
-        if (mode == TM_OSD_PANEL && history->count) {
-            line[used++] = ' '; line[used++] = '|'; line[used++] = ' ';
+        if (mode == TM_OSD_PANEL) {
+            Text_SetText(msg->layout_footer, 7, "%s", part);
+            const char *title = msg->layout_title[0] ? msg->layout_title : category_names[msg->layout_key % TM_SETTINGS_OSDS];
+            panel_title(msg->layout_footer, title);
+            OSD_TimingText(msg, line, 2);
+            Text_SetText(msg->layout_footer, 2, "%s", msg->timing_frame >= 0 ? line : "");
+            OSD_TimingText(msg, line, 1);
+            Text_SetText(msg->layout_footer, 3, "%s", line);
             static const char hex[] = "0123456789ABCDEF";
-            for (unsigned i = 0; i < history->count; ++i) {
+            for (unsigned row = 0; row < 3; ++row) {
+                if (history->count <= row + 1) { Text_SetText(msg->layout_footer, 4 + row, ""); continue; }
+                unsigned i = history->count - 2 - row; used = 0;
                 line[used++] = 0x1B;
                 for (int shift = 28; shift >= 0; shift -= 4) line[used++] = hex[(history->color[i] >> shift) & 15];
-                sprintf(part, history->turn[i] ? "%dtrn" : "%df", history->frame[i]);
+                if (history->turn[i] == 2) strcpy(part, "FAIL");
+                else sprintf(part, history->turn[i] ? "%dtrn" : "%df", history->frame[i]);
                 for (const char *p = part; *p; ++p) line[used++] = *p;
-                if (i + 1 < history->count) line[used++] = ' ';
+                line[used] = 0; Text_SetText(msg->layout_footer, 4 + row, "%s", line);
             }
+            Text_SetText(msg->layout_footer, 8, "|");
+        } else {
+            line[used] = 0;
+            Text_SetText(msg->layout_footer, 0, "%s", line);
         }
-        line[used] = 0;
-        Text_SetText(msg->layout_footer, 0, "%s", line);
         msg->layout_footer_state = state;
     }
-    msg->layout_footer->aspect.X = mode == TM_OSD_PANEL ? 710 : 450;
+    Text *view = msg->layout_footer;
+    view->use_aspect = mode == TM_OSD_PANEL ? 0 : 1;
+    view->viewport_scale.X = view->viewport_scale.Y = mode == TM_OSD_PANEL ? .025f : .023f;
+    if (mode == TM_OSD_PANEL) {
+        unsigned rgba = OSD_PaletteColor(Settings_Get(TM_SETTING_OSD_COLOR, msg->settings_id));
+        GXColor title = {rgba >> 24, rgba >> 16, rgba >> 8, rgba};
+        Text_SetColor(view, 0, &title); Text_SetColor(view, 1, &title);
+        Text_SetPosition(view, 0, 0, -20); Text_SetPosition(view, 1, 0, 0);
+        Text_SetScale(view, 0, .72f, .72f); Text_SetScale(view, 1, .72f, .72f);
+        Text_SetPosition(view, 2, 445, -12); Text_SetScale(view, 2, 2.2f, 2.2f);
+        Text_SetPosition(view, 3, 425, 35); Text_SetScale(view, 3, .6f, .6f);
+        for (unsigned row = 0; row < 3; ++row) {
+            Text_SetPosition(view, 4 + row, 730, -28.f + row * 28.f);
+            Text_SetScale(view, 4 + row, .8f, .8f);
+        }
+        Text_SetPosition(view, 7, 0, 60); Text_SetScale(view, 7, .5f, .5f);
+        Text_SetPosition(view, 8, 325, 0); Text_SetScale(view, 8, .6f, 2.3f);
+    } else view->aspect.X = 450;
     msg->layout_footer->hidden = 0;
 }
 void Message_LayoutUpdate(void) {
@@ -271,26 +322,39 @@ void Message_LayoutUpdate(void) {
         if (!layout.empty[i]) {
             layout.empty[i] = Text_CreateText(2, layout.canvas);
             layout.empty[i]->kerning = 1; layout.empty[i]->use_aspect = 1;
-            Text_AddSubtext(layout.empty[i], 0, -25, ""); Text_AddSubtext(layout.empty[i], 0, 0, "--");
-            Text_AddSubtext(layout.empty[i], 0, 25, "");
+            for(unsigned row=0;row<9;++row) Text_AddSubtext(layout.empty[i],0,0,"");
         }
         Text *text = layout.empty[i];
-        if (layout.empty_key[i] != (int)key) {
-            Text_SetText(text, 0, "%s", category_names[key % TM_SETTINGS_OSDS]);
+        if (layout.empty_key[i] != (int)key || layout.empty_mode[i] != (int)mode) {
+            for(unsigned row=0;row<9;++row) Text_SetText(text,row,"");
+            if(mode==TM_OSD_PANEL) panel_title(text, category_names[key % TM_SETTINGS_OSDS]);
+            else Text_SetText(text, 0, "%s", category_names[key % TM_SETTINGS_OSDS]);
+            Text_SetText(text,mode==TM_OSD_PANEL ? 2 : 1,"--");
             Playerblock *owner = Fighter_GetPlayerblock(key / TM_SETTINGS_OSDS);
-            Text_SetText(text, 2, owner && owner->p_kind == 1 ? "CPU%d waiting" : "P%d waiting", key / TM_SETTINGS_OSDS + 1);
+            Text_SetText(text, mode==TM_OSD_PANEL ? 7 : 2, owner && owner->p_kind == 1 ? "CPU%d waiting" : "P%d waiting", key / TM_SETTINGS_OSDS + 1);
+            if(mode==TM_OSD_PANEL)Text_SetText(text,8,"|");
             layout.empty_key[i] = key;
+            layout.empty_mode[i] = mode;
         }
         text->align = mode == TM_OSD_PANEL ? 0 : 1;
         text->trans.X = cell.x; text->trans.Y = -cell.y;
-        text->aspect.X = mode == TM_OSD_PANEL ? 520 : MSGTEXT_BASEWIDTH;
-        text->viewport_scale.X = text->viewport_scale.Y = mode == TM_OSD_PANEL ? .033f : .042f;
+        text->use_aspect=mode==TM_OSD_PANEL ? 0 : 1;
+        text->aspect.X = 215;
+        text->viewport_scale.X = text->viewport_scale.Y = mode == TM_OSD_PANEL ? .025f : .042f;
         Text_SetPosition(text, 0, 0, mode == TM_OSD_PANEL ? -29 : -MSGTEXT_YOFFSET);
         Text_SetPosition(text, 1, 0, mode == TM_OSD_PANEL ? -6 : 0);
         Text_SetPosition(text, 2, 0, mode == TM_OSD_PANEL ? 66 : 59);
         unsigned rgba = OSD_PaletteColor(Settings_Get(TM_SETTING_OSD_COLOR, TMOSD_Category(key)));
         GXColor color = {rgba >> 24, rgba >> 16, rgba >> 8, rgba};
-        Text_SetColor(text, 0, &color); Text_SetColor(text, 1, &muted); Text_SetColor(text, 2, &muted);
+        Text_SetColor(text, 0, &color); Text_SetColor(text, 1, mode==TM_OSD_PANEL ? &color : &muted); Text_SetColor(text, 2, &muted);
+        for(unsigned row=0;row<9;++row) Text_SetScale(text,row,1,1);
+        if(mode==TM_OSD_PANEL){
+            Text_SetPosition(text,0,0,-20); Text_SetPosition(text,1,0,0);
+            Text_SetScale(text,0,.72f,.72f);Text_SetScale(text,1,.72f,.72f);
+            Text_SetPosition(text,2,445,-12);Text_SetScale(text,2,2.2f,2.2f);
+            Text_SetPosition(text,7,0,60);Text_SetScale(text,7,.5f,.5f);
+            Text_SetPosition(text,8,325,0);Text_SetScale(text,8,.6f,2.3f);
+        }
         Playerblock *owner = Fighter_GetPlayerblock(key / TM_SETTINGS_OSDS);
         text->hidden = Settings_Get(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF) ||
             (owner && owner->p_kind == 1 && Settings_Get(TM_SETTING_FLAG, TM_FLAG_CPU_OSDS_OFF));

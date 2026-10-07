@@ -361,6 +361,7 @@ enum MsgArea
     MSGKIND_P6,
     MSGKIND_GENERAL,
 };
+#define MSG_CHARMAX 32 // characters per producer line
 typedef struct MsgData
 {
     Text *text;      // text pointer
@@ -388,6 +389,8 @@ typedef struct MsgData
     Text *layout_footer; // separate text; never inserts rows ahead of native caller edits
     int layout_footer_state;
     int layout_captured;
+    int timing_failed;
+    char layout_title[MSG_CHARMAX + 1];
 } MsgData;
 void Message_FreeObject(GOBJ *object);
 void Message_LayoutInit(int canvas);
@@ -415,6 +418,7 @@ void OSDContext_LCancel(GOBJ *fighter);
 unsigned OSDContext_MessageHitlag(int queue, unsigned category);
 void OSD_ActOutWait(GOBJ *fighter);
 void OSD_FormatTiming(MsgData *message, int inline_layout, int y);
+void OSD_TimingText(MsgData *message, char *line, int part); /* 0: full, 1: prefix, 2: result */
 void OSD_ShineBeforeIASA(GOBJ *fighter);
 void OSD_ShineAfterIASA(GOBJ *fighter);
 void Events_NotifyRestore(void);
@@ -438,7 +442,6 @@ enum MsgColors
 #define MSGTIMER_DELETE 6
 #define MSG_LIFETIME (2 * 60)
 #define MSG_LINEMAX 3  // lines per message
-#define MSG_CHARMAX 32 // characters per line
 #define MSG_HUDYOFFSET 8
 #define MSGJOINT_SCALE 3
 #define MSGJOINT_X 0

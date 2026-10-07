@@ -7,7 +7,7 @@ static int shine_loop(int state) { return state == 361 || state == 366; }
 static int shine_turn(int state) { return state == 364 || state == 369; }
 void TMShine_Tick(TMShineEpisode *s, uint32_t frame, int state, int hitlag, int dead) {
     if (s->seen && frame == s->frame) return;
-    if (dead || !shine_state(state) || (s->seen && frame < s->frame) ||
+    if (dead || (!shine_state(state) && !s->released) || (s->seen && frame < s->frame) ||
         (shine_start(state) && !shine_start(s->state))) *s = (TMShineEpisode){0};
     if (!dead && shine_state(state) && hitlag && !s->done) increment(&s->hitlag);
     s->seen = 1; s->frame = frame; s->state = state;
@@ -20,15 +20,25 @@ void TMShine_Before(TMShineEpisode *s, uint32_t frame, int state, int frozen, in
      * treating the two native turn-animation steps as actionable delay. */
     if (s->waiting_turn) { s->opportunity = s->jump_opportunity = 0; s->waiting_turn = 0; }
     increment(&s->opportunity);
+    increment(&s->elapsed);
     if (jump_available) increment(&s->jump_opportunity);
     s->prepared = 1; s->prepared_frame = frame; s->prepared_state = state;
 }
 int TMShine_After(TMShineEpisode *s, uint32_t frame, int state, int frozen) {
-    if (frozen || !s->prepared || s->prepared_frame != frame || s->done) return TM_SHINE_PENDING;
+    if (frozen || s->done) return TM_SHINE_PENDING;
+    if (!s->prepared || s->prepared_frame != frame) {
+        if (!s->released) return TM_SHINE_PENDING;
+        if (s->prepared_frame != frame || s->prepared_state != -1) {
+            increment(&s->elapsed); s->prepared_frame = frame; s->prepared_state = -1;
+        }
+        if (s->elapsed < 15) return TM_SHINE_PENDING;
+        s->done = 1; return TM_SHINE_FAIL;
+    }
     s->prepared = 0;
     if (shine_turn(state)) {
         if (!s->turns) {
             s->first_turn = s->opportunity; s->turns = 1; s->waiting_turn = 1;
+            if (s->elapsed >= 15) { s->done = 1; return TM_SHINE_FAIL; }
             return TM_SHINE_PENDING;
         }
         s->turns = 2; s->done = 1;
@@ -38,7 +48,9 @@ int TMShine_After(TMShineEpisode *s, uint32_t frame, int state, int frozen) {
         s->done = 1;
         return TM_SHINE_JUMP;
     }
-    return TM_SHINE_PENDING; /* B release, platform pass or a failed input is not a jump. */
+    if (state == 363 || state == 368) { s->released = 1; s->prepared_state = -1; }
+    if (s->elapsed >= 15) { s->done = 1; return TM_SHINE_FAIL; }
+    return TM_SHINE_PENDING; /* A released shine remains pending until the deadline. */
 }
 void TMOSDContext_Step(TMOSDContext *c, uint32_t frame, int state, int attack,
     int airborne, int shine, int shield, int victim, int hitlag, int dead) {

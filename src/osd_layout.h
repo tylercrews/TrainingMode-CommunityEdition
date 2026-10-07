@@ -5,9 +5,10 @@
 
 #define TM_OSD_PLAYERS 6
 #define TM_OSD_KEYS (TM_OSD_PLAYERS * TM_SETTINGS_OSDS)
-#define TM_OSD_GRID_CELLS 9
-#define TM_OSD_PANEL_CELLS 6
-#define TM_OSD_HISTORY 3
+#define TM_OSD_GRID_COLUMNS 5
+#define TM_OSD_GRID_CELLS 10
+#define TM_OSD_PANEL_CELLS 9
+#define TM_OSD_HISTORY 4 /* Latest + three previous scores. */
 
 typedef struct TMOSDHistory {
     int frame[TM_OSD_HISTORY];

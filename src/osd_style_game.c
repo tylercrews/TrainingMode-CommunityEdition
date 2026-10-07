@@ -12,29 +12,35 @@ static char *append_text(char *out, const char *in) {
     while (*in) *out++ = *in++;
     return out;
 }
-void OSD_FormatTiming(MsgData *msg, int inline_layout, int y) {
-    if (msg->timing_frame < 0) return;
-    if (!inline_layout && !msg->timing_hitlag && !msg->timing_turn && !msg->timing_encoded) return;
-    char line[112], part[24];
+void OSD_TimingText(MsgData *msg, char *line, int which) {
+    char part[24];
     char *out = line;
-    if (inline_layout) {
-        out = append_text(out, "Wavedash ");
-        msg->timing_subtext = 0; /* Title + timing share a single centered first row. */
-    }
-    if (msg->timing_hitlag) {
+    if (which != 2 && msg->timing_hitlag) {
         out = append_color(out, 0xFFFFFFFF);
         sprintf(part, "%dhl->", msg->timing_hitlag);
         out = append_text(out, part);
     }
-    if (msg->timing_turn) {
+    if (which != 2 && msg->timing_turn) {
         out = append_color(out, OSD_TimingColor(msg->timing_turn));
         sprintf(part, "%dtrn->", msg->timing_turn);
         out = append_text(out, part);
     }
-    out = append_color(out, msg->timing_second_turn ? 0xFFA2BAFF :
+    if (which != 1) {
+    out = append_color(out, msg->timing_second_turn || msg->timing_failed ? 0xFFA2BAFF :
         OSD_TimingColorFor(msg->timing_frame, msg->timing_best));
-    sprintf(part, msg->timing_second_turn ? "%dtrn" : msg->settings_id == 1 ? "%df/7f" : "%df", msg->timing_frame);
-    out = append_text(out, part); *out = 0;
+    if (msg->timing_failed) strcpy(part, "FAIL");
+    else sprintf(part, msg->timing_second_turn ? "%dtrn" : msg->settings_id == 1 ? "%df/7f" : "%df", msg->timing_frame);
+    out = append_text(out, part);
+    }
+    *out = 0;
+}
+void OSD_FormatTiming(MsgData *msg, int inline_layout, int y) {
+    if (msg->timing_frame < 0) return;
+    if (!inline_layout && !msg->timing_hitlag && !msg->timing_turn && !msg->timing_encoded && !msg->timing_failed) return;
+    char line[128], body[112];
+    OSD_TimingText(msg, body, 0);
+    if (inline_layout) { sprintf(line, "Wavedash %s", body); msg->timing_subtext = 0; }
+    else strcpy(line, body);
     Text_SetText(msg->text, msg->timing_subtext, line);
     Text_SetPosition(msg->text, msg->timing_subtext, 0, inline_layout ? y : y + msg->timing_subtext * MSGTEXT_YOFFSET);
     Text_SetScale(msg->text, msg->timing_subtext, 1.f, 1.f);

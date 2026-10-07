@@ -40,14 +40,14 @@ TMOSDCell TMOSD_Cell(const TMOSDMap *map, int key, unsigned layout) {
         index += !!(map->mask & (1u << TMSettings_OSDIDs[i]));
     unsigned capacity = TMOSD_Capacity(layout);
     out.key = key; out.page = index / capacity; out.cell = index % capacity;
-    out.x = layout == TM_OSD_PANEL ? -26.f : -19.f + (out.cell % 3) * 19.f;
-    out.y = layout == TM_OSD_PANEL ? 18.f - out.cell * 5.3f : 18.f - (out.cell / 3) * 7.f;
+    out.x = layout == TM_OSD_PANEL ? -26.f : -23.2f + (out.cell % TM_OSD_GRID_COLUMNS) * 11.6f;
+    out.y = layout == TM_OSD_PANEL ? 18.f - out.cell * 3.4f : 18.f - (out.cell / TM_OSD_GRID_COLUMNS) * 7.f;
     return out;
 }
 void TMOSD_HistoryPush(TMOSDHistory *h, int kind, int frame, uint32_t color, int turn, uint32_t native_frame) {
     if (frame < 0) return;
     if (h->seen && h->kind == kind && h->native_frame == native_frame && h->count &&
-        h->frame[h->count - 1] == frame && h->turn[h->count - 1] == !!turn) return;
+        h->frame[h->count - 1] == frame && h->turn[h->count - 1] == turn) return;
     if (h->seen && h->kind != kind) h->count = 0; /* Do not mix unrelated category sub-techniques. */
     if (h->count == TM_OSD_HISTORY) {
         for (unsigned i = 0; i < TM_OSD_HISTORY - 1; ++i) {
@@ -56,6 +56,6 @@ void TMOSD_HistoryPush(TMOSDHistory *h, int kind, int frame, uint32_t color, int
         --h->count;
     }
     unsigned i = h->count++;
-    h->frame[i] = frame; h->color[i] = color; h->turn[i] = !!turn;
+    h->frame[i] = frame; h->color[i] = color; h->turn[i] = turn;
     h->kind = kind; h->native_frame = native_frame; h->seen = 1;
 }

@@ -14,6 +14,8 @@ void memset(void *dst, int value, int size) {
     unsigned char *d = dst;
     while (size--) *d++ = value;
 }
+int strcpy(const char *target, const char *in) { char *out=(char *)target; while ((*out++ = *in++)); return (int)(uintptr_t)target; }
+int strlen(const char *in) { int count=0; while(in[count])++count; return count; }
 /* Freestanding integer formatting. Native font conversion is executed from
  * the input DOL with the actual assembled converter hook under Unicorn. */
 int sprintf(char *out, const char *format, ...) {
@@ -59,7 +61,7 @@ static GOBJ style_object;
 static uint32_t style_colors[8];
 static float style_scales[8][2], style_positions[8][2];
 static char style_strings[8][112];
-static struct { Text text; char body[3][128]; int live, count; } layout_texts[32];
+static struct { Text text; char body[9][128]; float pos[9][2], scale[9][2]; int live, count; } layout_texts[32];
 static struct { GOBJ object; JOBJ joint; MsgData message; Text text; int live; } layout_results[32];
 static unsigned layout_freed, layout_recent;
 static int layout_pause;
@@ -127,7 +129,7 @@ static int editor_row(Text *text, int subtext) {
 }
 void Text_SetText(Text *text, int subtext, const char *format, ...) {
     int layout_index = layout_text_index(text);
-    if (layout_index >= 0 && (unsigned)subtext < 3) {
+    if (layout_index >= 0 && (unsigned)subtext < 9) {
         va_list args; va_start(args, format);
         char *out = layout_texts[layout_index].body[subtext];
         while (*format) {
@@ -154,9 +156,11 @@ void Text_SetText(Text *text, int subtext, const char *format, ...) {
     va_end(args);
 }
 void Text_SetScale(Text *text, int subtext, float x, float y) {
+    int i=layout_text_index(text); if(i>=0 && (unsigned)subtext<9){layout_texts[i].scale[subtext][0]=x;layout_texts[i].scale[subtext][1]=y;}
     if (text == &style_text && (unsigned)subtext < 8) { style_scales[subtext][0] = x; style_scales[subtext][1] = y; }
 }
 void Text_SetPosition(Text *text, int subtext, float x, float y) {
+    int i=layout_text_index(text); if(i>=0 && (unsigned)subtext<9){layout_texts[i].pos[subtext][0]=x;layout_texts[i].pos[subtext][1]=y;}
     if (text == &style_text && (unsigned)subtext < 8) { style_positions[subtext][0] = x; style_positions[subtext][1] = y; }
 }
 int Text_AddSubtext(Text *text, float x, float y, char *format, ...) {
@@ -400,7 +404,24 @@ unsigned TestLayoutRecent(void) { return layout_recent; }
 unsigned TestLayoutLiveText(void) { unsigned count=0; for(unsigned i=0;i<countof(layout_texts);++i) count+=layout_texts[i].live; return count; }
 unsigned TestLayoutFooterChar(GOBJ *object, unsigned index) {
     int i = layout_text_index(((MsgData *)object->userdata)->layout_footer);
-    return i >= 0 ? (unsigned char)layout_texts[i].body[0][index] : 0;
+    if(i<0)return 0;
+    if(layout_texts[i].count==1)return (unsigned char)layout_texts[i].body[0][index];
+    unsigned rows[]={7,4,5,6,2};
+    for(unsigned r=0;r<5;++r){
+        const char *body=layout_texts[i].body[rows[r]]; unsigned len=strlen(body);
+        if(index<len)return (unsigned char)body[index];
+        index-=len;
+    }
+    return 0;
+}
+unsigned TestLayoutFooterRowChar(GOBJ *object,unsigned row,unsigned index) {
+    int i=layout_text_index(((MsgData *)object->userdata)->layout_footer);
+    return i>=0 && row<9 ? (unsigned char)layout_texts[i].body[row][index] : 0;
+}
+void TestStyleFailed(int fail) { style_message.timing_failed=fail; }
+int TestLayoutFooterMetric(GOBJ *object,unsigned row,unsigned metric){
+    int i=layout_text_index(((MsgData *)object->userdata)->layout_footer);
+    return i<0 || row>=9 ? 0 : (metric<2 ? layout_texts[i].pos[row][metric] : layout_texts[i].scale[row][metric-2]*100);
 }
 void TestLayoutSpawn(unsigned slot, int spawn) { cue_data[slot].spawn_num = spawn; }
 void TestLayoutHistory(TMOSDHistory *history, int kind, int frame, int turn, unsigned native_frame) {

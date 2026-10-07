@@ -2,7 +2,7 @@
 #include "osds.h"
 #include "osd_context.h"
 typedef struct OSDContextFighter { FighterData *fighter; int spawn; TMOSDContext context; TMShineEpisode shine; } OSDContextFighter;
-typedef char osd_context_layout[(sizeof(TMOSDContext) == 64 && sizeof(TMShineEpisode) == 52 && sizeof(OSDContextFighter) == 124) ? 1 : -1];
+typedef char osd_context_layout[(sizeof(TMOSDContext) == 64 && sizeof(TMShineEpisode) == 60 && sizeof(OSDContextFighter) == 132) ? 1 : -1];
 static OSDContextFighter contexts[12];
 static OSDContextFighter *entry_for(FighterData *fighter) {
     unsigned slot = (unsigned)(u8)fighter->ply * 2 + !!fighter->flags.ms;
@@ -108,6 +108,7 @@ void OSD_ShineAfterIASA(GOBJ *object) {
     msg->timing_hitlag = shine->hitlag;
     msg->timing_turn = shine->first_turn;
     msg->timing_second_turn = result == TM_SHINE_DOUBLE_TURN;
+    msg->timing_failed = result == TM_SHINE_FAIL;
     OSD_FormatTiming(msg, 0, -MSGTEXT_YOFFSET / 2);
     OSD_ApplyMessageStyle(msg);
 }

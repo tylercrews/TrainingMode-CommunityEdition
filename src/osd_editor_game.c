@@ -1,4 +1,5 @@
 #include "events.h"
+#include "osd_layout.h"
 
 /* Native RSS cursor order, not sparse OSD ID order. The first 15 rows are left. */
 #define row_ids TMSettings_EditorIDs
@@ -84,7 +85,7 @@ int OSD_EditorInput(void *data, unsigned buttons, unsigned row) {
          * remain available through the common pause-menu L/R controls. */
         unsigned count = 0, mask = Settings_Get(TM_SETTING_OSD_MASK, 0);
         for (unsigned i = 0; i < TM_SETTINGS_OSDS; ++i) count += !!(mask & (1u << TMSettings_OSDIDs[i]));
-        unsigned capacity = Settings_Get(TM_SETTING_OSD_LAYOUT, 0) == TM_OSD_PANEL ? 6 : 9;
+        unsigned capacity = TMOSD_Capacity(Settings_Get(TM_SETTING_OSD_LAYOUT, 0));
         unsigned pages = count ? (count + capacity - 1) / capacity : 1;
         page = (page + ((buttons & HSD_TRIGGER_R) ? 1 : pages - 1)) % pages;
         Settings_Set(TM_SETTING_OSD_PAGE, 0, page);
