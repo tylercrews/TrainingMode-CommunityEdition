@@ -19,6 +19,12 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Enlarged Practice Panel titles/detail text and removed New/Last/player status lines from both stable layouts.
+- Combined hitlag/turnaround prefixes and the main result into one uniformly large, fitted timing row; retained separate colored history and detail rows.
+
+- Reserved separate adjacent Jump Out Of Shine and JC Shine slots for Fox/Falco in Fixed Grid and Practice Panel, with independent histories under the shared character-specific setting.
+- Matched JC Shine hop colors to Wavedash using the printed hop duration: Short Hop 1f cyan, other Short Hops green, all Full Hops red.
+
 - Fixed event-setting crashes from native autosave using unloaded card icon/work resources; defer pending settings until Event Select's initialized card service can accept the save.
 - Guarded native save polling and synchronous save waits, and corrected the SDK's two native word-sized card flags; added regressions reproducing the exact reported PC/null read.
 

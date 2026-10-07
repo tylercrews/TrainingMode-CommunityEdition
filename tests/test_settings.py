@@ -876,7 +876,7 @@ class OSDLayoutTests(unittest.TestCase):
             for frame in range(2,125):m.call("TestLayoutTick",frame)
             self.assertEqual(m.call("TestLayoutAge",wave),120)
             self.assertEqual(m.call("TestLayoutVisible",wave),1)
-            self.assertIn(b"last",self.footer(wave))
+            self.assertNotIn(b"last",self.footer(wave));self.assertNotIn(b"new",self.footer(wave))
             self.assertEqual(m.call("TestLayoutFreed"),0)
             m.call("TestLayoutEmit",0,20,3,20);m.call("TestLayoutTick",125)
             self.assertEqual([m.call("TestLayoutX100",wave),m.call("TestLayoutY100",wave)],before)
@@ -940,7 +940,7 @@ class OSDLayoutTests(unittest.TestCase):
         m.call("Settings_Set",11,8,1);m.call("OSD_MessageGX",cpu,2)
         m.call("TestLayoutTick",4)
         self.assertEqual([m.call("TestLayoutX100",human),m.call("TestLayoutY100",human)],before)
-        self.assertIn(b"CPU2",self.footer(cpu))
+        self.assertNotIn(b"CPU2",self.footer(cpu))
 
     def test_importing_old_recent_result_cannot_overwrite_a_fresh_native_result(self):
         self.start(0);m=self.m
@@ -970,7 +970,7 @@ class OSDLayoutTests(unittest.TestCase):
             m.call("TestLayoutTick",frame)
             object=m.call("TestLayoutEmit",0,20,frame,20);m.call("TestLayoutTick",frame)
         self.assertEqual(m.call("TestLayoutFooterMetric",object,2,2),220)
-        self.assertEqual(m.call("TestLayoutFooterMetric",object,0,2),72)
+        self.assertEqual(m.call("TestLayoutFooterMetric",object,0,2),105)
         for row, expected in [(4,b"3f"),(5,b"2f"),(6,b"1f")]:
             line=bytes(m.call("TestLayoutFooterRowChar",object,row,i) for i in range(40)).split(b"\0",1)[0]
             self.assertIn(expected,line)
@@ -1016,6 +1016,35 @@ class OSDLayoutTests(unittest.TestCase):
         m.call('TMOSD_MapSplitOwners',ptr,63);m.call('TMOSD_MapReset',ptr,sum(1<<i for i in IDS))
         m.call('TMOSD_MapOwners',ptr,63);m.call('TMOSD_MapSplitOwners',ptr,63)
         self.assertEqual(m.call('TMOSD_Count',ptr),120)
+
+    def test_panel_has_one_large_colored_timing_stream_and_no_status_line(self):
+        self.start(2);m=self.m
+        object=m.call('TestLayoutEmit',0,8,2,8)
+        m.call('TestLayoutPrefix',object,3,1);m.call('TestLayoutTick',1)
+        line=bytes(m.call('TestLayoutTimingChar',object,i) for i in range(112)).split(b'\0',1)[0]
+        visible=[];i=0
+        while i<len(line):
+            if line[i]==0x1b:i+=9
+            else:visible.append(chr(line[i]));i+=1
+        self.assertEqual(''.join(visible),'3hl->1trn->2f')
+        self.assertEqual(m.call('TestLayoutTimingScale',object),220)
+        self.assertEqual(m.call('TestLayoutFooterMetric',object,0,2),105)
+        self.assertEqual(m.call('TestLayoutFooterRowChar',object,7,0),0)
+        self.assertEqual(m.call('TestLayoutFooterRowChar',object,3,0),0)
+        m.native_width(m.native_text(line))
+        m.native_rewrite_rows([line],[(0,b'\x1bFFA2BAFFFAIL'),(0,line)])
+        m.call('Settings_Set',21,0,1);m.call('TestLayoutTick',2)
+        self.assertEqual(self.footer(object),b'')
+        self.assertEqual(m.call('TestLayoutTimingScale',object),0)
+
+    def test_timing_presentation_objects_remain_bounded_across_repetition(self):
+        self.start(2);m=self.m
+        for frame in range(1,60):
+            m.call('TestLayoutTick',frame)
+            object=m.call('TestLayoutEmit',0,20,frame,20);m.call('TestLayoutPrefix',object,3,0)
+            m.call('TestLayoutTick',frame)
+        self.assertLessEqual(m.call('TestLayoutLiveText'),13)
+        m.call('Message_LayoutClear');self.assertLessEqual(m.call('TestLayoutLiveText'),6)
 
     def test_switching_back_to_recent_releases_stable_ownership(self):
         self.start(2);m=self.m

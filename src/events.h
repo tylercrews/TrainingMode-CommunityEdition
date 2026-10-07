@@ -391,6 +391,7 @@ typedef struct MsgData
     int layout_captured;
     int timing_failed;
     char layout_title[MSG_CHARMAX + 1];
+    Text *layout_timing; // One fitted large glyph stream for prefix + result in Practice Panel.
 } MsgData;
 void Message_FreeObject(GOBJ *object);
 void Message_LayoutInit(int canvas);

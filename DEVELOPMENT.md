@@ -333,3 +333,25 @@ New C2 guards at **0x8001CC84** (save poll) and **0x8001CDB4** (synchronous drai
 `MemcardState.memcard_changed` (+0xC) and `enable` (+0x18) are **four-byte native flags**; the SDK's byte `bool` declarations were wrong. They are now `int`, with assertions for widths/offsets and unchanged +0x5C table placement. The record still occupies **44 bytes / format 3**, with two reserve bits, and upstream identity isolation remains unchanged.
 
 **121 PowerPC tests pass**. New tests execute the real DOL card routines, reproduce the exact old invalid read, execute both patched guard bodies, preserve edits across archive teardown, exercise ready/missing/error states and async request acknowledgement, and verify the ESS export after optimized DAT relocation. Device request/time/language leaves are bounded fixtures; no real user card is written. Live Dolphin editing, Return-to-ESS saves, no-card/error prompts and reload remain runtime checks.
+
+## Character-specific layout children
+
+Fixed Grid and Practice Panel now reserve separate adjacent **Jump Out Of Shine / JC Shine** cells for Fox and Falco. Both read category **8** for title palette and suppression, while raw message kind **64** selects the JC child. The child has no new saved OSD setting. Other characters keep one ordinary character-specific cell. Recent still uses its existing independent kinds 8/64.
+
+Runtime keys have **20 slots per owner**, with the JC child at internal slot 19. `TMOSD_MessageKey` chooses a key from category plus kind; `TMOSD_Category` maps either child back to setting 8. The cell map inserts the active child directly after its parent in display order, before the next canonical category. `split_owners` records live Fox/Falco owners, so it reserves the child before either action emits. Per-owner counts/page ranks, replacement/import, history, placeholder names and stock/disable cleanup all use the new mapping. Both cells disappear when the single character-specific setting is disabled. Native ESS preview allows the extra possible child before CSS; actual match pagination uses the live roster.
+
+The bank grows **6,140 -> 6,456 static bytes**, with at most **120 possible keys**. MsgData and the saved record are unchanged: **44 bytes / format 3 / two reserve bits**. Latest/history/footer objects remain bounded as documented above.
+
+The native JC Shine producer preserves **r9's printed hop duration in r25** across Message_Display, rather than using r7's JC Shine timing. Its old short/full-only color table is replaced by the existing shared `OSD_WavedashHopColor` export 35. Its local short=0/full=1 flag is inverted to the helper's short=1/full=0 convention. The temporary color uses free stack space outside backupall's saved GPR region. Short Hop 1f is cyan, other Short Hops green, Full Hop red at every timing.
+
+**124 PowerPC regressions pass**, including independent child replacement/history, both layouts and characters, early reservation, non-Fox/Falco exclusion, shared disabling, 120-key mapping, and execution of the actual assembled JC producer with mismatched shine/hop counts and preserved r25. Native visual confirmation remains a Dolphin check.
+
+## Panel readability refinement
+
+Practice Panel title scales increase **0.72 -> 1.05** with greater separation between its two wrapped lines. Native detail viewport scale increases **0.019 -> 0.027**; visible details are counted independently of hidden source timing/title rows, so Wavedash angle/hop or landing-source information uses the freed status space. Empty placeholders use the same enlarged title geometry. The 3.4-unit row pitch and independent shine cells remain.
+
+Both stable layouts remove player/New/Last/waiting status text. Fixed Grid needs no supplemental footer Text. Practice Panel keeps its title/history/separator presentation, but uses a separate **single timing row** containing the full colored `Nhl->Ntrn->Nf`/FAIL stream. All parts share scale 2.2 and fit uniformly inside the timing column; there is no tiny prefix row or independently centered fragment. Title sizing is isolated from timing fitting. History keeps three previous entries. Actor ownership and suppression remain encoded in the bank despite removing visible ownership status.
+
+MsgData adds one timing Text pointer, **140 -> 144 bytes**. That Text is allocated only for visible timed panel results and destroyed on replacement, page hiding, clearing or transition to Fixed/Recent. Maximum supplemental presentation/timing Texts is two per visible panel row; placeholders/page remain bounded. The 44-byte save format, two remaining reserve bits and safe pending-card lifecycle are unchanged.
+
+**126 PowerPC tests pass**, including full-stream native parsing/replacement, larger title scale, missing status/prefix rows, transitions and bounded repeated timing-Text allocation. The release and packaged payloads are verified separately. Final spacing needs native Dolphin visual confirmation.

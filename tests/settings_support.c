@@ -374,6 +374,7 @@ void Message_FreeObject(GOBJ *object) {
     ++layout_freed;
     MsgData *msg = object->userdata;
     if (msg->layout_footer) Text_Destroy(msg->layout_footer);
+    if (msg->layout_timing) Text_Destroy(msg->layout_timing);
     for (unsigned i = 0; i < countof(layout_results); ++i) if (&layout_results[i].object == object) layout_results[i].live = 0;
 }
 void Message_Add(GOBJ *object, int queue) { if (!Message_LayoutAdd(object, queue)) ++layout_recent; }
@@ -416,7 +417,20 @@ unsigned TestLayoutFooterChar(GOBJ *object, unsigned index) {
         if(index<len)return (unsigned char)body[index];
         index-=len;
     }
+    i=layout_text_index(((MsgData *)object->userdata)->layout_timing);
+    if(i>=0 && index<(unsigned)strlen(layout_texts[i].body[0]))return (unsigned char)layout_texts[i].body[0][index];
     return 0;
+}
+unsigned TestLayoutTimingChar(GOBJ *object,unsigned index){
+    int i=layout_text_index(((MsgData *)object->userdata)->layout_timing);
+    return i>=0 ? (unsigned char)layout_texts[i].body[0][index] : 0;
+}
+int TestLayoutTimingScale(GOBJ *object){
+    int i=layout_text_index(((MsgData *)object->userdata)->layout_timing);
+    return i>=0 ? layout_texts[i].scale[0][0]*100 : 0;
+}
+void TestLayoutPrefix(GOBJ *object,unsigned hitlag,int turn){
+    MsgData *msg=object->userdata;msg->timing_hitlag=hitlag;msg->timing_turn=turn;
 }
 unsigned TestLayoutFooterRowChar(GOBJ *object,unsigned row,unsigned index) {
     int i=layout_text_index(((MsgData *)object->userdata)->layout_footer);
@@ -425,7 +439,7 @@ unsigned TestLayoutFooterRowChar(GOBJ *object,unsigned row,unsigned index) {
 void TestStyleFailed(int fail) { style_message.timing_failed=fail; }
 int TestLayoutFooterMetric(GOBJ *object,unsigned row,unsigned metric){
     int i=layout_text_index(((MsgData *)object->userdata)->layout_footer);
-    return i<0 || row>=9 ? 0 : (metric<2 ? layout_texts[i].pos[row][metric] : layout_texts[i].scale[row][metric-2]*100);
+    return i<0 || row>=9 ? 0 : (metric<2 ? layout_texts[i].pos[row][metric] : layout_texts[i].scale[row][metric-2]*100+.5f);
 }
 void TestLayoutSpawn(unsigned slot, int spawn) { cue_data[slot].spawn_num = spawn; }
 void TestLayoutHistory(TMOSDHistory *history, int kind, int frame, int turn, unsigned native_frame) {

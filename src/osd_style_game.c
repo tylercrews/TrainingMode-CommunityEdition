@@ -74,6 +74,7 @@ void OSD_MessageGX(GOBJ *gobj, int pass) {
     }
     msg->text->hidden = !visible;
     if (msg->layout_footer) msg->layout_footer->hidden = !visible;
+    if (msg->layout_timing) msg->layout_timing->hidden = !visible;
     if (!visible) return; /* Preserve the valid GOBJ contract even when a category is Off. */
     OSD_ApplyMessageStyle(msg); /* After all legacy caller recoloring, before the text GX pass. */
     Message_LayoutGeometry(gobj);

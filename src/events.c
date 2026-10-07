@@ -2082,6 +2082,7 @@ void Message_EndCombo(int queue_num) {
 }
 void Message_FreeObject(GOBJ *object) {
     MsgData *msg = object->userdata;
+    if (msg->layout_timing) Text_Destroy(msg->layout_timing);
     if (msg->layout_footer) Text_Destroy(msg->layout_footer);
     if (msg->text) Text_Destroy(msg->text);
     GObj_Destroy(object);

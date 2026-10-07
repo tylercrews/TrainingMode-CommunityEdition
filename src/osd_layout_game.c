@@ -153,12 +153,15 @@ void Message_LayoutGeometry(GOBJ *object) {
     JOBJ *joint = object->hsd_object;
     if (mode == TM_OSD_PANEL) {
         text->align = 0; text->use_aspect = 0;
-        text->viewport_scale.X = text->viewport_scale.Y = 0.019f;
+        text->viewport_scale.X = text->viewport_scale.Y = 0.027f;
         text->trans.X = cell.x; text->trans.Y = -cell.y;
+        unsigned detail = 0;
+        const char *title = msg->layout_title[0] ? msg->layout_title : slot_name(msg->layout_key);
+        float detail_base = strlen(title) > 13 ? 28.f : 0.f;
         for (int i = 0; i < msg->line_count; ++i) {
             if (i == 0 || (msg->timing_frame >= 0 && i == msg->timing_subtext))
                 Text_SetPosition(text, i, -2000, 0);
-            else Text_SetPosition(text, i, 0, 28.f + (i - 1) * 18.f);
+            else Text_SetPosition(text, i, 0, detail_base + detail++ * 26.f);
             Text_SetScale(text, i, 1.f, 1.f);
         }
         joint->scale.X = 5.8f; joint->scale.Y = 1.98f; joint->scale.Z = MSGJOINT_SCALE;
@@ -184,6 +187,10 @@ void Message_LayoutGeometry(GOBJ *object) {
         msg->layout_footer->trans.Y = -cell.y + (mode == TM_OSD_PANEL ? 0 : 2.5f);
         msg->layout_footer->align = mode == TM_OSD_PANEL ? 0 : 1;
     }
+    if (msg->layout_timing) {
+        msg->layout_timing->trans.X = cell.x + 9.375f;
+        msg->layout_timing->trans.Y = -cell.y - .3f;
+    }
 }
 void Message_LayoutRecent(void) {
     hide_empty();
@@ -204,6 +211,7 @@ void Message_LayoutRecent(void) {
             Text_SetScale(msg->text, i, 1.f, 1.f);
         }
         if (msg->layout_footer) { Text_Destroy(msg->layout_footer); msg->layout_footer = 0; }
+        if (msg->layout_timing) { Text_Destroy(msg->layout_timing); msg->layout_timing = 0; }
         layout.latest[key] = 0;
         msg->layout_owned = 0; msg->layout_key = -1;
         msg->layout_captured = 0;
@@ -237,11 +245,15 @@ static void footer(GOBJ *object, unsigned mode) {
     }
     if (!Message_LayoutVisible(msg)) {
         if (msg->layout_footer) { Text_Destroy(msg->layout_footer); msg->layout_footer = 0; }
+        if (msg->layout_timing) { Text_Destroy(msg->layout_timing); msg->layout_timing = 0; }
         return;
     }
-    Playerblock *owner = Fighter_GetPlayerblock(msg->queue_num);
-    int cpu = owner && owner->p_kind == 1;
-    int state = mode * 4 + (msg->alive_timer >= MSG_LIFETIME) * 2 + cpu;
+    if (mode != TM_OSD_PANEL) {
+        if (msg->layout_footer) { Text_Destroy(msg->layout_footer); msg->layout_footer = 0; }
+        if (msg->layout_timing) { Text_Destroy(msg->layout_timing); msg->layout_timing = 0; }
+        return; /* Fixed Grid has no New/Last or ownership status line. */
+    }
+    int state = mode * 4;
     if (msg->layout_footer && msg->layout_footer_state >= 0 && msg->layout_footer_state / 4 != (int)mode) {
         Text_Destroy(msg->layout_footer); msg->layout_footer = 0;
     }
@@ -251,23 +263,31 @@ static void footer(GOBJ *object, unsigned mode) {
         msg->layout_footer->aspect.X = mode == TM_OSD_PANEL ? 710 : 450;
         msg->layout_footer->viewport_scale.X = msg->layout_footer->viewport_scale.Y = .023f;
         msg->layout_footer->color = muted;
-        unsigned rows = mode == TM_OSD_PANEL ? 9 : 1;
+        unsigned rows = 9;
         for (unsigned i = 0; i < rows; ++i) Text_AddSubtext(msg->layout_footer, 0, 0, "");
         msg->layout_footer_state = -1;
     }
     if (msg->layout_footer_state != state) {
         char line[128], part[24];
-        sprintf(part, cpu ? "CPU%d %s" : "P%d %s", msg->queue_num + 1, msg->alive_timer >= MSG_LIFETIME ? "last" : "new");
         unsigned used = 0;
         for (const char *p = part; *p; ++p) line[used++] = *p;
         if (mode == TM_OSD_PANEL) {
-            Text_SetText(msg->layout_footer, 7, "%s", part);
+            Text_SetText(msg->layout_footer, 7, "");
             const char *title = msg->layout_title[0] ? msg->layout_title : slot_name(msg->layout_key);
             panel_title(msg->layout_footer, title);
-            OSD_TimingText(msg, line, 2);
-            Text_SetText(msg->layout_footer, 2, "%s", msg->timing_frame >= 0 ? line : "");
-            OSD_TimingText(msg, line, 1);
-            Text_SetText(msg->layout_footer, 3, "%s", line);
+            Text_SetText(msg->layout_footer, 2, ""); Text_SetText(msg->layout_footer, 3, "");
+            if (msg->timing_frame >= 0) {
+                if (!msg->layout_timing) {
+                    msg->layout_timing = Text_CreateText(2, layout.canvas);
+                    msg->layout_timing->kerning = 1; msg->layout_timing->use_aspect = 1;
+                    msg->layout_timing->aspect.X = 330;
+                    msg->layout_timing->viewport_scale.X = msg->layout_timing->viewport_scale.Y = .025f;
+                    Text_AddSubtext(msg->layout_timing, 0, 0, "");
+                }
+                OSD_TimingText(msg, line, 0); /* Prefix and result always share one font scale and native row. */
+                Text_SetText(msg->layout_timing, 0, "%s", line);
+                Text_SetScale(msg->layout_timing, 0, 2.2f, 2.2f);
+            }
             static const char hex[] = "0123456789ABCDEF";
             for (unsigned row = 0; row < 3; ++row) {
                 if (history->count <= row + 1) { Text_SetText(msg->layout_footer, 4 + row, ""); continue; }
@@ -293,8 +313,8 @@ static void footer(GOBJ *object, unsigned mode) {
         unsigned rgba = OSD_PaletteColor(Settings_Get(TM_SETTING_OSD_COLOR, msg->settings_id));
         GXColor title = {rgba >> 24, rgba >> 16, rgba >> 8, rgba};
         Text_SetColor(view, 0, &title); Text_SetColor(view, 1, &title);
-        Text_SetPosition(view, 0, 0, -20); Text_SetPosition(view, 1, 0, 0);
-        Text_SetScale(view, 0, .72f, .72f); Text_SetScale(view, 1, .72f, .72f);
+        Text_SetPosition(view, 0, 0, -35); Text_SetPosition(view, 1, 0, 0);
+        Text_SetScale(view, 0, 1.05f, 1.05f); Text_SetScale(view, 1, 1.05f, 1.05f);
         Text_SetPosition(view, 2, 445, -12); Text_SetScale(view, 2, 2.2f, 2.2f);
         Text_SetPosition(view, 3, 425, 35); Text_SetScale(view, 3, .6f, .6f);
         for (unsigned row = 0; row < 3; ++row) {
@@ -305,6 +325,7 @@ static void footer(GOBJ *object, unsigned mode) {
         Text_SetPosition(view, 8, 325, 0); Text_SetScale(view, 8, .6f, 2.3f);
     } else view->aspect.X = 450;
     msg->layout_footer->hidden = 0;
+    if (msg->layout_timing) msg->layout_timing->hidden = 0;
 }
 void Message_LayoutUpdate(void) {
     unsigned mode = current_mode();
@@ -349,8 +370,6 @@ void Message_LayoutUpdate(void) {
             if(mode==TM_OSD_PANEL) panel_title(text, slot_name(key));
             else Text_SetText(text, 0, "%s", slot_name(key));
             Text_SetText(text,mode==TM_OSD_PANEL ? 2 : 1,"--");
-            Playerblock *owner = Fighter_GetPlayerblock(key / TM_OSD_SLOTS);
-            Text_SetText(text, mode==TM_OSD_PANEL ? 7 : 2, owner && owner->p_kind == 1 ? "CPU%d waiting" : "P%d waiting", key / TM_OSD_SLOTS + 1);
             if(mode==TM_OSD_PANEL)Text_SetText(text,8,"|");
             layout.empty_key[i] = key;
             layout.empty_mode[i] = mode;
@@ -368,8 +387,8 @@ void Message_LayoutUpdate(void) {
         Text_SetColor(text, 0, &color); Text_SetColor(text, 1, mode==TM_OSD_PANEL ? &color : &muted); Text_SetColor(text, 2, &muted);
         for(unsigned row=0;row<9;++row) Text_SetScale(text,row,1,1);
         if(mode==TM_OSD_PANEL){
-            Text_SetPosition(text,0,0,-20); Text_SetPosition(text,1,0,0);
-            Text_SetScale(text,0,.72f,.72f);Text_SetScale(text,1,.72f,.72f);
+            Text_SetPosition(text,0,0,-35); Text_SetPosition(text,1,0,0);
+            Text_SetScale(text,0,1.05f,1.05f);Text_SetScale(text,1,1.05f,1.05f);
             Text_SetPosition(text,2,445,-12);Text_SetScale(text,2,2.2f,2.2f);
             Text_SetPosition(text,7,0,60);Text_SetScale(text,7,.5f,.5f);
             Text_SetPosition(text,8,325,0);Text_SetScale(text,8,.6f,2.3f);
