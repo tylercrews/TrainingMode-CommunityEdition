@@ -15,9 +15,14 @@ The Tyro version and stable game/save identity live in [version.h](version.h). U
 
 ## Tyro branch changelog
 
-This section records Tyro-specific changes. Add a bullet under the matching Tyro version whenever a change is implemented; keep the newest version first. Proposed gameplay changes stay in the [investigation and implementation plan](OSD-GLOBAL-SETTINGS-INVESTIGATION.md) until implemented.
+This section records Tyro-specific changes. Add a bullet under the matching Tyro version whenever a change is implemented; keep the newest version first. Proposed changes stay in the relevant [OSD investigation](OSD-GLOBAL-SETTINGS-INVESTIGATION.md) or [Training Lab menu investigation](TRAINING-LAB-MENU-INVESTIGATION.md) until implemented.
 
-### T2 (V1.4.1T2, unreleased)
+### T3 (V1.4.1T3)
+
+- Increment the centralized release version to V1.4.1T3 for the Training Lab menu rework.
+- Add the [Training Lab menu investigation](TRAINING-LAB-MENU-INVESTIGATION.md), including the current inventory, proposed organization, styling research, submenu previews, and an alternative UI sketch. Menu implementation remains pending.
+
+### T2 (V1.4.1T2)
 
 - Shrink `->` arrows to 75% of the surrounding OSD text size while preserving full-size frame counts, colors and single-row alignment in all layouts.
 - Exclude post-shine hitlag from JC Shine timing; Jump Out Of Shine retains its relevant hitlag context.

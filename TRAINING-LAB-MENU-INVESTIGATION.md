@@ -1,0 +1,757 @@
+# Training Lab menu: T3 investigation and implementation plan
+
+**Version: V1.4.1T3. Initial source audit: October 7, 2026. Branch: `t3-menu-rework`.**
+
+This is the working research and decision log for the Training Lab menu rework. Like [the OSD investigation](OSD-GLOBAL-SETTINGS-INVESTIGATION.md), it separates observed behavior, proposed changes, implementation, and validation. The version bump and this research are implemented; the game menu changes below are proposals.
+
+## Running to-do list
+
+- [x] Increment the central release version to V1.4.1T3; retain the stable TYRE01 identity.
+- [x] Inventory the current pause menu, conditional submenus, dynamic rows, custom screens, and shortcuts.
+- [x] Propose a complete semantic grouping with row counts and a depth limit.
+- [x] Investigate alternating rows, contiguous color blocks, selection, and value styling.
+- [x] Establish how submenu descriptions can show purpose and contents before entry.
+- [x] Sketch an alternative category-rail interface for discussion.
+- [ ] Choose the hierarchy, labels, and whether to use the category rail.
+- [ ] Choose zebra rows, color blocks, or the combined treatment.
+- [ ] Implement a presentation layer that preserves setting identities and callback behavior.
+- [ ] Implement purpose/contents previews, unavailable reasons, and override explanations.
+- [ ] Validate all conditional menus and recording transitions in Dolphin.
+- [ ] Validate native 4:3/CRT readability, menu fit, input conflicts, and rendering cost.
+
+## 1. Scope, sources, and the three views
+
+The request names three ways of listing options but explicitly describes two. This document supplies **(1) the exact existing order, (2) the proposed semantic tree, and (3) common-task routes through that tree**. The third view makes the navigation cost reviewable without inventing another competing taxonomy.
+
+The inventory is of the Training Lab event's **in-match pause menu**, including screens opened by its actions. Import is documented separately because it belongs to the Training Lab character-select flow, not the pause menu. The native L-button OSD editor is also a separate interface; its shared settings must continue to agree with Lab.
+
+Primary local sources:
+
+| Source | What it establishes |
+| --- | --- |
+| [src/lab.h](src/lab.h), menu definitions beginning around line 896 | Static row order, submenu destinations, labels, value arrays, shortcuts. |
+| [src/lab.c](src/lab.c), `Event_Init`, `Record_*`, `Lab_*`, `Export_*`, `CustomTDI_*` | Runtime availability, replaced labels, saved settings, custom screens. |
+| [src/recovery.c](src/recovery.c), `RecOptions_*`, `RecoveryMenus` | Five character-specific recovery menus. |
+| [src/menu.h](src/menu.h) and [src/menu.c](src/menu.c) | Nine visible rows, four description lines, navigation, text/model drawing. |
+| [src/settings.h](src/settings.h) and [src/settings_game.c](src/settings_game.c) | Shared names, setting IDs, save service and override scope. |
+| [src/lab_css.c](src/lab_css.c) | Recording import interface outside the pause menu. |
+| [build.sh](build.sh), [scripts/project-config.sh](scripts/project-config.sh), [version.h](version.h) | Central version metadata and rebuild rules. |
+
+This audit reads source, not a live Dolphin menu. Rows can be disabled or renamed at runtime. Disabled rows still occupy the list; navigation skips them. Blank disabled rows are counted where the current renderer reserves space for them. Order below is one-based display order, not C enum IDs. Values such as On/Off are choices within a row, not extra menu entries.
+
+## 2. View one: existing menus in appearance order
+
+### 2.1 Main Menu — 9 rows
+
+1. General → General
+2. CPU Options → CPU Options
+3. Recording → Recording
+4. HMN Info Display → HMN Info Display
+5. CPU Info Display → CPU Info Display
+6. Character RNG → dynamically assembled Character RNG; disabled without a supported fighter
+7. Stage Options → stage-specific menu; disabled outside Fountain of Dreams/Pokemon Stadium
+8. Controls → Controls
+9. Exit → return to Event Select
+
+### 2.2 Main Menu → General — 19 rows
+
+1. Frame Advance
+2. Player Percent
+3. Lock Player Percent
+4. Model Display
+5. Fighter Collision
+6. Item Grab Sizes
+7. Environment Collision
+8. Camera Mode
+9. HMN Color Overlays → HMN Overlays
+10. CPU Color Overlays → CPU Overlays
+11. HUD
+12. DI Display
+13. Input Display
+14. Game Speed
+15. Move Staling
+16. Custom OSDs → Custom OSDs
+17. Action Log → Action Log
+18. Hitbox Trails → Hitbox Trails
+19. Global Settings → Global Settings
+
+### 2.3 General → HMN Color Overlays / CPU Color Overlays — 17 rows each
+
+Both menus use the same order; the settings belong to different actors.
+
+1. Actionable
+2. Hitstun
+3. Invincible
+4. Ledge Actionable
+5. Missed L-Cancel
+6. Can Fastfall
+7. Autocancel
+8. Crouch
+9. Wait
+10. Walk
+11. Dash
+12. Run
+13. Jumps
+14. Full Hop
+15. Short Hop
+16. IASA
+17. Shield Stun
+
+Choices include colors and effects, not just enable/disable. Preserve all existing choices. These actor-specific overlay preferences use the shared settings service; moving them into a section called Visual Feedback must not imply they are automatically session-only. There are 17 editable rows; a reserved eighteenth storage condition is not an existing menu row.
+
+### 2.4 General → Custom OSDs — 9 reserved rows
+
+1. Add Custom OSD
+2. Remove OSD: `<state name>` — first added state, otherwise blank/disabled
+3. Remove OSD: `<state name>` — second added state, otherwise blank/disabled
+4. Remove OSD: `<state name>` — third added state, otherwise blank/disabled
+5. Remove OSD: `<state name>` — fourth added state, otherwise blank/disabled
+6. Remove OSD: `<state name>` — fifth added state, otherwise blank/disabled
+7. Remove OSD: `<state name>` — sixth added state, otherwise blank/disabled
+8. Remove OSD: `<state name>` — seventh added state, otherwise blank/disabled
+9. Remove OSD: `<state name>` — eighth added state, otherwise blank/disabled
+
+Added states appear in insertion order. Removing one compacts subsequent rows. At capacity, Add remains present but refuses the addition with an error sound. A proposed improvement is a visible `8/8` explanation rather than sound alone.
+
+### 2.5 General → Action Log — 8 rows per selected action
+
+1. Action Number
+2. Action Behaviour
+3. Set State — becomes **Remove State** with the captured state name as its value
+4. State Frame
+5. Min Stick X
+6. Min Stick Y
+7. Fastfall
+8. IASA
+
+Action Number selects one of ten configurations; it does not open ten nested menus. Keep that bounded editor pattern. Action Behaviour is the existing display/color behavior choice; do not relabel it as CPU behavior.
+
+### 2.6 General → Hitbox Trails — 3 rows
+
+1. Enable (local)
+2. Decay
+3. Global: Off — informational; can become **Global: Very Fast**, **Global: Instant**, or **Global: Both On**
+
+Decay choices are Normal, Fast, Very Fast, Instant, Slow, Off. **Decay Off means no fading**, not disabled trails. The two global trail flags override local controls; when both flags are On, the existing service uses the Very Fast union once.
+
+### 2.7 General → Global Settings — 30 rows including a spacer
+
+1. Wavedash
+2. L-Cancel
+3. Act OoS Frame
+4. Dashback
+5. Fighter-specific Tech
+6. Powershield Frame
+7. SDI Inputs
+8. Lockout Timers
+9. Item Throw Interrupts
+10. Boost Grab
+11. Act OoLag
+12. Act OoAirborne
+13. Jump Cancel Timing
+14. Fastfall Timing
+15. Frame Advantage
+16. Combo Counter
+17. Grab Breakout
+18. Ledgedash Info
+19. Act OoHitstun
+20. OVERRIDE CPU OSDS OFF
+21. OVERRIDE ALL OSDS OFF
+22. **Blank disabled spacer**
+23. Hitbox Trails Very Fast
+24. Hitbox Trails Instant
+25. Missed L Cancel
+26. Run Turnaround
+27. Actionable Yellow>Green
+28. Infinite Shields
+29. Invincibility Overlay
+30. OSD Display → OSD Display
+
+Rows 1–19 select Off, White, Red, Green, Blue, Yellow, Cyan, Magenta. Rows 20–21 and 23–29 are global toggles. **Infinite Shields here is a shared global preference; the identically named CPU row is a different local policy.** Text suppression does not turn off the visual cues/trails. This distinction needs to remain visible in the new menu.
+
+### 2.8 Global Settings → OSD Display — 3 rows
+
+1. Display Style — Recent / Fixed Grid / Practice Panel
+2. Recent Position — HUD / Sides / Top Left / Top Right
+3. L/R: OSD Page — informational instructions, not an editable setting
+
+Recent Position affects the Recent layout; stable layouts use the top left. Manual OSD paging already uses paused L/R input. A new menu tab/page binding must account for that existing behavior.
+
+### 2.9 Main Menu → CPU Options — 24 rows
+
+1. CPU Percent
+2. Lock CPU Percent
+3. Tech Options → Tech Options
+4. Trajectory DI
+5. Custom TDI → custom stick editor
+6. Smash DI Amount
+7. Smash DI Direction
+8. ASDI
+9. Behavior
+10. Counter Action (Ground)
+11. Counter Action (Air)
+12. Counter Action (Shield)
+13. Counter Delay
+14. Advanced Counter Options → Advanced Counter Options
+15. Infinite Shields
+16. Infinite Shields Health
+17. Shield Angle
+18. Intangibility
+19. Grab Escape
+20. Grab Release
+21. Move CPU — becomes **Finish Moving CPU** while repositioning
+22. Controlled By
+23. Freeze CPU
+24. Recovery Options → supported CPU character's recovery menu, otherwise disabled
+
+Freeze CPU is currently an action, not a normal On/Off row. Do not assume it can be converted into a Boolean without checking its callback/state behavior.
+
+### 2.10 CPU Options → Tech Options — 16 rows
+
+1. Tech Option
+2. Get Up Option
+3. Tech Invisibility
+4. Tech Invisibility Delay
+5. Tech Sound
+6. Simulate Tech Trap
+7. Tech Lockout
+8. Tech in Place Chance
+9. Tech Away Chance
+10. Tech Toward Chance
+11. Miss Tech Chance
+12. Miss Tech Wait Chance
+13. Stand Chance
+14. Roll Away Chance
+15. Roll Toward Chance
+16. Getup Attack Chance
+
+Tech and getup chance controls have runtime availability tied to their corresponding Random selections. Probability callbacks rebalance related values. Miss Tech Wait Chance is separate from the four Stand/Roll/Attack chances; preserve that distinction.
+
+### 2.11 CPU Options → Advanced Counter Options — 8 rows per hit number
+
+1. Hit Number
+2. Counter Logic
+3. Counter Action (Ground)
+4. Counter Action (Air)
+5. Counter Action (Shield)
+6. Delay (Ground)
+7. Delay (Air)
+8. Delay (Shield)
+
+Hit Number selects one of ten records. Counter Logic gates the six custom action/delay rows. Show the reason for disabled rows rather than hiding the existence of custom controls.
+
+### 2.12 CPU Options → Recovery Options — conditional menus
+
+| CPU / menu title | Rows, in current order |
+| --- | --- |
+| Fox / Fox Recovery | 1. Firefox Low; 2. Firefox Mid; 3. Firefox High; 4. Double Jump; 5. Illusion; 6. Fast Fall |
+| Falco / Falco Recovery | 1. Firebird Low; 2. Firebird Mid; 3. Firebird High; 4. Double Jump; 5. Phantasm; 6. Fast Fall |
+| Sheik / Sheik Recovery | 1. Vanish to Ledge; 2. Vanish to Stage; 3. Vanish High; 4. Double Jump; 5. Fair; 6. Amsah Tech |
+| Captain Falcon / Falcon Recovery | 1. Falcon Dive; 2. Drift Back; 3. Double Jump; 4. Fast Fall; 5. Falcon Kick |
+| Marth / Marth Recovery | 1. Dolphin Slash Early; 2. Double Jump; 3. Dancing Blade; 4. Fair |
+
+All are Boolean permissions. `Event_Init` enables every option in the selected recovery menu, overriding individual static initializers. Other CPU characters have no recovery-options submenu in this implementation.
+
+### 2.13 Main Menu → Recording — 18 rows
+
+1. Save Positions — becomes **Restore Positions** once the initial state exists
+2. HMN Mode
+3. HMN Record Slot
+4. CPU Mode
+5. CPU Record Slot
+6. Mirrored Playback
+7. CPU Counter
+8. Loop Input Playback
+9. Auto Restore
+10. Start Paused
+11. Playback Takeover
+12. Re-Save Positions
+13. Prune Positions
+14. Delete Positions
+15. Slot Management → Slot Management
+16. Set HMN Chances → HMN Playback Slot Chances
+17. Set CPU Chances → CPU Playback Slot Chances
+18. Export → custom memory-card export flow
+
+On a fresh session, all rows except Save Positions are disabled by `Record_Init`. Saving, deleting, importing, selecting mirrored playback, and record-mode changes update availability. Some playback features depend on compatible state/mirroring conditions. The new UI must represent those dependencies and keep saved recordings compatible.
+
+### 2.14 Recording → Slot Management — 6 rows
+
+1. Player
+2. Slot
+3. Modify Inputs → Alter Inputs
+4. Delete Slot
+5. Copy Slot To
+6. Copy Slot
+
+### 2.15 Slot Management → Modify Inputs (title: Alter Inputs) — 13 rows
+
+1. Frame
+2. Stick X
+3. Stick Y
+4. C-Stick X
+5. C-Stick Y
+6. Analog Trigger
+7. A
+8. B
+9. X
+10. Y
+11. Z
+12. L
+13. R
+
+Frame is an editor selector, not navigation depth. This screen currently scrolls. A two-page editor with Frame repeated as a reference control is a better candidate than another chain of submenus.
+
+### 2.16 Recording → Set HMN Chances / Set CPU Chances — 7 rows each
+
+Both menus use the same order but operate on separate recording banks.
+
+1. Slot 1
+2. Slot 2
+3. Slot 3
+4. Slot 4
+5. Slot 5
+6. Slot 6
+7. Random Percent
+
+Slot chance rows begin disabled and become usable when recordings exist. Empty slots must not become selectable simply because a new presentation list contains them. Probability rebalancing and separate human/CPU Random Percent values must remain intact.
+
+### 2.17 Main Menu → HMN Info Display / CPU Info Display — 10 rows each
+
+1. Display Preset
+2. Size
+3. Row 1
+4. Row 2
+5. Row 3
+6. Row 4
+7. Row 5
+8. Row 6
+9. Row 7
+10. Row 8
+
+Preset choices are None, State, Ledge, Damage; sizes are Small, Medium, Large. Each Row has these choices in existing value order:
+
+> None; Position; State Name; State Frame; Velocity - Self; Velocity - KB; Velocity - Total; Engine LStick; System LStick; Engine CStick; System CStick; Engine Trigger; System Trigger; Ledgegrab Timer; Intangibility Timer; Hitlag; Hitstun; Shield Health; Shield Stun; Grip Strength; ECB Lock; ECB Bottom; Jumps; Walljumps; Can Walljump; Jab Counter; Line Info; Blastzone Left/Right; Blastzone Up/Down.
+
+These are field choices within the eight rows, not 29 additional submenus. Preserve their identities when changing labels.
+
+### 2.18 Main Menu → Character RNG — dynamic order, 8 reserved entries
+
+The menu appends the human fighter's supported rows first, then the CPU fighter's rows if its option-array pointer differs. A same-character pair shares the rows instead of duplicating them. This is **not** a fixed five-row menu.
+
+| Fighter | Its rows, in order |
+| --- | --- |
+| Peach | 1. Peach Turnip; 2. Peach Forward Smash |
+| Luigi | 1. Luigi Misfire |
+| Game & Watch | 1. GnW Hammer |
+| Ice Climbers | 1. Nana Throw |
+
+Example: human Luigi / CPU Peach displays Luigi Misfire, Peach Turnip, Peach Forward Smash. Human Peach / CPU Peach displays only Peach Turnip and Peach Forward Smash. No supported fighter means the root row is disabled. `OPTCHARRNG_MAXCOUNT` reserves eight entries; the runtime assembly can produce up to three with the current fighter table.
+
+### 2.19 Main Menu → Stage Options — conditional
+
+| Stage | Rows, in current order | Choice order |
+| --- | --- | --- |
+| Pokemon Stadium | 1. Transformation | Normal, Fire, Grass, Rock, Water |
+| Fountain of Dreams | 1. Left Platform Height; 2. Right Platform Height | Random, Hidden, Lowest, Left Default, Average, Right Default, Highest |
+| Other stages | No active submenu | Stage Options remains disabled. |
+
+Stadium's current description says it requires Stage Hazards and is experimental with issues. Keep that context in any restyle. A stage-hazards toggle is not an existing row in this Lab pause menu.
+
+### 2.20 Main Menu → Controls — 6 rows
+
+1. Frame Advance Button — L, Z, X, Y, R
+2. Frame Decrement Button — None, Z, L, R, X, Y
+3. DPad Up — Taunt, None
+4. DPad Down — Place CPU, None, Frame Advance
+5. DPad Left — Load State, None
+6. DPad Right — Save State, None
+
+These value orders are serialized. Keep them unchanged or supply an explicit migration.
+
+### 2.21 Custom screens and related interfaces
+
+These are part of the experience but are not ordinary `EventOption` lists:
+
+| Entry point | Current controls / sequence |
+| --- | --- |
+| CPU Options → Custom TDI | Live main-stick/C-stick input; A: Save Input; X: Delete Input; B: Return; Z: Reversible. Saved inputs are displayed in sequence. |
+| Recording → Export, step 1 | Select a Memory Card: Slot A, Slot B. |
+| Export, step 2 | Enter File Name: character keyboard; A: Select; B: Backspace; Y: Caps; X: Space; Start: Confirm. Filename and stage/HMN/CPU/card details appear. |
+| Export, step 3 | Save File to Slot A/B? Yes, No; asynchronous success/error status follows. |
+| Lab character-select Import, outside pause menu | Select Memory Card A/B → Select Recording → confirmation. File list provides A: Select; B: Return; X: Delete; Y: Swap Sheik/Zelda; load/delete confirmations offer Yes/No, while incompatible versions or no recordings show OK. |
+
+Do not add an in-match Import row to the current inventory; there is none. Moving Import into the pause menu would be a separate behavioral feature requiring investigation.
+
+### 2.22 Existing quick access
+
+Holding Y invokes the Lab shortcut list, including from descendant menus; the renderer propagates the shortcut pointer when entering a child. For a submenu shortcut it walks back to the root before entering the target. The controls and targets are:
+
+| While holding Y | Existing target |
+| --- | --- |
+| A | Frame Advance toggle |
+| X | Model Display |
+| D-pad Left | Tech Options |
+| D-pad Right | Slot Management |
+| D-pad Up | Global Settings |
+| D-pad Down | Recording |
+| Z | Re-Save Positions |
+
+Unpaused configurable D-pad assignments in Controls are a different input path. Preserve these shortcuts, or record an intentional remapping. Avoid treating Y as a free new tab-modifier without resolving the shortcut conflict.
+
+## 3. What currently makes the menu difficult to scan
+
+| Screen | Existing rows | Problem |
+| --- | ---: | --- |
+| General | 19 | Mixes simulation, human setup, visual debugging, OSD tools, and shared preferences. |
+| CPU Options | 24 | Mixes damage, DI, tech, counters, shield, positioning, and recovery. |
+| Global Settings | 30, including spacer | Nineteen OSD colors and unrelated global flags form one long list. |
+| Recording | 18 | Mixes capture, playback, initial state, slot editing, and export. |
+| Tech Options | 16 | Probabilities and diagnostic/trap controls compete with the basic mode selectors. |
+| Each actor's Overlays | 17 | Movement, recovery, combat, and protection conditions have little visible structure. |
+| Alter Inputs | 13 | Buttons and analog controls make one tall editor. |
+| Each Info Display | 10 | A nearly fitting editor exceeds the nine-row viewport by one. |
+
+The root is already compact. The main improvement is splitting its long descendants according to the job the player is doing. Smaller text or a taller list would retain the underlying scanning problem.
+
+## 4. View two: recommended semantic tree
+
+**Target: 5–9 selectable rows per ordinary screen, fewer where a feature is small.** Count the root as depth 0: normal controls should take one or two submenu entries; specialist editors may take three. Do not add a fourth nested level. Tabs/pages within one editor do not add tree depth, but still need visible page names and input hints.
+
+Root order: **Session; CPU; Recording; Visual Feedback; Global Settings; Stage & RNG; Controls; Exit.** Eight rows. Global Settings is promoted so cross-event preferences are easy to find. Visual Feedback is a functional category, not a promise that all of its settings are unsaved.
+
+All row names in this section refer to existing controls unless marked proposed. A slash describes a runtime alternate label or actor-specific pair, not a new combined setting.
+
+### 4.1 Session — 5 rows, depth 1
+
+1. Frame Advance
+2. Game Speed
+3. Player Percent
+4. Lock Player Percent
+5. Move Staling
+
+Use two labeled blocks: **Simulation** (Frame Advance, Game Speed), **Fighter Setup** (percent/lock/staling). These frequently used controls do not need separate two-row submenus. Keep controller bindings in Controls.
+
+### 4.2 CPU — 9 rows, depth 1
+
+1. CPU Percent
+2. Lock CPU Percent
+3. Behavior
+4. DI & Survival → 7 rows
+5. Tech & Getup → 5 rows
+6. Counter Actions → 5 rows
+7. Shield & Protection → 4 rows
+8. Position & Control → 3 rows
+9. Recovery Options → existing character menu, 4–6 rows
+
+| Child screen, depth 2 | Proposed row order | Count / block treatment |
+| --- | --- | --- |
+| DI & Survival | Trajectory DI; Custom TDI; Smash DI Amount; Smash DI Direction; ASDI; Grab Escape; Grab Release | 7. DI / Grab blocks. |
+| Tech & Getup | Tech Option; Get Up Option; Tech Chances →; Getup Chances →; Tech Feedback & Traps → | **5** actual rows; the hub deliberately leaves room rather than filling all nine. |
+| Counter Actions | Counter Action (Ground); Counter Action (Air); Counter Action (Shield); Counter Delay; Advanced Counter Options → | 5. Defaults followed by per-hit customization. |
+| Shield & Protection | Infinite Shields (local); Infinite Shields Health; Shield Angle; Intangibility | 4. Shield / Protection blocks; display global override context. |
+| Position & Control | Move CPU / Finish Moving CPU; Controlled By; Freeze CPU | 3. No further submenu. |
+| Recovery Options | Existing character-specific list from section 2.12 | 4–6. Keep character name in title. |
+
+Intangibility has one canonical home under Shield & Protection. The CPU row for Tech & Getup should preview its five child entries.
+
+At depth 3, Tech & Getup has these terminal editors:
+
+- **Tech Chances — 4 rows:** Tech in Place Chance; Tech Away Chance; Tech Toward Chance; Miss Tech Chance.
+- **Getup Chances — 5 rows:** Miss Tech Wait Chance; Stand Chance; Roll Away Chance; Roll Toward Chance; Getup Attack Chance.
+- **Tech Feedback & Traps — 5 rows:** Tech Invisibility; Tech Invisibility Delay; Tech Sound; Simulate Tech Trap; Tech Lockout. Use Feedback and Trap blocks.
+
+Counter Actions → Advanced Counter Options retains all eight rows from section 2.11 at depth 3. Custom TDI remains its custom editor, also at depth 3. No further grouping inside either editor.
+
+### 4.3 Recording — 9 rows, depth 1
+
+1. Save Positions / Restore Positions
+2. HMN Mode
+3. HMN Record Slot
+4. CPU Mode
+5. CPU Record Slot
+6. Playback Rules → 6 rows
+7. Positions & Files → 4 rows
+8. Slot Management → existing 6 rows
+9. Playback Chances → 2 rows
+
+Use **Initial State**, **Human Capture**, **CPU Capture**, **Tools** blocks. Keep mode and slot side by side in the navigation sequence for each actor. Replace HMN with Human in presentation labels if we approve that naming change.
+
+| Child screen, depth 2 | Proposed row order | Count |
+| --- | --- | ---: |
+| Playback Rules | Mirrored Playback; CPU Counter; Loop Input Playback; Auto Restore; Start Paused; Playback Takeover | 6 |
+| Positions & Files | Re-Save Positions; Prune Positions; Delete Positions; Export | 4 |
+| Playback Chances | Set HMN Chances →; Set CPU Chances → | 2 |
+
+Keep Delete Positions visually separate from routine resaving. Export still launches its existing modal flow. Slot Management is directly on the Recording root so Modify Inputs stays at depth 3. Adding a Slots & Chances hub above Slot Management would create an unnecessary fourth level. Playback Chances has two actor entries leading to their seven-row chance editors at depth 3.
+
+Alter Inputs should become one editor with **Analog** and **Buttons** pages:
+
+- Analog: Frame; Stick X; Stick Y; C-Stick X; C-Stick Y; Analog Trigger — 6 rows.
+- Buttons: Frame (same selector, repeated for context); A; B; X; Y; Z; L; R — 8 rows.
+
+The repeated Frame is a view of the same option, not a second frame setting. Keep the selected recording, slot, and frame visible in the editor title.
+
+### 4.4 Visual Feedback — 9 rows, depth 1
+
+1. Model Display
+2. Collision & Bounds → 3 rows
+3. Camera Mode
+4. HUD
+5. DI Display
+6. Input Display
+7. Fighter Displays → 4 rows
+8. Hitbox Trails → existing 3 rows
+9. OSD Tools → 2 rows
+
+| Child screen | Proposed row order | Depth / count |
+| --- | --- | --- |
+| Collision & Bounds | Fighter Collision; Item Grab Sizes; Environment Collision | Depth 2, 3 rows. |
+| Fighter Displays | HMN Info Display →; CPU Info Display →; HMN Color Overlays →; CPU Color Overlays → | Depth 2, 4 rows. Two clearly labeled actor blocks. |
+| OSD Tools | Custom OSDs →; Action Log → | Depth 2, 2 rows. |
+
+At depth 3, retain the actor-specific Info Display and Overlay editors. To avoid scrolling or additional depth:
+
+- **Info Display pages:** Setup (Display Preset, Size); Rows (Row 1 through Row 8). Pages are peers inside the same editor. Alternatively show preset/size as a fixed header and eight editable rows, which requires layout work.
+- **Overlay pages:** Movement (Crouch, Wait, Walk, Dash, Run, Jumps, Full Hop, Short Hop — 8); Timing (Actionable, Ledge Actionable, Missed L-Cancel, Can Fastfall, Autocancel, IASA — 6); Combat (Hitstun, Invincible, Shield Stun — 3).
+- **Custom OSDs:** retain Add and up to eight Remove rows; compact unused empty capacity in the view if implemented safely.
+- **Action Log:** retain its eight-row per-action editor with labeled State, Input Conditions, Display blocks.
+
+This is the tradeoff for keeping Visual Feedback at nine rows: actor-specific editors require three entries from the root. The category-rail alternative can make those routes more direct without increasing the tree depth.
+
+### 4.5 Global Settings — 7 rows, depth 1
+
+1. OVERRIDE ALL OSDS OFF
+2. OVERRIDE CPU OSDS OFF
+3. Movement & Landing OSDs → 7 rows
+4. Combat & Defense OSDs → 7 rows
+5. Action Timing OSDs → 5 rows
+6. OSD Display → existing 3 rows
+7. Global Visuals & Shields → 7 rows
+
+| Child screen, depth 2 | Exact members in proposed order |
+| --- | --- |
+| Movement & Landing OSDs | Wavedash; L-Cancel; Dashback; Boost Grab; Jump Cancel Timing; Fastfall Timing; Ledgedash Info |
+| Combat & Defense OSDs | Act OoS Frame; Powershield Frame; SDI Inputs; Frame Advantage; Combo Counter; Grab Breakout; Act OoHitstun |
+| Action Timing OSDs | Act OoLag; Act OoAirborne; Lockout Timers; Item Throw Interrupts; Fighter-specific Tech |
+| Global Visuals & Shields | Hitbox Trails Very Fast; Hitbox Trails Instant; Missed L Cancel; Run Turnaround; Actionable Yellow>Green; Invincibility Overlay; Infinite Shields (global) |
+
+All nineteen OSD categories have exactly one home. The last group is a broad action/interrupt bucket; test whether **Action & Interrupt OSDs** is a clearer name. Global Visuals & Shields uses **Trails** (2), **Fighter Cues** (4), **Shield Rule** (1) color blocks. The old blank spacer becomes spacing/block styling rather than an option.
+
+These global rows retain their existing IDs, choice orders, defaults and save behavior. Scope should be visible in the title/detail: **Global — applies across events**. A local shield row should say **Local — overridden while Global Infinite Shields is On**, with the effective behavior shown.
+
+### 4.6 Stage & RNG — 2 rows, depth 1
+
+1. Stage Options → existing stage-specific 1–2 rows
+2. Character RNG → existing runtime-assembled 1–3 rows
+
+Keep unavailable entries visible with reasons such as `No stage controls on Final Destination` or `No RNG controls for these fighters`. A stable two-row hub is easier to locate than a shifting root. For a relevant fighter/stage, show the actual available option names in the preview before entry.
+
+### 4.7 Controls — existing 6 rows, depth 1; Exit — root action
+
+Keep the Controls order from section 2.20. Use **Frame Stepping** and **D-pad Shortcuts** blocks. Exit remains immediately visible at the end of the root list or category rail; modal export/custom editors must still close safely before returning to Event Select.
+
+### 4.8 Coverage and depth checks
+
+| Current origin | Recommended destination | Coverage |
+| --- | --- | --- |
+| General's simulation/player rows | Session | All 5. |
+| General's display/collision rows | Visual Feedback + Collision & Bounds | Model, all 3 collision controls, camera, HUD, DI and input. |
+| General's actor overlays | Visual Feedback → Fighter Displays | Both actors, all 17 conditions each. |
+| Main's info displays | Visual Feedback → Fighter Displays | Both actors, preset/size/all 8 rows each. |
+| General's OSD tools/trails | Visual Feedback → OSD Tools / Hitbox Trails | Add/remove custom states, all Action Log rows, all 3 trail rows. |
+| General's Global Settings | Root Global Settings | All 19 palette rows, 9 toggles, OSD Display; spacer removed from navigation. |
+| CPU Options and descendants | CPU and its child screens | All 24 hub rows, 16 tech rows, 8 advanced-counter rows, all 5 recovery variants, Custom TDI. |
+| Recording and descendants | Recording and its child screens | All 18 existing rows; all 6 slot-management, 13 input-editor, and 7+7 probability rows; export flow retained. |
+| Character RNG / Stage / Controls / Exit | Stage & RNG / Controls / Exit | All conditional variants and actions retained. |
+
+Longest ordinary paths are **3 submenu entries**, for example Recording → Slot Management → Modify Inputs, CPU → Counter Actions → Advanced Counter Options, and Visual Feedback → Fighter Displays → HMN Color Overlays. All ordinary leaf pages fit in nine rows. Export's card/name/confirmation steps are a task flow, not additional generic settings-tree depth.
+
+## 5. View three: options by common task
+
+Depth here counts entering a top-level category from the root, then any child screens. A category rail would eliminate the first root-list entry step when switching categories.
+
+| Player intent | Proposed route and relevant controls | Entries |
+| --- | --- | ---: |
+| Frame-step or slow down | Session: Frame Advance, Game Speed; Controls for bindings | 1 |
+| Set starting damage | Session: Player Percent/Lock; CPU: CPU Percent/Lock | 1 per actor |
+| Practice DI | CPU → DI & Survival: TDI, SDI, ASDI; Custom TDI opens the stick editor | 2; 3 for editor |
+| Practice tech chases | CPU → Tech & Getup: Tech/Get Up; chance and trap editors one step further | 2–3 |
+| Practice punish windows | CPU → Counter Actions: ground/air/shield action and delay; Advanced for per-hit rules | 2–3 |
+| Practice shield pressure | CPU → Shield & Protection: local policy/health/angle; Global Settings → Global Visuals & Shields for shared Infinite Shields | 2 |
+| Practice edgeguards | CPU → Recovery Options; CPU → Position & Control to move/freeze/assign a port | 2 |
+| Record and replay a sequence | Recording: positions, actor modes and slots; Playback Rules for looping/restore/takeover | 1–2 |
+| Edit one recorded frame | Recording → Slot Management → Modify Inputs: Analog/Buttons pages | 3 |
+| Randomize playback | Recording → Playback Chances → human/CPU chance editor | 3 |
+| Inspect collision or inputs | Visual Feedback: Model/DI/Input; Collision & Bounds for collision detail | 1–2 |
+| Configure actor diagnostics | Visual Feedback → Fighter Displays → actor info/overlay editor | 3 |
+| Show timing feedback | Global Settings → relevant OSD group; OSD Display for layout | 2 |
+| Add custom state feedback | Visual Feedback → OSD Tools → Custom OSDs / Action Log | 3 |
+| Control platforms or fighter RNG | Stage & RNG → applicable child | 2 |
+| Save recording to card | Recording → Positions & Files → Export, then card/name/confirmation flow | 3 + flow |
+
+This view also defines a usability review: a person should be able to predict the category for each task without memorizing the old General menu.
+
+## 6. Styling research: zebra rows and semantic color blocks
+
+### 6.1 What the current renderer actually supports
+
+`MENU_MAXOPTION` is 9 and `MENU_DESCLINEMAX` is 4. `EventMenu_CreateModel` creates a popup-model rowbox for each visible slot. Those rowboxes are **behind the value column**, not across the full option label. The code changes joint corner positions and writes `mobj->mat->diffuse` plus alpha. The selected row already has a separate full-width yellow highlight, at 0.4 alpha. Ordinary value boxes use a dark fill at 0.6 alpha; enabled toggles use green.
+
+`EventMenu_UpdateText` resets rowbox diffuse every refresh and hides the box for ordinary submenu rows and actions without a value string. **Changing only `ROWBOX_COLOR` will not create full-width alternating rows**, and color set only at model creation will be overwritten on update. Full-row backgrounds require widening/repositioning these boxes with changed visibility rules, or adding a separate full-row background layer while preserving value boxes.
+
+Recommendation: separate **row surface**, **value presentation**, and **selection**. A full-row surface supplies zebra/group shading. Value text always carries On/Off/current selection. The selected row retains an unmistakable outline/marker or high-contrast band. No user should have to infer selection or On status from a background color.
+
+### 6.2 Three treatments to compare
+
+| Treatment | Implementation concept | Best use / limitation |
+| --- | --- | --- |
+| Zebra | Alternate two low-contrast row fills by absolute displayed row index, including scroll offset. | Helps track label-to-value alignment; does not explain relationships by itself. |
+| Semantic blocks | Give contiguous related controls a shared muted fill plus a visible group label or thin labeled boundary. | Makes Simulation, DI, Human Capture, etc. identifiable; labels must carry meaning independently of hue. |
+| Combined — recommended | Group hue establishes the block; slight luminance alternation separates its rows. Selection stays a separate layer. | Supports both scanning and semantics; keep saturation/contrast restrained so selection wins. |
+
+Example native starting palette for an opaque menu surface: neutral rows `#191D29` / `#222838`; DI block `#17303B` / `#1E3A47`; tech block `#29243B` / `#332C49`; shield block `#32301E` / `#3E3A25`. These are **proposed trial RGBs**, not validated contrast or final artwork. Color pairs should be tested over the actual DAT background and effective alpha. Use bright readable labels and an independent selection treatment.
+
+Semantic examples that should remain on one screen:
+
+- Session: Simulation (2 rows), Fighter Setup (3).
+- DI & Survival: Trajectory DI/Custom TDI (2), SDI/ASDI (3), Grab (2).
+- Recording root: Initial State (1), Human Capture (2), CPU Capture (2), Tools (4).
+- Advanced Counters: Context (Hit Number/Counter Logic), Ground, Air, Shield pairs. A three-pair layout or reordered view can visually pair action and delay without changing backing indices.
+- Global Visuals & Shields: Trails (2), Fighter Cues (4), Shield Rule (1).
+
+Avoid spending selectable rows on empty spacer options or headings. Render headings in gaps or a small fixed section caption. If gaps reduce the available viewport, remeasure the row budget rather than claiming nine rows still fit.
+
+### 6.3 Required visual and interaction rules
+
+- Use explicit submenu chevrons, values, and action labels; do not make a blank value column the only indication of a submenu.
+- Keep consistent value alignment; long values should receive a deliberate abbreviated display plus the full meaning in details.
+- Preserve selected-row contrast across all fills; don't use the green On fill as the selected state.
+- Distinguish disabled controls with readable dim text and a reason; the present disabled color uses alpha 0, so verify native text alpha behavior before copying it into a redesign. Current navigation skips disabled rows: either render their reason beside the label, or allow inspection focus while continuing to block editing/activation.
+- Base zebra parity on the visible view's absolute row index, not just screen slot, to prevent flips when scrolling. Apply group membership by stable option identity.
+- Label Local / Global / Saved scope where known. Do not claim all Lab options persist: current settings persistence varies by feature.
+- Prefer paging the dense specialist editors to reducing their text size.
+- Keep native input glyph/font constraints in mind; the existing ASCII table has project modifications. Check glyph support before adding Unicode arrows or bullets to game labels.
+
+## 7. Submenu descriptions: purpose plus included options
+
+### 7.1 Available now without a renderer redesign
+
+`EventOption.desc` already stores four strings. `EventMenu_CreateText` creates four subtexts and `EventMenu_UpdateText` fills them from the highlighted option. The current system can therefore show **one line of purpose and three lines listing contents** before A enters a submenu. No additional settings storage is needed.
+
+Example for the proposed Counter Actions entry:
+
+```text
+Choose how the CPU responds after a hit.
+Includes: Ground, Air, Shield actions;
+Counter Delay; Advanced Counter Options.
+Advanced: per-hit actions and delays.
+```
+
+Example for Stage Options on Fountain of Dreams:
+
+```text
+Set the platform heights on this stage.
+Includes: Left Platform Height;
+Right Platform Height.
+Applies to Fountain of Dreams.
+```
+
+Those examples need native text-fit testing. The aspect setting is not a verified wrapping/overflow policy, and the renderer simply supplies four strings; do not assume unlimited text wraps safely.
+
+### 7.2 Recommended behavior
+
+Give each submenu a purpose plus its **immediate child names**, in displayed order. Do not dump the entire descendant tree. Terminal screens should preview every option before entry; broad hubs can list their immediate child categories. For long names, use approved short aliases and preserve full labels in the child menu.
+
+For the modest tree here, authored four-line previews are the smallest first implementation. A more robust presentation layer could generate contents from the child view, refresh when dynamic availability changes, and use separate purpose/contents text regions. Keep runtime strings in persistent owned buffers; never leave text pointing at stack storage or pass generated percent signs as formatting instructions.
+
+| Case | Preview behavior |
+| --- | --- |
+| Ordinary submenu | Purpose + all immediate child names. |
+| Stage Options | Actual current-stage labels; unavailable reason if no submenu. |
+| Character RNG | Actual assembled labels in HMN-then-CPU order; no generic promise of all five controls. |
+| Recovery Options | Current character and all applicable recovery toggles. |
+| Disabled child | Include it with its reason when relevant; don't hide important dependencies. |
+| Saved/global settings | Add scope where it helps the player predict impact. |
+| Global override | Explain the effective value and how to change the source preference. |
+| Contents exceed three lines | Use a deliberate expanded preview layout or bounded page mechanism; do not silently cut off entries. |
+
+A layout redesign should reserve a fixed detail area: purpose, **Includes:** list, context/availability. Selection changes update the preview; opening the child should preserve the same names/order. Entering and returning should retain the selected row and page, so exploration does not reset the player to the top.
+
+## 8. Alternative UI: persistent category rail + short list + detail footer
+
+Instead of repeatedly returning to a root list, keep the seven categories visible as a compact left rail, with Exit below. The right area shows the selected category's short list; a full-width footer shows the highlighted row's purpose and included options. Nested editors replace the right list and show a breadcrumb/back action. This gives the player a stable location and avoids a desktop-style three-column design that would squeeze text at 640×480.
+
+The accompanying interactive sketch is [training-lab-menu-demo.html](docs/training-lab-menu-demo.html). It demonstrates category switching, submenu entry/back, previews before entry, alternating rows, color blocks, and page-based editors. Illustrative values change locally for discussion; it does not control the game. It is a proposal, not a screenshot of native output or proof of console fit.
+
+The demo uses the final tree in section 4. It represents a sample match with Fox CPU and Peach human on Fountain of Dreams; Stage/RNG/recovery variants remain fully inventoried above. Long editor lists use named pages rather than deeper children. The two conversation variants compare the category rail with a compact tree; the design controls compare Combined, Zebra, and Blocks row treatments. Directly opening the fragment shows the rail with Combined styling. Custom TDI and Export are destination sketches, not full emulations of the stick editor or card/keyboard flow. Values/ranges are illustrative subsets and the sketch does not emulate conditional availability, probability balancing, or per-hit/per-action recording state. The live game would retain those behaviors.
+
+| Alternative | Benefit | Cost / recommendation |
+| --- | --- | --- |
+| Reorganized existing list | Familiar controls, easiest incremental change, existing DAT background. | More backtracking between categories; recommended first game implementation. |
+| Category rail + short list + detail footer | Category stays visible; purpose/contents have a permanent home. | Needs new geometry, focus rules and controller testing; strongest alternative to prototype. |
+| Two-column dashboard of settings cards | Related controls can be viewed simultaneously. | Less predictable controller navigation, tighter value widths and more visual density on CRT; not recommended first. |
+| Search-first interface | Fast on a keyboard. | Poor fit for a GameCube controller; category navigation must remain primary. |
+
+Proposed native rail controls: stick/D-pad Up/Down selects within the active region; A activates; B backs out, then returns focus to the rail at the category root; Left/Right edits a value while the list is active. Page switching needs an explicitly resolved binding. **Do not claim L/R or Y is free:** OSD paging, frame-step bindings, and hold-Y shortcuts already use those inputs. The browser sketch uses clicks and normal keyboard button activation, not emulated controller bindings.
+
+Keep the rail as an optional renderer direction until the console layout is measured. Prototype a 640×480 logical layout and overscan-safe bounds, with real fonts, before choosing it. The demo's responsive reflow is useful for reviewing here but is not the native game layout.
+
+## 9. Implementation constraints and a staged approach
+
+### 9.1 Preserve behavior while changing presentation
+
+The backing arrays are more than labels. Code directly references `LabOptions_General[OPTGEN_*]`, `LabOptions_CPU[OPTCPU_*]`, recording arrays, chance arrays, and overlay IDs. `Lab_ChangeOSDs` currently checks the active menu and converts its row position through `LabOSD_ID`. Splitting that menu without replacing the row-to-ID mapping would make edits fail or affect the wrong category. Copying `EventOption` structs into independent new arrays can also create stale `val`/`disable`/runtime-label state.
+
+Recommended design: a **view of references to canonical options**, plus per-view metadata (section, short preview alias, optional display label). An accessor maps view index to the original option. Adapt navigation, drawing, selection, and callbacks to use that accessor; avoid assuming that every event has been migrated. The existing contiguous-array interface must keep working for other events. A Lab-only adapter or appended optional view pointer is safer than replacing every event's menu representation at once.
+
+Review callbacks that infer identity from `curr_menu`, cursor or scroll. In particular: OSD palette writes, custom OSD removal, per-hit counters, Action Log selection, dynamic recording labels, local/global shield refresh, and slot-chance rebalance. `Lab_RemoveCustomOSD` currently derives its index from the cursor alone; a reworked scroll/page view needs the selected canonical identity. Do not carry that positional assumption into a new renderer.
+
+Preserve exported recording value IDs and the serialized control choice orders noted in `lab.h`. Labels and view order may change; storage order must not casually change. The current metadata bump does not change the save format. New grouping/colors/previews are compiled UI data and runtime objects; they do not inherently consume persistent preference bits. Saving a preferred menu theme/category would be a separate storage decision.
+
+### 9.2 Shared renderer and rebuild impact
+
+`menu.c` and `menu.h` serve multiple events, not only Lab. Full-row styling should be opt-in per menu/theme or provide a conservative default for existing events. Adding fields changes sizes/ABI; rebuild every affected module. The current `settings_abi_stamp` in `build.sh` does not include `src/menu.h`; add the appropriate dependency/fingerprint if the menu structure is extended. A version change already forces a full build, but subsequent T3 header edits need reliable invalidation too.
+
+The DAT asset references (`evMenu.menu`, `popup`, `scroll`) support geometry manipulation already used in C. A basic color/row change likely does not need new artwork; the rail/footer may need altered geometry or a new asset. That remains a prototype question, not a confirmed asset-free implementation. Check material sharing so per-row diffuse changes do not recolor unrelated instances.
+
+### 9.3 Proposed phases
+
+1. **Approve organization:** finalize the canonical destinations, depth ceiling, and labels from section 4. Keep this document as the decision log.
+2. **Introduce views:** map existing options into short screens; explicitly update callbacks and shortcuts. Keep values/save format/recording IDs stable.
+3. **Add descriptions:** purpose + contents + dynamic unavailable/override explanations; validate text fit using real labels.
+4. **Restyle the existing renderer:** full-width backgrounds, zebra/block treatment, clear selection/value distinction and subsection captions.
+5. **Evaluate the rail:** compare native category switching/fit against the reorganized list; adopt only if it improves the actual controller experience.
+6. **Verify and record implementation:** add implemented changes to the README T3 changelog and dated sections here. Mark live checks only after they are actually performed.
+
+## 10. Acceptance checks for later implementation
+
+- Every current row and conditional variant in section 2 has a reachable home; deliberate removals/renames are recorded explicitly.
+- Root has eight rows; no ordinary page exceeds nine selectable rows; no generic settings path exceeds three entries.
+- Submenu highlighting shows both purpose and all immediate contents before entry, including relevant unavailable reasons.
+- Selection, On/Off, disabled status, action vs submenu, and local vs global scope remain understandable without color.
+- Frame advance/decrement, hold-Y shortcuts, paused OSD paging, and ordinary Left/Right edits have no accidental new conflicts.
+- Saving/restoring/deleting positions, recording/playback/re-record, mirroring, takeover, probability editing, copy/delete slots, and export retain behavior.
+- Human/CPU settings remain distinct. Global edits agree with the native OSD editor and keep override precedence.
+- Character RNG order/deduplication, stage availability, five recovery variants, empty/full custom OSD lists, and all ten counter/Action Log pages work.
+- Scene changes, custom-editor return, pause/unpause, cursor/page retention, font support, long labels, and overscan fit are checked in Dolphin.
+- Other events using the shared renderer remain functional; optimized DAT/release builds are checked if headers or engine rendering change.
+
+## 11. Research validation and decision log
+
+**October 7, 2026 — initial proposal.** Source definitions and runtime modifications were inspected. The centralized version is V1.4.1T3; the save identity stays TYRE01. This document is the starting inventory and design proposal. The demo is illustrative. No native menu implementation or new ISO is claimed by this research pass.
+
+Completed checks for this pass:
+
+- Source-label coverage: every nonempty literal menu/option name in `lab.h` and `recovery.c`, plus the expanded shared global labels, appears in the inventory document. Dynamic inserted rows and alternate names were inspected separately in `lab.c`.
+- `./build.sh --version`: reports V1.4.1T3, TYRE01, and `TM-Tyro-V1.4.1T3.iso`.
+- Demo JavaScript syntax check passed. A temporary DOM harness exercised 44 menu destinations / 51 pages in both designs: row counts, links, entry/back navigation, focus previews, value changes, and the shared Analog/Buttons Frame selector passed. The menu graph has maximum depth 3 from the root.
+- Whitespace/content checks passed. No browser surface was available for screenshot/layout inspection; the harness is not browser-rendering validation. Native Dolphin/CRT fit and gameplay checks remain pending.
+
+Record future decisions using this format:
+
+| Date | Decision / implemented change | Reason | Validation / remaining work |
+| --- | --- | --- | --- |
+| 2026-10-07 | Start T3 menu investigation and version bump. | Establish a complete inventory before reorganizing. | Source audit; metadata/diff checks. Native layout/gameplay validation remains pending. |
+
+**Open design choices:** approve the final nine-row Recording hub; decide whether the extra Fighter Displays hub is worth its compact Visual Feedback root; choose the Action Timing group name; choose whether Human replaces HMN in display labels; select styling treatment; decide whether to prototype the category rail natively after the list reorganization.
