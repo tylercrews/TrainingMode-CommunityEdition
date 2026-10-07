@@ -2735,10 +2735,10 @@ struct MemcardState
     /* +0  */ int x0;
     /* +4  */ int x4;
     /* +8  */ int x8;
-    /* +C  */ bool memcard_changed;
+    /* +C  */ int memcard_changed; /* Native word boolean, not SDK's byte-sized bool. */
     /* +10 */ int x10;
     /* +14 */ int x14;
-    /* +18 */ bool enable;
+    /* +18 */ int enable; /* Native archive lifecycle reads/writes a full word. */
     /* +1C */ char _1C[0x40];
     /* +5C */ int *x5C;
     /* +60 */ int x60;

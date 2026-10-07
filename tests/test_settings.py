@@ -262,8 +262,8 @@ class RelocatedDATSettingsTests(unittest.TestCase):
         self.m.cpu.mem_write(self.base, bytes(payload))
         for i in range(num_exports):
             index, offset = struct.unpack_from(">II", dat, 32 + exports + i * 8)
-            if index in [27, 28]:
-                self.m.symbols["DAT_Get" if index == 27 else "DAT_Set"] = self.base + offset
+            if index in [27, 28, 38]:
+                self.m.symbols[{27:"DAT_Get",28:"DAT_Set",38:"DAT_Commit"}[index]] = self.base + offset
         # Native memcpy is an external SDK dependency; use the tested PPC stub.
         address = self.m.symbols["memcpy"]
         self.m.cpu.mem_write(0x800031F4, struct.pack(">4I", 0x3D800000 | (address >> 16),
@@ -341,6 +341,99 @@ class RelocatedDATSettingsTests(unittest.TestCase):
         self.assertEqual(m.call("DAT_Get",23,0),4)
         self.assertEqual(m.record(),saved)
         self.assertEqual(m.record()[40:43],before[40:43])
+
+
+class NativeCardSaveTests(unittest.TestCase):
+    STATE=0x80433318
+    WORK=0x80432A68
+    ICONS=0x80407000
+
+    def setUp(self):
+        self.m=Machine();self.m.init()
+        self.m.cpu.mem_write(self.STATE,bytes(0x68))
+        self.m.cpu.mem_write(self.WORK,bytes(8))
+        dol=(ROOT/'build/Start.dol').read_bytes()
+        start,size=0x8001C600,0x800
+        for section in range(18):
+            offset,base,length=[struct.unpack_from('>I',dol,at+section*4)[0] for at in (0,0x48,0x90)]
+            if base<=start and start+size<=base+length:
+                self.m.cpu.mem_write(start,dol[offset+start-base:offset+start-base+size]);break
+        else:self.fail('Native card routines missing')
+        self.m.symbols['NativeSave']=0x8001CC84
+        self.m.symbols['NativeSaveWait']=0x8001CDB4
+        self.leaf(0x80304470,0);self.leaf(0x80164ABC,1)
+        self.leaf(0x8001C658,0x80408000) # Date/banner string, not part of the null-table failure.
+        self.leaf(0x8001BE30,11) # Successful asynchronous request, no real card is written.
+        self.leaf(0x8001B6F8,0)
+        self.m.cpu.mem_write(self.ICONS,struct.pack('>4I',*[0x80408000]*4))
+
+    def leaf(self,address,value):
+        self.m.cpu.mem_write(address,struct.pack('>3I',0x3C600000|(value>>16),0x60630000|(value&65535),0x4E800020))
+
+    def ready(self,enable=1,icons=ICONS,work=0x80409000,buffer=0x8040A000,card_state=0):
+        m=self.m
+        m.cpu.mem_write(self.STATE+0x18,struct.pack('>I',enable))
+        m.cpu.mem_write(self.STATE+0x5C,struct.pack('>I',icons))
+        m.cpu.mem_write(self.STATE+8,struct.pack('>I',card_state))
+        m.cpu.mem_write(self.WORK,struct.pack('>2I',work,buffer))
+
+    def test_unpatched_save_reproduces_the_reported_pc_and_null_read(self):
+        m=self.m;m.cpu.mem_write(self.STATE+0xC,struct.pack('>I',1))
+        with self.assertRaises(UcError):m.call('NativeSave')
+        self.assertEqual(m.cpu.reg_read(reg.UC_PPC_REG_PC),0x8001C868)
+        self.assertEqual(m.cpu.reg_read(gpr(3))+m.cpu.reg_read(gpr(0)),4)
+
+    def test_native_poll_and_wait_defer_each_uninitialized_resource_without_losing_dirty(self):
+        m=self.m;m.install_hook(0x8001CC84,0x80481000);m.install_hook(0x8001CDB4,0x80482000)
+        for missing in ['enable','icons','work','buffer']:
+            self.ready(**{missing:0})
+            m.cpu.mem_write(self.STATE+0xC,struct.pack('>I',1))
+            m.call('NativeSave');m.call('NativeSaveWait')
+            self.assertEqual(m.call('TestDirty'),1)
+            self.assertEqual(struct.unpack('>I',m.cpu.mem_read(self.STATE+0x10,4))[0],0)
+
+    def test_both_events_queue_through_match_unload_then_commit_to_ready_native_pipeline(self):
+        m=self.m;m.install_hook(0x8001CC84,0x80481000)
+        m.call('Settings_Set',18,0,2);m.call('Settings_Set',19,4,1)
+        saved=m.record()
+        self.assertEqual(m.call('TestDirty'),0)
+        m.call('NativeSave');m.call('Settings_CommitPending')
+        self.assertEqual(m.call('TestDirty'),0)
+        m.cpu.mem_write(self.STATE,bytes(0x68)) # Actual archive teardown resets native dirty.
+        self.ready(card_state=3)
+        m.call('Settings_CommitPending');self.assertEqual(m.call('TestDirty'),0)
+        self.ready();m.call('Settings_CommitPending')
+        self.assertEqual(m.call('TestDirty'),1)
+        m.call('NativeSave')
+        self.assertEqual(m.call('TestDirty'),0)
+        self.assertEqual(struct.unpack('>I',m.cpu.mem_read(self.STATE+0x10,4))[0],1)
+        self.assertEqual(m.record(),saved)
+        self.assertEqual(m.read(18,0),2);self.assertEqual(m.read(19,4),1)
+        m.call('Settings_CommitPending') # Acknowledge the accepted request, not merely the dirty mark.
+        m.call('NativeSave');self.assertEqual(struct.unpack('>I',m.cpu.mem_read(self.STATE+0x10,4))[0],0)
+        m.call('Settings_CommitPending');self.assertEqual(m.call('TestDirty'),0)
+
+    def test_safe_commit_respects_identity_and_real_ready_state(self):
+        m=self.m;m.call('Settings_Set',18,4,0)
+        for missing in ['enable','icons','work','buffer']:
+            self.ready(**{missing:0});m.call('Settings_CommitPending')
+            self.assertEqual(m.call('TestDirty'),0)
+        self.ready();m.cpu.mem_write(0x80000000,b'GTME01')
+        m.call('Settings_CommitPending');self.assertEqual(m.call('TestDirty'),0)
+        m.cpu.mem_write(0x80000000,b'TYRE01');m.call('Settings_CommitPending')
+        self.assertEqual(m.call('TestDirty'),1)
+
+    def test_commit_retry_survives_leaving_menu_before_native_request_acceptance(self):
+        m=self.m;m.call('Settings_Set',19,0,15)
+        self.ready();m.call('Settings_CommitPending');self.assertEqual(m.call('TestDirty'),1)
+
+    def test_unrelated_inflight_request_cannot_acknowledge_unqueued_match_edits(self):
+        m=self.m;m.call('Settings_Set',19,4,1)
+        self.ready();m.cpu.mem_write(self.STATE+0x10,struct.pack('>I',1))
+        m.call('Settings_CommitPending')
+        self.assertEqual(m.call('TestDirty'),1)
+        m.cpu.mem_write(self.STATE,bytes(0x68)) # Leave before the next native poll.
+        self.ready();m.call('Settings_CommitPending');self.assertEqual(m.call('TestDirty'),1)
 
 
 class SettingsTests(unittest.TestCase):
@@ -546,7 +639,7 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(m.cpu.reg_read(fp), 0x3FF0000000000000 + n)
         m.call("TestSettingsWrite", IDS[5], 1)
         self.assertEqual(m.call("Settings_Get", 15, IDS[5]), 1)
-        self.assertEqual(m.call("TestDirty"), 1)
+        self.assertEqual(m.call("TestDirty"), 0)  # Match edit is queued, not sent to an unloaded card service.
 
 
 class EventPreferenceTests(unittest.TestCase):
@@ -578,7 +671,7 @@ class EventPreferenceTests(unittest.TestCase):
         self.assertEqual(m.call("Settings_Get", self.EGGS, 4), 0)
         self.assertEqual(m.call("TestDirty"), 0)
         m.call("Settings_Set", self.LEDGE, 4, 0)
-        self.assertEqual(m.call("TestDirty"), 1)
+        self.assertEqual(m.call("TestDirty"), 0)  # Native dirty is deferred until card resources are ready.
         self.assertEqual(m.record()[:40], old[:40])
         self.assertEqual(m.record()[40] & 0x80, 0x80)
         self.assertEqual(m.record()[43] & 0x80, 0x80)

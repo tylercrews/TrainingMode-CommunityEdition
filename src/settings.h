@@ -125,5 +125,6 @@ typedef struct TMSettingsAPI {
 uint32_t Settings_Get(unsigned field, unsigned index);
 void Settings_Set(unsigned field, unsigned index, uint32_t value);
 int Settings_Status(void);
+void Settings_CommitPending(void);
 
 #endif

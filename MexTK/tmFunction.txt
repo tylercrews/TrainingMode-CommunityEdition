@@ -36,3 +36,4 @@ OSD_ActOutWait
 OSD_WavedashHopColor
 OSD_ShineBeforeIASA
 OSD_ShineAfterIASA
+Settings_CommitPending

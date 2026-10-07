@@ -195,6 +195,7 @@
     ENTRY TM_WavedashHopColor
     ENTRY TM_ShineBeforeIASA
     ENTRY TM_ShineAfterIASA
+    ENTRY TM_SettingsCommitPending
 
     # TmDt Data Pointers
     .set TM_Data, TM_tmFunction - 0x4
