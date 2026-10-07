@@ -19,6 +19,11 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Renamed the recovery control Actionable Yellow>Green and regrouped both Global Settings menus as OSDs, CPU override, ALL override, separator, then overlays/shared controls.
+
+- Fixed the remaining hitlag pointer warnings and duplicate/blank shine text by teaching the native setter to count inline RGB commands when replacing an existing row.
+- Deferred shine formatting until turnaround/hitlag context is attached, avoiding a second rewrite of an already-colored row; added end-to-end native setter/position/scale/color regressions.
+
 - Fixed the native text-pointer warning and corrupted hitlag/shine/Wavedash text: inline color commands now contain three RGB bytes, matching the engine parser.
 - Added regressions that reproduce the malformed four-byte payload and run native width/subtext traversal on corrected Wavedash, hitlag, landing and turnaround rows.
 

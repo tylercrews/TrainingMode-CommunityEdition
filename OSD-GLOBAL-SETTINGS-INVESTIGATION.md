@@ -2,7 +2,7 @@
 
 **Running to-do list: audited October 6, 2026**
 
-The eleven-item correction request is implemented in section 36; the subsequent nine-item round is implemented in section 37, with its follow-up Wavedash/layout/shine corrections in section 38 and native text-pointer fix in section 39. These are remaining items from the earlier plan; optional extensions are identified separately. Historical sections describe the checkout at investigation time, not necessarily current behavior.
+The eleven-item correction request is implemented in section 36; the subsequent nine-item round is implemented in section 37, with its follow-up Wavedash/layout/shine corrections in section 38 and native text-pointer fixes in sections 39-40. These are remaining items from the earlier plan; optional extensions are identified separately. Historical sections describe the checkout at investigation time, not necessarily current behavior.
 
 - [ ] Protect accurate imported-recording playback from the effective global Infinite Shields override while preserving its saved preference; show that override in Lab's local shield controls (section 15).
 - [ ] Decide whether Infinite Shields means full-health refill or literal never-break. The current implementation refills health; a single sufficiently damaging hit can still need a native break-boundary hook (section 15).
@@ -928,3 +928,30 @@ The converter now emits **0x0C + exactly three RGB bytes**. Its ASCII escape syn
 The previous tests checked conversion output but did not execute the downstream native parser; that gap allowed the invalid payload through. The new regression runs the actual native width parser at **0x803A8134**, including the reported PC, and native subtext locator **0x803A6FEC**. It reproduces an unmapped-pointer failure using the old four-byte payload, then verifies corrected streams with zero/0xFF color bytes, Wavedash title/angle/hop rows, hitlag/landing-source rows and shine turnaround/jump rows. Text opcode-history and bounded SIS font fixtures are initialized to match the parser's requirements.
 
 **85 compiled PowerPC tests pass**, and the optimized C/assembly release builds without warnings. The final versioned ISO/archive is rebuilt and its shared/event/ASM payloads checked separately. This addresses the demonstrated text-stream failure; live Dolphin confirmation remains required. Version **V1.4.1T2**, identity **TYRE01**, format **3 / 44 bytes** and **29 reserved bits** remain unchanged. User cards were not edited.
+
+
+**40. Remaining hitlag pointer warning: repeated native text replacement**
+
+The follow-up warning reports **Unknown Pointer 0x025345c0, PC 0x803A8438, LR 0x803A8FBC**, again in the text-width/render path. The user also showed duplicate hitlag fragments and nearly blank Jump Out Of Shine text, while non-hitlag cases worked. The RGB payload correction in section 39 was necessary but did not cover how native text setters replace a previously colored row.
+
+Local DOL inspection identifies another limitation: the optional old-body-length scan used by **Text_SetText**, at **0x803A7068**, treats inline color opcode 0x0C as an end marker. It recognizes glyphs/spacing/tracking, but does not count the four-byte RGB command. A second replacement therefore fails to remove the old colored body. SetText writes the new closing command over the previous color opcode, leaving its RGB bytes and text behind; those orphaned bytes can be interpreted as glyphs, producing duplicated/blank text and invalid font pointers.
+
+Shine results previously went through formatting twice when hitlag was present: once inside Message_Display using generic hitlag context, then after the caller attached the finalized shine/turn context. Without hitlag, the first pass left the row plain, explaining why ordinary/turn-only cases behaved differently.
+
+Two coordinated corrections are implemented:
+
+- A native C2 hook at **0x803A7068** counts **0x0C plus three RGB bytes as four body bytes**, preserving correct replacement bounds. This makes later growing/shrinking updates safe for colored text too.
+- **TM_OSD_DEFER_FORMAT**, tag bit 28, makes shine results wait until finalized hitlag/turn/outcome metadata is attached before formatting. The completed row is formatted once; timing/turn colors and one-row alignment remain intact.
+
+The regression now runs the actual **native SetText, Position, Scale, Color and subtext locator**, including repeated replacements of the same complete message buffer. Without the old-length hook it detects retained/corrupted data; with the hook it verifies exact title/body/detail boundaries, width parsing and memory canaries over multiple growing/shrinking hitlag, turnaround and plain-text updates. A bounded fixture supplies the already-formatted string to the native setter, as the production timing builder does. Previous tests exercised conversion and finished-buffer traversal but missed this mutation lifecycle.
+
+**86 compiled PowerPC tests pass**; the optimized C/assembly release builds without warnings. The corrected versioned ISO/archive is rebuilt and payload-checked. Read-only Dolphin MEM1 inspection was used to inspect text structures; no process memory or user card was modified. Version **V1.4.1T2 / TYRE01**, packed format **3 / 44 bytes** and **29 free reserved bits** are unchanged. Live gameplay confirmation of the reported layouts remains outstanding.
+
+
+**41. Global Settings naming and final grouping**
+
+The cue label is now exactly **Actionable Yellow>Green**, shared by both editors. The logical flag and yellow/green behavior are unchanged.
+
+Both Global Settings menus now use this order: **nineteen OSDs, OVERRIDE CPU OSDS OFF, OVERRIDE ALL OSDS OFF, one blank separator, then the seven overlays/shared controls**. Native display rows 19/20 are CPU/ALL; row 21 is the disabled separator; rows 22-28 are the visual/gameplay controls. Native physical RSS IDs 16/17 now map to CPU/ALL and ID 18 to the separator. Logical flag IDs and serialized bits remain unchanged. Lab includes the same disabled empty row, and its initialization/callback offsets are shifted consistently.
+
+Existing compiled editor regressions cover the moved override rows, hidden separator checkbox, all native exit saves, preserved unknown OSD-mask bits and palette/flag round trips. The full native text-update regressions remain included. Format **3 / 44 bytes**, version **V1.4.1T2**, identity **TYRE01** and **29 free reserved bits** are unchanged. The README records these Tyro changes.

@@ -102,7 +102,7 @@ void OSD_ShineAfterIASA(GOBJ *object) {
         data->flags.freeze || data->flags.dead);
     if (!result || data->flags.ms || !(Settings_Get(TM_SETTING_OSD_MASK, 0) & (1u << OSD_FighterSpecificTech))) return;
     unsigned frame = result == TM_SHINE_JUMP ? shine->jump_opportunity : shine->opportunity;
-    GOBJ *message = Message_Display(OSD_MessageTag(OSD_FighterSpecificTech, OSD_FighterSpecificTech, 1, 1, 0),
+    GOBJ *message = Message_Display(OSD_MessageTag(OSD_FighterSpecificTech, OSD_FighterSpecificTech, 1, 1, 0) | TM_OSD_DEFER_FORMAT,
         data->ply, MSGCOLOR_WHITE, "Jump Out Of Shine\n%df", frame);
     MsgData *msg = message->userdata;
     msg->timing_hitlag = shine->hitlag;

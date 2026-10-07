@@ -31,6 +31,14 @@ int sprintf(char *out, const char *format, ...) {
     *out = 0; va_end(args); return out - start;
 }
 int TestDirty(void) { return stc_memcard_state->memcard_changed; }
+int TestTextCopyFormat(char *out, int limit, const char *format, void *args) {
+    /* Native SetText fixture inputs are already formatted, as in the timing
+     * builder. Keep native conversion, buffer shifting and setters real. */
+    char *start = out;
+    while (*format) *out++ = *format++;
+    *out = 0;
+    return out - start;
+}
 void TestClearDirty(void) { stc_memcard_state->memcard_changed = 0; }
 int TestTimingArgument(int tag, int queue, int color, const char *format, ...) {
     va_list args;

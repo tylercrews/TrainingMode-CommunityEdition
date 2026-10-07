@@ -32,7 +32,7 @@
 #define TM_GLOBAL_INVINCIBILITY_ROW 25
 #define TM_GLOBAL_INVINCIBILITY_NAME "Invincibility Overlay"
 #define TM_GLOBAL_MISSED_LCANCEL_NAME "Missed L Cancel"
-#define TM_GLOBAL_ACTION_CUES_NAME "Actionable Yellow/Green"
+#define TM_GLOBAL_ACTION_CUES_NAME "Actionable Yellow>Green"
 #define TM_GLOBAL_RUN_TURN_NAME "Run Turnaround"
 #define TM_GLOBAL_INFINITE_SHIELDS_NAME "Infinite Shields"
 #define TM_GLOBAL_TRAIL_VERY_FAST_NAME "Hitbox Trails Very Fast"

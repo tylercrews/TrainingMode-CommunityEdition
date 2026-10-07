@@ -8,7 +8,7 @@ const uint8_t TMSettings_OSDIDs[TM_SETTINGS_OSDS] = {
 /* Read down the left column, then the right. 255 marks a display-only gap. */
 const uint8_t TMSettings_EditorIDs[29] = {
     0,1,3,5,8,9,10,12,13,14,16,18,19,20,21,
-    22,24,26,28,255,6,29,2,4,7,17,11,23,25,
+    22,24,26,28,29,6,255,2,4,7,17,11,23,25,
 };
 int TMSettings_EditorID(unsigned native_row) {
     static const uint8_t physical[] = {

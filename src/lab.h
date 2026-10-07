@@ -1836,15 +1836,19 @@ static EventOption LabOptions_OSDs[] = {
     },
     {
         .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_CPU_OSDS_OFF_NAME,
+        .desc = {"Hide messages belonging to CPU players in every match.", "Preserves individual OSD choices and player messages."},
+        .OnChange = Lab_ChangeOSDsOff,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
         .name = TM_GLOBAL_OSDS_OFF_NAME,
         .desc = {"Hide global OSD messages without clearing their colors.", "Trails and event feedback remain active."},
         .OnChange = Lab_ChangeOSDsOff,
     },
     {
-        .kind = OPTKIND_TOGGLE,
-        .name = TM_GLOBAL_CPU_OSDS_OFF_NAME,
-        .desc = {"Hide messages belonging to CPU players in every match.", "Preserves individual OSD choices and player messages."},
-        .OnChange = Lab_ChangeOSDsOff,
+        .kind = OPTKIND_INFO, .disable = 1, .name = "",
+        .desc = {""},
     },
     {
         .kind = OPTKIND_TOGGLE,

@@ -271,3 +271,17 @@ TMShineEpisode adds 52 bytes per context; twelve entries total 1,488 bytes. MsgD
 The native width parser at 0x803A8314 and renderer at 0x803A8D7C consume exactly three bytes after color opcode 0x0C. Emitting RGBA leaves alpha in the command stream; 0xFF is then interpreted as a glyph prefix and can index an invalid SIS font pointer at 0x803A8368. It also corrupts subtext traversal and can make timing content, recovery sources or titles overlap/disappear. Eight ASCII hex input digits remain supported, but the converter emits only RGB.
 
 A converter-byte test alone does not validate that stream. The regressions now execute the native width parser (0x803A8134) and the same native subtext locator (0x803A6FEC) used by text editing. Initialize the text opcode-history buffer and native constants/SIS kerning fixture when running these functions under Unicorn. Tests include an old malformed RGBA stream that must fail, and corrected RGB streams that must preserve all following row boundaries.
+
+
+## Replacing Already-Colored Native Text
+
+The native subtext locator's optional old-body-length iterator at 0x803A7068 originally recognized glyph pairs, spacing (0x0A) and tracking (0x0B), but stopped at inline color (0x0C). SetText therefore treated an existing colored row as an empty/truncated old body. Inserting a replacement and writing its closing 0x0F could orphan the old RGB payload, turning color bytes into bogus glyphs and leaving duplicated/blank content. The new C2 hook counts 0x0C + RGB as four bytes while preserving other commands.
+
+Shine callers set TM_OSD_DEFER_FORMAT (tag bit 28). Message_Display creates their unformatted result row, then the caller attaches finalized hitlag/turn/outcome metadata and formats once. The shared category, best-frame bits, CPU/master suppression and existing queue API stay unchanged.
+
+Do not validate this path solely by converting strings or manually assembling a finished text buffer. The regression now invokes real native SetText, Position, Scale, Color and subtext traversal on the same buffer through repeated growing/shrinking updates. Its format fixture copies already-expanded ASCII, matching the timing builder; native conversion and buffer mutation remain real. Without the old-length fix, the regression detects retained/orphaned data; with it, title/detail/angle/hop rows and buffer boundaries remain intact.
+
+
+## Final Global Settings Order
+
+Use the shared Actionable Yellow>Green label. Both editors order nineteen OSDs, CPU override, ALL override, a disabled blank row, then seven visual/gameplay controls. Native rows 19/20 bind to logical CPU/all IDs 29/6; row 21 is ID 255. Physical RSS rows 16/17/18 map to CPU/all/separator. Lab's identical spacer shifts trail/cue initialization and callbacks by one; override rows remain its offsets 19/20 with CPU first. Do not alter serialized IDs/bits to move UI rows. The record still has 29 reserved bits.

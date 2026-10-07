@@ -1853,7 +1853,8 @@ GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, 
         Text_AddSubtext(msg_text, 0, y_base + y_delta, msg_line);
     }
 
-    OSD_FormatTiming(msg_data, OSD_MessageInline(msg_kind), (line_num - 1) * (-MSGTEXT_YOFFSET / 2));
+    if (!((uint32_t)msg_kind & TM_OSD_DEFER_FORMAT))
+        OSD_FormatTiming(msg_data, OSD_MessageInline(msg_kind), (line_num - 1) * (-MSGTEXT_YOFFSET / 2));
     OSD_ApplyMessageStyle(msg_data);
 
     // Add to queue

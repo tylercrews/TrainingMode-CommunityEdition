@@ -42,7 +42,7 @@ class Machine:
         self.cpu.mem_write(0x800C0658, bytes.fromhex("800304302c0000004182000c386304084e800020386304884e800020"))
         dol = (ROOT / "build/Start.dol").read_bytes()
         for address, size in [(0x8040C680,574),(0x8040C8C0,574),(0x8040CB00,640),
-                              (0x803A67EC,0x3AC),(0x803A6FEC,0xB4),(0x803A7684,0xE38),
+                              (0x803A67EC,0x3AC),(0x803A6B98,0x1F24),
                               (0x8040C568,0xAC),(0x804DE000,0xC00)]:
             for section in range(18):
                 offset, base, length = [struct.unpack_from(">I",dol,at+section*4)[0] for at in (0,0x48,0x90)]
@@ -136,6 +136,58 @@ class Machine:
             if found != expected: raise AssertionError(f"Row {i} corrupted: {found:x} != {expected:x}")
             expected+=len(chunk)
         return chunks
+
+    def native_rewrite_rows(self, sources, updates, patch_iterator=True):
+        """Use real SetText/Position/Scale/Color on one complete text buffer."""
+        if patch_iterator: self.install_hook(0x803A7068,0x80481000)
+        rows=[self.native_text(source) for source in sources]
+        self.native_subtexts(rows)
+        stream,text,pool=0x80410000,0x80404000,0x80404300
+        chunks=[b"\x07"+struct.pack(">2h",0,i*30)+b"\x0c\xff\xff\xff\x0e\x01\0\x01\0"+
+                row+b"\x0f\x0d" for i,row in enumerate(rows)]
+        initial=b"".join(chunks)
+        self.cpu.mem_write(stream-8,b"\xA5"*8+b"\0"*4096+b"\xA5"*8)
+        self.cpu.mem_write(stream,initial+b"\0")
+        self.cpu.mem_write(text,bytes(0xA4))
+        self.cpu.mem_write(text+0x5C,struct.pack(">3I",stream,stream+len(initial)-2,pool))
+        self.cpu.mem_write(pool,struct.pack(">4I",stream+len(initial),stream,4096,len(rows)))
+        address=self.symbols["TestTextCopyFormat"]
+        self.cpu.mem_write(0x80323DC8,struct.pack(">4I",0x3D800000|(address>>16),
+            0x618C0000|(address&65535),0x7D8903A6,0x4E800420))
+        self.symbols.update(NativeSetText=0x803A70A0,NativePosition=0x803A746C,
+                            NativeScale=0x803A7548,NativeColor=0x803A74F0,NativeSubtext=0x803A6FEC)
+        saved_r2=self.cpu.reg_read(gpr(2))
+        try:
+            self.cpu.reg_write(gpr(2),0x804DF9E0)
+            for index,source in updates:
+                expected=self.native_text(source);rows[index]=expected
+                self.cpu.mem_write(0x80403000,source+b"\0")
+                self.call("NativeSetText",text,index,0x80403000)
+                for function,x,y in [("NativePosition",0.0,index*30.0),("NativeScale",1.0,1.0)]:
+                    self.cpu.reg_write(reg.UC_PPC_REG_FPR1,struct.unpack(">Q",struct.pack(">d",x))[0])
+                    self.cpu.reg_write(reg.UC_PPC_REG_FPR2,struct.unpack(">Q",struct.pack(">d",y))[0])
+                    self.call(function,text,index)
+                self.cpu.mem_write(0x80403E00,b"\xff\xff\xff\xff")
+                self.call("NativeColor",text,0,0x80403E00)
+                current=struct.unpack(">I",self.cpu.mem_read(pool,4))[0]
+                self.assert_stream_rows(stream,current,rows)
+                assert bytes(self.cpu.mem_read(stream-8,8)) == b"\xA5"*8
+                assert bytes(self.cpu.mem_read(stream+4096,8)) == b"\xA5"*8
+        finally: self.cpu.reg_write(gpr(2),saved_r2)
+        return rows
+
+    def assert_stream_rows(self, stream, current, rows):
+        for index,expected in enumerate(rows):
+            group=self.call("NativeSubtext",stream,index,0)
+            if not group: raise AssertionError(f"Missing native row {index}")
+            body=group+14
+            actual=bytes(self.cpu.mem_read(body,len(expected)+2))
+            if actual != expected+b"\x0f\x0d":
+                raise AssertionError(f"Row {index} retained/corrupted text: {actual.hex()}")
+            self.native_width(expected)
+        last=self.call("NativeSubtext",stream,len(rows)-1,0)
+        if last+14+len(rows[-1])+2 != current:
+            raise AssertionError("Native buffer end/row boundaries changed incorrectly")
 
     def call(self, name, *args):
         for i, value in enumerate(args, 3):
@@ -238,7 +290,7 @@ class RelocatedDATSettingsTests(unittest.TestCase):
         self.assertEqual(m.call("DAT_Get", 11, 1), 1)
         self.assertEqual(m.call("DAT_Get", 17, 19), 1)
         before = m.record()
-        m.call("DAT_Set", 17, 16, 1)  # First gap is not a saved preference.
+        m.call("DAT_Set", 17, 18, 1)  # Separator is not a saved preference.
         self.assertEqual(m.record(), before)
 
     def test_relocated_dat_migration_and_foreign_identity_preserve_records(self):
@@ -764,6 +816,19 @@ class OSDStyleTests(unittest.TestCase):
     def setUp(self):
         self.m = Machine()
 
+    def test_real_native_setter_replaces_colored_rows_without_orphaned_color_bytes(self):
+        original=[b"Jump Out Of Shine",b"4f",b"Landing"]
+        first=b"\x1BFFFFFFFF3hl->\x1BFFA2BAFF4f"
+        second=b"\x1BFFFFFFFF3hl->\x1B00FFFFFF1trn->\x1B8DFF6EFF2f"
+        # The old length iterator stops at the first inline RGB command. Its
+        # next rewrite overwrites that opcode but leaves color bytes as glyphs.
+        with self.assertRaises(AssertionError):
+            Machine().native_rewrite_rows(original,[(1,first),(1,second)],patch_iterator=False)
+        for sources,index in [(original,1),([b"Wavedash 1f",b"Angle: 20.0",b"Short Hop: 1f"],0)]:
+            updates=[(index,first),(index,second),(index,b"\x1B00FFFFFF1f"),
+                     (index,b"\x1BFFF000FF3trn->\x1BFFA2BAFF1trn"),(index,b"1f")]*4
+            Machine().native_rewrite_rows(sources,updates)
+
     def test_inline_color_rgb_payload_survives_native_width_and_subtext_parsers(self):
         m=self.m
         # Cover zero bytes, 0xFF alpha in source, bright colors and all affected
@@ -1007,16 +1072,16 @@ class OSDEditorTests(unittest.TestCase):
         m=self.m
         m.write(14,20,6); m.write(15,29,1)  # An unknown old enable bit must survive this row allocation.
         reserved=bytearray(m.record()); reserved[40:44]=b"\xf8ABC"; m.put(reserved)
-        m.call("TestEditorInit"); m.call("TestEditorInput",0x200,21)
+        m.call("TestEditorInit"); m.call("TestEditorInput",0x200,19)
         self.assertEqual(m.read(11,8),1)
         self.assertEqual(m.record()[40:44],b"\xfcABC")
         self.assertEqual(m.read(15,29),1)
         self.assertEqual(m.read(14,20),6)
-        self.assertEqual(m.call("TestEditorHidden",21),0)
-        m.call("TestEditorAnimate",21); m.call("TestSettingsEditorWrite",18,m.call("TestEditorCache",21))
+        self.assertEqual(m.call("TestEditorHidden",19),0)
+        m.call("TestEditorAnimate",19); m.call("TestSettingsEditorWrite",16,m.call("TestEditorCache",19))
         saved=m.record(); fresh=Machine(); fresh.put(saved); fresh.call("TestEditorInit")
         self.assertEqual(fresh.call("Settings_Get",11,8),1)
-        for row,label in [(20,"OVERRIDE ALL OSDS OFF"),(21,"OVERRIDE CPU OSDS OFF")]:
+        for row,label in [(19,"OVERRIDE CPU OSDS OFF"),(20,"OVERRIDE ALL OSDS OFF")]:
             self.assertEqual(''.join(chr(fresh.call("TestEditorLabelChar",row,i)) for i in range(len(label))),label)
         self.assertEqual(fresh.record(),saved)
 
@@ -1070,7 +1135,7 @@ class OSDEditorTests(unittest.TestCase):
         m = self.m
         m.call("TestEditorInit")
         before = m.record()
-        for row in [19, 29, 65535]:
+        for row in [21, 29, 65535]:
             self.assertEqual(m.call("TestEditorInput", 0x200, row), 1)
             self.assertEqual(m.call("TestEditorInput", 0x10, row), 1)
         for button in [1, 2, 4, 8, 0x100, 0x400, 0x800, 0x1000]:
@@ -1112,7 +1177,7 @@ class OSDEditorTests(unittest.TestCase):
     def test_grouped_editor_gaps_and_native_exit_keep_every_preference(self):
         m = self.m
         physical = [0,1,2,3,4,5,6,7,8,9,11,10,24,26,28,12,13,14,15,16,17,18,19,20,21,22,23,25,27]
-        expected = IDS + [255,6,29,2,4,7,17,11,23,25]
+        expected = IDS + [29,6,255,2,4,7,17,11,23,25]
         for i, id in enumerate(IDS):
             m.write(14, id, (i % 7) + 1)
         for flag in range(8):
@@ -1121,7 +1186,7 @@ class OSDEditorTests(unittest.TestCase):
         m.call("TestEditorInit")
         for row, native in enumerate(physical):
             self.assertEqual(m.call("TMSettings_EditorID", native), expected[row])
-            self.assertEqual(m.call("TestEditorHidden", row), int(row == 19))
+            self.assertEqual(m.call("TestEditorHidden", row), int(row == 21))
             self.assertEqual(m.read(17, native), m.call("TestEditorCache", row))
             self.assertEqual(m.call("TestSettingsEditorRow", native), m.call("TestEditorCache", row))
         label = "OVERRIDE ALL OSDS OFF"
@@ -1135,8 +1200,8 @@ class OSDEditorTests(unittest.TestCase):
             m.call("TestSettingsEditorWrite", native, m.call("TestEditorCache", row))
         self.assertEqual(m.record(), before)
         self.assertEqual(m.read(15, 15), 1)
-        self.assertEqual(m.call("TestEditorLabelChar", 19, 0), 0)
-        self.assertEqual(m.call("TestEditorLabelChar", 21, 0), ord("O"))
+        self.assertEqual(m.call("TestEditorLabelChar", 21, 0), 0)
+        self.assertEqual(m.call("TestEditorLabelChar", 20, 0), ord("O"))
 
 
 class ActionCueTests(unittest.TestCase):

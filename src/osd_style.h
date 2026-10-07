@@ -5,6 +5,7 @@
 
 #define TM_OSD_COLOR_NAMES "Off", "White", "Red", "Green", "Blue", "Yellow", "Cyan", "Magenta"
 #define TM_OSD_POINTER_FIRST (1u << 22)
+#define TM_OSD_DEFER_FORMAT (1u << 28) /* Caller completes timing context after creation. */
 /* Tagged message kind: low byte is the unchanged queue/dedup kind.
  * Bits 8..12 identify the settings category; 16..18 select an integer vararg;
  * 19..20 select its text line; 21 requests the Wavedash inline layout;

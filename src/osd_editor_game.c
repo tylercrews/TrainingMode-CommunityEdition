@@ -6,8 +6,8 @@ static const char *row_names[] = {
     "Wavedash Info", "L-Cancel", "Act OoS Frame", "Dashback", "Fighter-specific Tech",
     "Powershield Frame", "SDI Inputs", "Lockout Timers", "Item Throw Interrupts", "Boost Grab",
     "Act OoLag", "Act OoAirborne", "Jump Cancel Timing", "Fastfall Timing", "Frame Advantage",
-    "Combo Counter", "Grab Breakout", "Ledgedash Info", "Act OoHitstun", 0,
-    TM_GLOBAL_OSDS_OFF_NAME, TM_GLOBAL_CPU_OSDS_OFF_NAME, TM_GLOBAL_TRAIL_VERY_FAST_NAME, TM_GLOBAL_TRAIL_INSTANT_NAME,
+    "Combo Counter", "Grab Breakout", "Ledgedash Info", "Act OoHitstun",
+    TM_GLOBAL_CPU_OSDS_OFF_NAME, TM_GLOBAL_OSDS_OFF_NAME, 0, TM_GLOBAL_TRAIL_VERY_FAST_NAME, TM_GLOBAL_TRAIL_INSTANT_NAME,
     TM_GLOBAL_MISSED_LCANCEL_NAME, TM_GLOBAL_RUN_TURN_NAME, TM_GLOBAL_ACTION_CUES_NAME,
     TM_GLOBAL_INFINITE_SHIELDS_NAME, TM_GLOBAL_INVINCIBILITY_NAME,
 };
