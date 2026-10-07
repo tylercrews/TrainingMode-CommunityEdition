@@ -1,6 +1,45 @@
 #include "osd_context.h"
 #include "../MexTK/mex.h"
 static void increment(unsigned *value) { if (*value < 999) ++*value; }
+static int shine_state(int state) { return state >= 360 && state <= 369; }
+static int shine_start(int state) { return state == 360 || state == 365; }
+static int shine_loop(int state) { return state == 361 || state == 366; }
+static int shine_turn(int state) { return state == 364 || state == 369; }
+void TMShine_Tick(TMShineEpisode *s, uint32_t frame, int state, int hitlag, int dead) {
+    if (s->seen && frame == s->frame) return;
+    if (dead || !shine_state(state) || (s->seen && frame < s->frame) ||
+        (shine_start(state) && !shine_start(s->state))) *s = (TMShineEpisode){0};
+    if (!dead && shine_state(state) && hitlag && !s->done) increment(&s->hitlag);
+    s->seen = 1; s->frame = frame; s->state = state;
+}
+void TMShine_Before(TMShineEpisode *s, uint32_t frame, int state, int frozen, int jump_available) {
+    if (s->prepared_frame == frame && s->prepared_state) return;
+    s->prepared = 0;
+    if (frozen || s->done || !shine_loop(state)) return;
+    /* Turn IASA is empty. Wait for the engine to restore the loop, rather than
+     * treating the two native turn-animation steps as actionable delay. */
+    if (s->waiting_turn) { s->opportunity = s->jump_opportunity = 0; s->waiting_turn = 0; }
+    increment(&s->opportunity);
+    if (jump_available) increment(&s->jump_opportunity);
+    s->prepared = 1; s->prepared_frame = frame; s->prepared_state = state;
+}
+int TMShine_After(TMShineEpisode *s, uint32_t frame, int state, int frozen) {
+    if (frozen || !s->prepared || s->prepared_frame != frame || s->done) return TM_SHINE_PENDING;
+    s->prepared = 0;
+    if (shine_turn(state)) {
+        if (!s->turns) {
+            s->first_turn = s->opportunity; s->turns = 1; s->waiting_turn = 1;
+            return TM_SHINE_PENDING;
+        }
+        s->turns = 2; s->done = 1;
+        return TM_SHINE_DOUBLE_TURN;
+    }
+    if (state >= ASID_KNEEBEND && state <= ASID_JUMPAERIALB && s->jump_opportunity) {
+        s->done = 1;
+        return TM_SHINE_JUMP;
+    }
+    return TM_SHINE_PENDING; /* B release, platform pass or a failed input is not a jump. */
+}
 void TMOSDContext_Step(TMOSDContext *c, uint32_t frame, int state, int attack,
     int airborne, int shine, int shield, int victim, int hitlag, int dead) {
     if (c->seen && frame == c->frame) return;

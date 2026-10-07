@@ -14,4 +14,16 @@ unsigned TMOSDContext_Hitlag(const TMOSDContext *ctx, unsigned category);
 /* Return the native opportunity count and anchor/source indexes; 0 = no result. */
 int TMOSD_WaitFrames(const uint16_t *states, const uint16_t *frames, unsigned count,
     unsigned normal_lag, int *anchor, int *source);
+enum { TM_SHINE_PENDING, TM_SHINE_JUMP, TM_SHINE_DOUBLE_TURN };
+typedef struct TMShineEpisode {
+    uint32_t frame, seen;
+    int state;
+    unsigned hitlag, opportunity, first_turn, turns, done;
+    uint32_t prepared_frame;
+    int prepared, prepared_state, waiting_turn;
+    unsigned jump_opportunity; // Airborne loops with no remaining jump do not advance it.
+} TMShineEpisode;
+void TMShine_Tick(TMShineEpisode *shine, uint32_t frame, int state, int hitlag, int dead);
+void TMShine_Before(TMShineEpisode *shine, uint32_t frame, int state, int frozen, int jump_available);
+int TMShine_After(TMShineEpisode *shine, uint32_t frame, int state, int frozen);
 #endif

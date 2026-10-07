@@ -23,6 +23,16 @@ def gpr(n):
     return getattr(reg, f"UC_PPC_REG_{n}")
 
 
+def styled_ascii(m, line):
+    raw=bytes(m.call("TestStyleStringChar",line,i) for i in range(112)).split(b"\0",1)[0]
+    result=[]; color=None; i=0
+    while i < len(raw):
+        if raw[i] == 0x1B:
+            color=int(raw[i+1:i+9],16);i+=9
+        else: result.append((chr(raw[i]),color));i+=1
+    return "".join(c for c,_ in result),result,raw
+
+
 class Machine:
     def __init__(self):
         self.cpu = Uc(UC_ARCH_PPC, UC_MODE_32 | UC_MODE_BIG_ENDIAN)
@@ -31,7 +41,7 @@ class Machine:
         # Verified against the local native DOL, function 0x800C0658.
         self.cpu.mem_write(0x800C0658, bytes.fromhex("800304302c0000004182000c386304084e800020386304884e800020"))
         dol = (ROOT / "build/Start.dol").read_bytes()
-        for address, size in [(0x8040C680,574),(0x8040C8C0,574),(0x8040CB00,640)]:
+        for address, size in [(0x8040C680,574),(0x8040C8C0,574),(0x8040CB00,640),(0x803A67EC,0x3AC)]:
             for section in range(18):
                 offset, base, length = [struct.unpack_from(">I",dol,at+section*4)[0] for at in (0,0x48,0x90)]
                 if base <= address and address + size <= base + length:
@@ -62,6 +72,31 @@ class Machine:
             self.cpu.mem_write(0x80300000 - 200 + slot * 4, struct.pack(">I", self.symbols[name]))
         self.cpu.mem_write(0x80000000, b"TYRE01")
         self.cpu.mem_write(RECORD - 8, b"\xA5" * 60)
+
+    def install_hook(self, address, allocation=0x80480000):
+        data = (ROOT / "build/settings-codes-test.gct").read_bytes()
+        needle = struct.pack(">I", 0xC2000000 | (address & 0x01FFFFFF))
+        offset = data.find(needle)
+        if offset < 0: raise AssertionError(f"Native C2 hook missing at {address:x}")
+        lines = struct.unpack_from(">I",data,offset+4)[0]
+        body = bytearray(data[offset+8:offset+8+lines*8])
+        assert len(body) == lines*8
+        struct.pack_into(">I",body,len(body)-4,0x48000000|((address+4-allocation-len(body)+4)&0x03FFFFFC))
+        self.cpu.mem_write(allocation,bytes(body))
+        self.cpu.mem_write(address,struct.pack(">I",0x48000000|((allocation-address)&0x03FFFFFC)))
+        return allocation
+
+    def native_text(self, value):
+        self.install_hook(0x803A684C)
+        source,output=0x80403000,0x80403200
+        self.cpu.mem_write(source,value+b"\0")
+        self.cpu.mem_write(output-8,b"\xA5"*8+b"\0"*160+b"\xA5"*8)
+        self.symbols["NativeTextConvert"] = 0x803A67EC
+        size=self.call("NativeTextConvert",output,source)
+        assert size <= 160
+        assert bytes(self.cpu.mem_read(output-8,8)) == b"\xA5"*8
+        assert bytes(self.cpu.mem_read(output+160,8)) == b"\xA5"*8
+        return bytes(self.cpu.mem_read(output,size))
 
     def call(self, name, *args):
         for i, value in enumerate(args, 3):
@@ -547,7 +582,7 @@ class OSDContextTests(unittest.TestCase):
     def test_native_adapter_player_subfighter_lifetimes_freeze_and_wait_source(self):
         m = self.m
         m.init(); m.call("TestCueInit")
-        m.call("TestCueKind", 0, 2)
+        m.call("TestCueKind", 0, 1)
         m.call("TestCueState", 0, 360, 0, 40, 100)
         data = m.call("TestCueData", 0)
         # phys.air_state is not needed for ground-shine episode.
@@ -581,39 +616,142 @@ class OSDContextTests(unittest.TestCase):
         self.assertEqual(m.call("OSDContext_MessageHitlag", 0, 8), 0)
 
 
+class ShineEpisodeTests(unittest.TestCase):
+    def setUp(self):
+        self.m=Machine(); self.episode=0x80402000
+        self.m.cpu.mem_write(self.episode,bytes(52))
+
+    def tick(self,frame,state,hitlag=0,dead=0):
+        self.m.call("TMShine_Tick",self.episode,frame,state,hitlag,dead)
+
+    def act(self,frame,before,after,frozen=0,jump_available=1):
+        self.m.call("TMShine_Before",self.episode,frame,before,frozen,jump_available)
+        return self.m.call("TMShine_After",self.episode,frame,after,frozen)
+
+    def fields(self):
+        return struct.unpack(">12I",self.m.cpu.mem_read(self.episode,48))
+
+    def test_jump_without_turn_uses_actual_loop_opportunities(self):
+        self.tick(1,360);self.assertEqual(self.act(1,360,360),0)
+        self.tick(2,361);self.assertEqual(self.act(2,361,361),0)
+        self.tick(3,361);self.assertEqual(self.act(3,361,24),1)
+        self.assertEqual(self.fields()[4:8],(2,0,0,1))
+        self.assertEqual(self.act(3,361,24),0)  # No duplicate message on the same update.
+
+    def test_startup_hitlag_first_turn_and_two_blocked_turn_updates(self):
+        for frame in range(1,4):
+            self.tick(frame,365,1);self.assertEqual(self.act(frame,365,365,1),0)
+        self.tick(4,366);self.assertEqual(self.act(4,366,369),0)
+        self.assertEqual(self.fields()[3:8],(3,1,1,1,0))
+        for frame in [5,6]:
+            self.tick(frame,369);self.assertEqual(self.act(frame,369,369),0)
+            self.assertEqual(self.fields()[4],1)  # Native turn recovery is not added to delay.
+        self.tick(7,366);self.assertEqual(self.act(7,366,27),1)
+        self.assertEqual(self.fields()[3:8],(3,1,1,1,1))  # 3hl->1trn->1f.
+
+    def test_second_turn_completes_once_and_keeps_separate_timing(self):
+        self.tick(1,361);self.assertEqual(self.act(1,361,361),0)
+        self.tick(2,361);self.assertEqual(self.act(2,361,364),0)  # First turn at 2trn.
+        self.tick(3,364);self.assertEqual(self.act(3,364,364),0)
+        self.tick(4,361);self.assertEqual(self.act(4,361,361),0)
+        self.tick(5,361);self.assertEqual(self.act(5,361,364),2)  # Second turn at 2trn.
+        self.assertEqual(self.fields()[4:8],(2,2,2,1))
+        self.tick(6,361);self.assertEqual(self.act(6,361,24),0)
+        self.tick(7,360);self.assertEqual(self.act(7,360,360),0)  # A new shine resets the verdict.
+        self.tick(8,361);self.assertEqual(self.act(8,361,24),1)
+        self.assertEqual(self.fields()[4:8],(1,0,0,1))
+
+    def test_release_failed_jump_duplicate_frame_and_ground_air_transfer(self):
+        self.tick(1,361);self.assertEqual(self.act(1,361,361),0)
+        self.assertEqual(self.act(1,361,361),0)
+        self.assertEqual(self.fields()[4],1)
+        self.tick(2,366);self.assertEqual(self.act(2,366,366),0)
+        self.assertEqual(self.fields()[4],2)
+        self.tick(3,366);self.assertEqual(self.act(3,366,368),0)  # B release emits no Jump OSD.
+        self.tick(4,368);self.assertEqual(self.act(4,368,27),0)  # Jump during end is not a shine cancel.
+        self.tick(5,29);self.assertEqual(self.fields()[3:8],(0,0,0,0,0))
+
+    def test_no_air_jump_left_does_not_become_late_jump_time_after_landing(self):
+        for frame in range(1,5):
+            self.tick(frame,366);self.assertEqual(self.act(frame,366,366,0,0),0)
+        self.tick(5,361);self.assertEqual(self.act(5,361,24),1)
+        self.assertEqual(self.fields()[4],5)  # Turning was available throughout the loop.
+        self.assertEqual(struct.unpack(">I",self.m.cpu.mem_read(self.episode+48,4))[0],1)
+
+    def test_turn_hitlag_and_native_loop_resumption_after_any_blocked_duration(self):
+        self.tick(1,361);self.assertEqual(self.act(1,361,364),0)
+        for frame in range(2,5): self.tick(frame,364,1);self.act(frame,364,364,1)
+        self.tick(5,361);self.assertEqual(self.act(5,361,361),0)
+        self.tick(6,361);self.assertEqual(self.act(6,361,24),1)
+        self.assertEqual(self.fields()[3:6],(3,2,1))
+        self.tick(2,361);self.assertEqual(self.fields()[3:8],(0,0,0,0,0))  # Rewind clears.
+        self.tick(3,361,0,1);self.assertEqual(self.fields()[3:8],(0,0,0,0,0))
+
+    def test_native_adapter_observes_turn_and_jump_after_iasa_for_fox_and_falco(self):
+        for kind in [1,22]:
+            m=Machine();m.init();m.call("TestCueInit");m.write(14,8,1)
+            m.call("TestCueKind",0,kind);m.call("TestWaitClear")
+            def before(frame,state,frozen=0):
+                m.call("TestCueState",0,state,0,40,100);m.call("TestCueFrozen",0,frozen)
+                m.call("TestContextTick",0,frame);m.call("TestShineBefore",0)
+            def after(state):
+                m.call("TestCueState",0,state,0,40,100);m.call("TestShineAfter",0)
+            for frame in range(1,4): before(frame,360,1);after(360)
+            before(4,361);after(364)
+            self.assertEqual(m.call("TestWaitFrame"),0)  # A turn is no longer an Act OoShine result.
+            before(5,364);after(364)
+            before(6,361);after(24)
+            self.assertEqual(m.call("TestWaitFrame"),1)
+            text,colors,raw=styled_ascii(m,1)
+            self.assertEqual(text,"3hl->1trn->1f")
+            self.assertEqual(colors[5][1],0x00FFFFFF)
+            self.assertEqual(colors[-1][1],0x00FFFFFF)
+            m.native_text(raw)
+            m.call("ActionCues_Clear");m.call("TestWaitClear")
+            before(7,360);after(360)
+            before(8,361);after(364)
+            before(9,364);after(364)
+            before(10,361);after(364)
+            text,colors,raw=styled_ascii(m,1)
+            self.assertEqual(text,"1trn->1trn")
+            self.assertEqual(colors[0][1],0x00FFFFFF)
+            self.assertEqual(colors[-1][1],0xFFA2BAFF)
+            m.call("TestWaitClear")
+            before(11,361);after(24)
+            self.assertEqual(m.call("TestWaitFrame"),0)  # The two-turn result was terminal.
+
+
 class OSDStyleTests(unittest.TestCase):
     def setUp(self):
         self.m = Machine()
 
-    def test_wavedash_compact_top_row_and_neutral_hitlag_prefix(self):
-        m = self.m; m.init()
-        m.write(14, 0, 1)
-        m.call("TestStyleInit", 0, 2, 0, 1)
-        m.call("TestStyleFormat", 0, 1, -30)
-        self.assertEqual(m.call("TestStyleScale100", 0), 70)
-        self.assertEqual(m.call("TestStyleScale100", 3), 70)
-        self.assertEqual(m.call("TestStyleX",0), 0xFFFFFFBA)
-        self.assertEqual(m.call("TestStyleX",3), 55)
-        m.call("TestStyleInit", 0, 2, 0, 1)
-        m.call("TestStyleFormat", 3, 1, -30)
-        self.assertEqual(m.call("TestStyleScale100", 3), 70)
-        self.assertEqual(m.call("TestStyleY", 3), 0xFFFFFFE2)
-        self.assertEqual(m.call("TestStyleY", 4), 0xFFFFFFE2)
-        m.call("TestStyleDraw")
-        self.assertEqual(m.call("TestStyleColor", 3), 0x8DFF6EFF)
-        self.assertEqual(m.call("TestStyleColor", 4), 0xFFFFFFFF)
+    def test_wavedash_top_row_is_normal_size_and_a_single_centered_row(self):
+        m = self.m; m.init(); m.write(14,0,1)
+        for hitlag in [0,3]:
+            m.call("TestStyleInit",0,2,0,1);m.call("TestStyleFormat",hitlag,1,-30)
+            text,colors,raw=styled_ascii(m,0)
+            self.assertEqual(text,"Wavedash "+("3hl->" if hitlag else "")+"2f")
+            self.assertEqual(m.call("TestStyleScale100",0),100)
+            self.assertEqual(m.call("TestStyleX",0),0)
+            self.assertEqual(m.call("TestStyleY",0),0xFFFFFFE2)
+            self.assertEqual(m.call("TestStyleTimingLine"),0)
+            self.assertEqual(m.call("TestStylePrefix"),0xFFFFFFFF)
+            self.assertEqual(colors[-1][1],0x8DFF6EFF)
+            self.assertEqual(m.call("TestStyleEncoded"),1)
+            m.native_text(raw)  # Exercise the actual emitted converter hook, not a mock.
 
     def test_lcancel_prefixed_result_keeps_window_outcome_and_measurement(self):
-        m = self.m; m.init()
-        m.write(14, 1, 1)
-        m.call("TestStyleInit", 1, 4, 1, 1)
-        m.call("TestStyleFormat", 7, 0, -30)
-        self.assertEqual(bytes(m.call("TestStyleStringChar",1,i) for i in range(5)), b"4f/7f")
-        self.assertEqual(bytes(m.call("TestStyleStringChar",3,i) for i in range(5)), b"7hl->")
-        self.assertEqual(m.call("TestStyleTimingLine"), 1)
-        m.call("TestStyleDraw")
-        self.assertEqual(m.call("TestStyleColor", 1), 0xFFA2BAFF)
-        self.assertEqual(m.call("TestStyleColor", 3), 0xFFFFFFFF)
+        m=self.m;m.init();m.write(14,1,1)
+        m.call("TestStyleInit",1,4,1,1);m.call("TestStyleFormat",7,0,-30)
+        text,colors,raw=styled_ascii(m,1)
+        self.assertEqual(text,"7hl->4f/7f")
+        self.assertEqual(colors[0][1],0xFFFFFFFF)
+        self.assertEqual(colors[-1][1],0xFFA2BAFF)
+        self.assertEqual(m.call("TestStyleTimingLine"),1)
+        self.assertEqual(m.call("TestStylePrefix"),0xFFFFFFFF)
+        self.assertEqual(m.call("TestStyleX",1),0)
+        self.assertEqual(m.call("TestStyleScale100",1),100)
+        m.native_text(raw)
 
     def test_message_identity_and_legacy_contract(self):
         for raw, owner in [(7, 20), (5, 16), (5, 28), (-1, 10), (13, 22), (13, 26), (64, 8)]:
@@ -643,6 +781,33 @@ class OSDStyleTests(unittest.TestCase):
                              0x00FFFFFF if frame == 1 else 0x8DFF6EFF)
             self.assertEqual(self.m.call("OSD_WavedashHopColor",0,frame),0xFFA2BAFF)
 
+    def test_real_wavedash_assembly_colors_the_printed_hop_count_not_wavedash_timing(self):
+        for wave,held,short,expected in [(1,2,1,0x8DFF6EFF),(2,1,1,0x00FFFFFF),
+                                         (1,1,0,0xFFA2BAFF),(3,2,0,0xFFA2BAFF)]:
+            m=Machine();m.init();m.call("TestCueInit");m.write(14,0,1)
+            m.call("TestCueState",0,42,0,40,100)
+            data=m.call("TestCueData",0);obj=m.call("TestCueObject",0)
+            m.call("TestStyleInit",0,-1,0,1)
+            m.cpu.mem_write(data+0x2408,struct.pack(">H",wave))
+            m.cpu.mem_write(data+0x2428,struct.pack(">fI",0.0,short))
+            m.cpu.mem_write(data+0x685,bytes([held]))
+            m.cpu.mem_write(data+0x2438,b"\x04\0")  # One past input-log update since jump release.
+            m.cpu.reg_write(gpr(13),0x804D6D5C)
+            m.cpu.mem_write(0x80300000-0x6758,struct.pack(">Q",0x4330000080000000))
+            m.cpu.mem_write(0x80300000-0x3D10,struct.pack(">f",0.017453292))
+            m.cpu.mem_write(0x80005510,bytes.fromhex("386000004e800020"))  # Main fighter.
+            m.cpu.mem_write(0x80099D80,bytes.fromhex("4e800020"))  # Return after the displaced instruction.
+            address=m.symbols["Text_SetColor"]
+            m.cpu.mem_write(0x803A74F0,struct.pack(">4I",0x3D800000|(address>>16),
+                0x618C0000|(address&65535),0x7D8903A6,0x4E800420))
+            for slot,name in [(21,"Message_Display"),(35,"OSD_WavedashHopColor")]:
+                m.cpu.mem_write(0x80300000-200+slot*4,struct.pack(">I",m.symbols[name]))
+            m.symbols["NativeWaveProducer"]=m.install_hook(0x80099D7C,0x80481000)
+            m.call("NativeWaveProducer",obj)
+            self.assertEqual(m.call("TestWaveFrame"),wave)
+            self.assertEqual(m.call("TestWaveHop"),held)
+            self.assertEqual(m.call("TestStyleColor",2),expected)
+
     def test_cpu_override_hides_owned_messages_live_and_preserves_humans_and_general_feedback(self):
         m=self.m; m.init(); m.call("TestCueInit")
         m.write(14,20,6)
@@ -668,32 +833,22 @@ class OSDStyleTests(unittest.TestCase):
         m.call("TestStyleInit",20,3,1,1); m.write(11,0,1); m.call("TestStyleDraw")
         self.assertEqual(m.call("TestStyleHidden"),1)  # ALL override still independently covers humans.
 
-    def test_compact_hitlag_runs_meet_using_native_glyph_widths(self):
-        m=self.m; m.init(); m.write(14,20,1)
-        m.call("TestStyleInit",20,3,1,1); m.call("TestStyleFormat",12,0,-15)
-        self.assertEqual(bytes(m.call("TestStyleStringChar",1,i) for i in range(2)),b"3f")
-        self.assertEqual(bytes(m.call("TestStyleStringChar",3,i) for i in range(6)),b"12hl->")
-        self.assertEqual(m.call("TestStyleY",1),15)
-        self.assertEqual(m.call("TestStyleY",3),15)
-        # Verify adjacency against the actual native font dictionary and kerning.
-        dictionary=bytes(m.cpu.mem_read(0x8040C8C0,574)); tokens=bytes(m.cpu.mem_read(0x8040C680,574))
-        kern=bytes(m.cpu.mem_read(0x8040CB00,640))
-        def width(value):
-            result=0
-            for c in value:
-                code = 0x824F+ord(c)-ord('0') if c.isdigit() else (
-                    0x8281+ord(c)-ord('a') if c.isalpha() else {'-':0x817C,'>':0x8184,'/':0x815E}[c])
-                index=dictionary.index(struct.pack(">H",code))//2
-                glyph=struct.unpack_from(">H",tokens,index*2)[0]-0x2000
-                result+=34-kern[glyph*2]-kern[glyph*2+1]
-            return result*.7
-        def signed(value): return value if value < 0x80000000 else value - 0x100000000
-        right=signed(m.call("TestStyleX",3))+width("12hl->")/2
-        left=signed(m.call("TestStyleX",1))-width("3f")/2
-        self.assertLessEqual(abs(right-left),1.0)  # Native position commands round to integer pixels.
-        m.call("TestStyleDraw")
-        self.assertEqual(m.call("TestStyleColor",1),0xFFF000FF)
-        self.assertEqual(m.call("TestStyleColor",3),0xFFFFFFFF)
+    def test_hitlag_and_turn_colors_share_one_positioned_row(self):
+        m=self.m;m.init();m.write(14,8,1)
+        for first,result,second in [(1,1,0),(2,3,0),(3,1,1)]:
+            m.call("TestStyleInit",8,result,1,1);m.call("TestStyleTurn",first,second)
+            m.call("TestStyleFormat",3,0,-15)
+            text,colors,raw=styled_ascii(m,1)
+            self.assertEqual(text,f"3hl->{first}trn->{result}"+("trn" if second else "f"))
+            self.assertEqual(colors[0][1],0xFFFFFFFF)
+            self.assertEqual(colors[5][1],m.call("OSD_TimingColor",first))
+            self.assertEqual(colors[-1][1],0xFFA2BAFF if second else m.call("OSD_TimingColor",result))
+            self.assertEqual(m.call("TestStyleX",1),0)
+            self.assertEqual(m.call("TestStyleY",1),15)
+            self.assertEqual(m.call("TestStylePrefix"),0xFFFFFFFF)
+            encoded=m.native_text(raw)
+            self.assertIn(b"\x0c\xff\xff\xff\xff",encoded)
+            self.assertIn(b"\x0c"+colors[-1][1].to_bytes(4,"big"),encoded)
 
     def test_source_first_timing_tag_reads_string_and_integer_with_their_actual_types(self):
         m=self.m

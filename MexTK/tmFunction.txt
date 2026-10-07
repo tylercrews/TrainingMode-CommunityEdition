@@ -34,3 +34,5 @@ ActionCues_LCancel
 OSDContext_Tick
 OSD_ActOutWait
 OSD_WavedashHopColor
+OSD_ShineBeforeIASA
+OSD_ShineAfterIASA

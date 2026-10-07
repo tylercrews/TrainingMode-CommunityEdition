@@ -8,6 +8,10 @@
     .set player, 30
 
     backupall
+    SettingsBackup
+    mr r3, player
+    rtocbl r12, TM_ShineBeforeIASA
+    SettingsRestore
     
 OSD_ActOoWait:
     # CHECK IF ENABLED
@@ -128,11 +132,6 @@ FoxFalco:
     cmpwi r3, 0x16D                 # Ground Side B End
     beq FoxFalco_ShineAirStartup
 
-    cmpwi r3, 0x169
-    beq FoxFalco_ShineGroundLoop
-    cmpwi r3, 0x16E
-    beq FoxFalco_ShineAirLoop
-
     b FighterSpecificTech_End
 
 # --------
@@ -205,63 +204,6 @@ FoxFalco_SideBEnd:
 
 # --------
 
-FoxFalco_ShineGroundLoop:
-    # Check For JC
-    bl CheckForJumpCancel
-    cmpwi r3, 0x0
-    beq FighterSpecificTech_End
-
-FoxFalco_ShineGroundLoop_SetColor:
-    load r5, MSGCOLOR_RED
-    lhz r3, 0x23F8(playerdata)
-    cmpwi r3, 0x1
-    bne FoxFalco_ShineGroundLoop_EndSetColor
-    load r5, MSGCOLOR_GREEN
-
-FoxFalco_ShineGroundLoop_EndSetColor:
-    li r3, OSD.FighterSpecificTech  # ID
-    lbz r4, 0xC(playerdata)         # queue
-    bl FoxFalco_ActOOShineText
-    mflr r6
-    lhz r7, 0x23F8(playerdata)
-    Message_DisplayOSD 8, 1, 1, 0
-
-    b FighterSpecificTech_End
-
-# --------
-
-FoxFalco_ShineAirLoop:
-    # Check For Remaining Jump
-    lbz r3, 0x1968(playerdata)      # Jumps Used
-    lwz r0, 0x0168(playerdata)      # Total Jumps
-    cmpw r3, r0
-    bge FighterSpecificTech_End
-
-    # Check For JC
-    bl CheckForJumpCancel
-    cmpwi r3, 0x0
-    beq FighterSpecificTech_End
-
-FoxFalco_ShineAirLoop_SetColor:
-    load r5, MSGCOLOR_RED
-    lhz r3, 0x23F8(playerdata)
-    cmpwi r3, 0x1
-    bne FoxFalco_ShineAirLoop_EndSetColor
-    load r5, MSGCOLOR_GREEN
-
-FoxFalco_ShineAirLoop_EndSetColor:
-
-    li r3, OSD.FighterSpecificTech  # ID
-    lbz r4, 0xC(playerdata)         # queue
-    bl FoxFalco_ActOOShineText
-    mflr r6
-    lhz r7, 0x23F8(playerdata)
-    Message_DisplayOSD 8, 1, 1, 0
-
-    b FighterSpecificTech_End
-    
-# --------
-    
 FoxFalco_ShineAirStartup:
     # ensure we just jumped from the ground
     lhz r3, 0x23fc(playerdata)
@@ -318,7 +260,7 @@ FoxFalco_ShineAirStartup_EndJumpInputsLoop:
 EndGetHopTypeText:
     
     # display
-    li r3, OSD.FighterSpecificTechAlt  # ID - use alt so that ActOoShine doesn't overwrite
+    li r3, OSD.FighterSpecificTechAlt  # ID - use alt so that Jump Out Of Shine does not overwrite
     lbz r4, 0xC(playerdata)         # queue
     li r5, MSGCOLOR_WHITE
     bl FoxFalco_JCShineText
@@ -432,11 +374,6 @@ FoxFalco_ShortenLatePressText:
     .string "Shorten Press\nLate"
     .align 2
 
-FoxFalco_ActOOShineText:
-    blrl
-    .string "Act OoShine\n%df"
-    .align 2
-    
 FoxFalco_JCShineText:
     blrl
     .string "JC Shine\n%df\n%s: %df"

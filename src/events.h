@@ -378,6 +378,9 @@ typedef struct MsgData
     unsigned timing_hitlag; // snapshot at creation; never read later match context while drawing
     int timing_prefix; // separate neutral-colored prefix; -1 when absent
     int queue_num; // player ownership for live CPU suppression; 6 = general feedback
+    int timing_turn; // first shine turnaround's actionable opportunity; 0 = absent
+    int timing_second_turn; // terminal turnaround outcome; final marker is always red
+    int timing_encoded; // color commands inside one timing row; no separate centered runs
 } MsgData;
 void OSD_ApplyMessageStyle(MsgData *msg);
 void OSD_MessageGX(GOBJ *gobj, int pass);
@@ -394,6 +397,8 @@ void OSDContext_LCancel(GOBJ *fighter);
 unsigned OSDContext_MessageHitlag(int queue, unsigned category);
 void OSD_ActOutWait(GOBJ *fighter);
 void OSD_FormatTiming(MsgData *message, int inline_layout, int y);
+void OSD_ShineBeforeIASA(GOBJ *fighter);
+void OSD_ShineAfterIASA(GOBJ *fighter);
 void Events_NotifyRestore(void);
 typedef struct MsgMngrData
 {

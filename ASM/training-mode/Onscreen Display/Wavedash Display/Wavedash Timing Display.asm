@@ -85,6 +85,7 @@ EndJumpInputsLoop:
     b PrintMessage
 
 PrintMessage:
+    mr r25, r9                     # Preserve the hop count actually printed on row 3.
     li r3, 0                        # Message Kind
     lbz r4, 0xC(REG_FighterData)    # Message Queue
     li r5, MSGCOLOR_WHITE
@@ -108,7 +109,7 @@ PrintMessage_NoHopType:
 
 CheckSetHopTypeColor:
     lwz r3, TM_ShortOrFullHop(REG_FighterData)
-    lhz r4, TM_FramesinOneASAgo(REG_FighterData)
+    mr r4, r25                     # Hop duration, independent of wavedash timing (r7).
     rtocbl r12, TM_WavedashHopColor
     stw r3, 0x84(sp)
     mr r3, REG_Text                 # text pointer

@@ -19,6 +19,12 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Corrected Wavedash hop colors to use the hop duration printed on the bottom row, independently of wavedash timing.
+- Restored normal-size Wavedash top-row text and replaced separate centered timing runs with one inline-colored row to eliminate overlap.
+- Replaced Fox/Falco Act OoShine input predictions with confirmed Jump Out Of Shine results and colored turnaround context (Nhl->Ntrn->Nf).
+- Complete two-turn shine sequences as Ntrn->Ntrn with the second marker red; exclude native turn recovery and unavailable air jumps from jump timing.
+- Added native assembly/converter regressions and documented the invisible two-frame turn recovery; persistent settings remain 44 bytes with 29 reserved bits.
+
 - Shortened numeric OSD timing to Nf and compacted hitlag text to Nhl->Nf, preserving separate prefix/result colors.
 - Changed the third timing color to yellow and reordered Act OoWait to title, source, timing.
 - Kept Ledgedash randomized egg target/distance stable through ledge regrabs and restores; reroll only on reset/reposition.

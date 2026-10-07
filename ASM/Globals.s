@@ -193,6 +193,8 @@
     ENTRY TM_OSDContextTick
     ENTRY TM_ActOutWait
     ENTRY TM_WavedashHopColor
+    ENTRY TM_ShineBeforeIASA
+    ENTRY TM_ShineAfterIASA
 
     # TmDt Data Pointers
     .set TM_Data, TM_tmFunction - 0x4

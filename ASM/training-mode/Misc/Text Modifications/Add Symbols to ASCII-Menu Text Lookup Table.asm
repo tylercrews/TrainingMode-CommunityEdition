@@ -11,6 +11,10 @@
 
     backup
 
+    # ESC + eight hexadecimal digits: inline RGBA within a single text row.
+    cmpwi r10, 0x1B
+    beq InlineColor
+SearchCustomSymbols:
     # Search custom symbol table
     bl CustomSymbolDictionary
     mflr Dictionary
@@ -50,6 +54,48 @@ CharacterFound_Resume:
     mr r31, r12
     load r0, 0x8040c8c0
     branch r12, 0x803a6b08
+
+InlineColor:
+    li r28, 1
+    li r29, 0
+InlineColor_Read:
+    lbzx r11, r6, r28
+    cmpwi r11, 0x30
+    blt SearchCustomSymbols
+    cmpwi r11, 0x39
+    ble InlineColor_Digit
+    cmpwi r11, 0x41
+    blt SearchCustomSymbols
+    cmpwi r11, 0x46
+    bgt SearchCustomSymbols
+    subi r11, r11, 0x37
+    b InlineColor_Accumulate
+InlineColor_Digit:
+    subi r11, r11, 0x30
+InlineColor_Accumulate:
+    slwi r29, r29, 4
+    or r29, r29, r11
+    addi r28, r28, 1
+    cmpwi r28, 9
+    blt InlineColor_Read
+    li r11, 0x0C
+    stbx r11, r3, r9
+    addi r9, r9, 1
+    srwi r11, r29, 24
+    stbx r11, r3, r9
+    addi r9, r9, 1
+    srwi r11, r29, 16
+    stbx r11, r3, r9
+    addi r9, r9, 1
+    srwi r11, r29, 8
+    stbx r11, r3, r9
+    addi r9, r9, 1
+    stbx r29, r3, r9
+    addi r9, r9, 1
+    addi r5, r5, 8
+    addi r6, r6, 8
+    restore
+    branch r12, 0x803a6b70
 
 CustomSymbolDictionary:
     blrl

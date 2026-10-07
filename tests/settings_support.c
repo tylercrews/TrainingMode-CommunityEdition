@@ -13,8 +13,8 @@ void memset(void *dst, int value, int size) {
     unsigned char *d = dst;
     while (size--) *d++ = value;
 }
-/* Freestanding formatting/font conversion for compact timing layout. The
- * glyph/token/kerning tables are the actual input-DOL tables installed by tests. */
+/* Freestanding integer formatting. Native font conversion is executed from
+ * the input DOL with the actual assembled converter hook under Unicorn. */
 int sprintf(char *out, const char *format, ...) {
     va_list args; va_start(args, format);
     char *start = out;
@@ -29,19 +29,6 @@ int sprintf(char *out, const char *format, ...) {
         } else *out++ = *format++;
     }
     *out = 0; va_end(args); return out - start;
-}
-int Text_ConvertToMenuText(char *out, char *in) {
-    const u16 *dictionary = (const u16 *)0x8040C8C0, *tokens = (const u16 *)0x8040C680;
-    char *start = out;
-    while (*in) {
-        unsigned c = (u8)*in++, sjis = c >= '0' && c <= '9' ? 0x824F + c - '0' :
-            c >= 'a' && c <= 'z' ? 0x8281 + c - 'a' :
-            c == '-' ? 0x817C : c == '>' ? 0x8184 : c == '/' ? 0x815E : 0;
-        for (unsigned i = 0; i < 287; ++i) if (dictionary[i] == sjis) {
-            *out++ = tokens[i] >> 8; *out++ = tokens[i]; break;
-        }
-    }
-    *out = 0; return out - start;
 }
 int TestDirty(void) { return stc_memcard_state->memcard_changed; }
 void TestClearDirty(void) { stc_memcard_state->memcard_changed = 0; }
@@ -58,20 +45,41 @@ static MsgData style_message;
 static GOBJ style_object;
 static uint32_t style_colors[8];
 static float style_scales[8][2], style_positions[8][2];
-static char style_strings[8][40];
+static char style_strings[8][112];
 static int style_count, wait_frame, wait_tag;
 static const char *wait_label;
 static GOBJ wait_object;
+static int wave_frame, wave_hop;
 GOBJ *Message_Display(int tag, int queue, int color, char *format, ...) {
     va_list args; va_start(args, format);
+    unsigned id = OSD_MessageSettings(tag);
     if (OSD_MessagePointerFirst(tag)) {
         wait_label = va_arg(args, const char *); wait_frame = va_arg(args, int);
     } else {
-        wait_frame = va_arg(args, int); wait_label = va_arg(args, const char *);
+        wait_frame = va_arg(args, int);
+        wait_label = id == 16 ? va_arg(args, const char *) : "Jump Out Of Shine";
+        if (id == 0) {
+            wave_frame = wait_frame;
+            (void)va_arg(args, double);
+            (void)va_arg(args, const char *);
+            wave_hop = va_arg(args, int);
+        }
     }
     va_end(args); wait_tag = tag;
+    style_message = (MsgData){.text = &style_text, .settings_id = id, .timing_frame = wait_frame,
+        .timing_subtext = OSD_MessageLine(tag), .timing_best = OSD_MessageBestFrame(tag),
+        .timing_prefix = -1, .queue_num = queue};
+    wait_object.userdata = &style_message;
+    style_count = id == 0 ? 3 : 2;
     return &wait_object;
 }
+int TestWaveFrame(void) { return wave_frame; }
+int TestWaveHop(void) { return wave_hop; }
+void TestShineBefore(unsigned slot) { OSD_ShineBeforeIASA(Fighter_GetSubcharGObj(slot/2,slot&1)); }
+void TestShineAfter(unsigned slot) { OSD_ShineAfterIASA(Fighter_GetSubcharGObj(slot/2,slot&1)); }
+void TestStyleTurn(int first_turn, int second_turn) { style_message.timing_turn = first_turn; style_message.timing_second_turn = second_turn; }
+int TestStyleEncoded(void) { return style_message.timing_encoded; }
+
 int TestWaitFrame(void) { return wait_frame; }
 unsigned TestWaitLabelChar(unsigned i) { return wait_label ? wait_label[i] : 0; }
 void TestWaitClear(void) { wait_frame = wait_tag = 0; wait_label = 0; }
@@ -100,7 +108,7 @@ void Text_SetText(Text *text, int subtext, const char *format, ...) {
     int row = editor_row(text, subtext);
     if (text == &style_text && (unsigned)subtext < 8) {
         /* Capture format and integer args without depending on a host libc. */
-        unsigned i = 0; while (format[i] && i < 39) { style_strings[subtext][i] = format[i]; ++i; }
+        unsigned i = 0; while (format[i] && i < 111) { style_strings[subtext][i] = format[i]; ++i; }
         style_strings[subtext][i] = 0;
     }
     if (row < 0) return;
@@ -257,7 +265,7 @@ void TestCueLanding(unsigned slot, int lag, int allow_interrupt) {
     cue_data[slot].attr.normal_landing_lag = lag;
     cue_data[slot].state_var.state_var1 = allow_interrupt;
 }
-void TestCueFrozen(unsigned slot, int frozen) { cue_data[slot].flags.hitlag = frozen; }
+void TestCueFrozen(unsigned slot, int frozen) { cue_data[slot].flags.hitlag = frozen; cue_data[slot].flags.freeze = frozen; }
 void TestCueIASA(unsigned slot, int ready) { cue_data[slot].flags.past_iasa = ready; }
 void TestCueKind(unsigned slot, int kind) { cue_data[slot].kind = kind; }
 void TestCueSpawn(unsigned slot, int spawn, int dead) {

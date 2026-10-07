@@ -1,16 +1,20 @@
 #include "events.h"
 #include "osds.h"
 #include "osd_context.h"
-typedef struct OSDContextFighter { FighterData *fighter; int spawn; TMOSDContext context; } OSDContextFighter;
-typedef char osd_context_layout[(sizeof(TMOSDContext) == 64 && sizeof(OSDContextFighter) == 72) ? 1 : -1];
+typedef struct OSDContextFighter { FighterData *fighter; int spawn; TMOSDContext context; TMShineEpisode shine; } OSDContextFighter;
+typedef char osd_context_layout[(sizeof(TMOSDContext) == 64 && sizeof(TMShineEpisode) == 52 && sizeof(OSDContextFighter) == 124) ? 1 : -1];
 static OSDContextFighter contexts[12];
-static TMOSDContext *context_for(FighterData *fighter) {
+static OSDContextFighter *entry_for(FighterData *fighter) {
     unsigned slot = (unsigned)(u8)fighter->ply * 2 + !!fighter->flags.ms;
     if (slot >= countof(contexts)) return 0;
     OSDContextFighter *entry = &contexts[slot];
     if (entry->fighter != fighter || entry->spawn != fighter->spawn_num)
         *entry = (OSDContextFighter){.fighter = fighter, .spawn = fighter->spawn_num};
-    return &entry->context;
+    return entry;
+}
+static TMOSDContext *context_for(FighterData *fighter) {
+    OSDContextFighter *entry = entry_for(fighter);
+    return entry ? &entry->context : 0;
 }
 void OSDContext_Clear(void) { memset(contexts, 0, sizeof(contexts)); }
 /* 0x8006AB78 is reached by both frozen and normal animation updates, before
@@ -20,6 +24,9 @@ void OSDContext_Tick(FighterData *fighter) {
     if (!c) return;
     int state = fighter->state_id;
     int shine = (fighter->kind == FTKIND_FOX || fighter->kind == FTKIND_FALCO) && state >= 360 && state <= 369;
+    OSDContextFighter *entry = entry_for(fighter);
+    TMShine_Tick(&entry->shine, stc_match->time_frames, shine ? state : -1,
+        fighter->flags.hitlag || (fighter->flags.freeze && fighter->dmg.hitlag_frames > 0), fighter->flags.dead);
     int shield = state >= ASID_GUARDON && state <= ASID_GUARDREFLECT;
     int victim = (state >= ASID_DAMAGEHI1 && state <= ASID_DAMAGEFLYROLL) || state == ASID_DAMAGEFALL;
     TMOSDContext_Step(c, stc_match->time_frames, state, fighter->atk_instance,
@@ -73,4 +80,34 @@ void OSD_ActOutWait(GOBJ *object) {
     if (!label) return;
     Message_Display(OSD_MessageTag(5, OSD_ActOoWait, 2, 2, 0) | TM_OSD_POINTER_FIRST, data->ply, MSGCOLOR_WHITE,
         "Act OoWait\n%s\n%df", label, frame);
+}
+
+void OSD_ShineBeforeIASA(GOBJ *object) {
+    if (!object || !object->userdata) return;
+    FighterData *data = object->userdata;
+    if (data->kind != FTKIND_FOX && data->kind != FTKIND_FALCO) return;
+    OSDContextFighter *entry = entry_for(data);
+    if (entry) TMShine_Before(&entry->shine, stc_match->time_frames, data->state_id,
+        data->flags.freeze || data->flags.dead,
+        data->state_id == 361 || (u8)data->jump.jumps_used < data->attr.max_jumps);
+}
+void OSD_ShineAfterIASA(GOBJ *object) {
+    if (!object || !object->userdata) return;
+    FighterData *data = object->userdata;
+    if (data->kind != FTKIND_FOX && data->kind != FTKIND_FALCO) return;
+    OSDContextFighter *entry = entry_for(data);
+    if (!entry) return;
+    TMShineEpisode *shine = &entry->shine;
+    int result = TMShine_After(shine, stc_match->time_frames, data->state_id,
+        data->flags.freeze || data->flags.dead);
+    if (!result || data->flags.ms || !(Settings_Get(TM_SETTING_OSD_MASK, 0) & (1u << OSD_FighterSpecificTech))) return;
+    unsigned frame = result == TM_SHINE_JUMP ? shine->jump_opportunity : shine->opportunity;
+    GOBJ *message = Message_Display(OSD_MessageTag(OSD_FighterSpecificTech, OSD_FighterSpecificTech, 1, 1, 0),
+        data->ply, MSGCOLOR_WHITE, "Jump Out Of Shine\n%df", frame);
+    MsgData *msg = message->userdata;
+    msg->timing_hitlag = shine->hitlag;
+    msg->timing_turn = shine->first_turn;
+    msg->timing_second_turn = result == TM_SHINE_DOUBLE_TURN;
+    OSD_FormatTiming(msg, 0, -MSGTEXT_YOFFSET / 2);
+    OSD_ApplyMessageStyle(msg);
 }

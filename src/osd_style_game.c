@@ -1,45 +1,44 @@
 #include "events.h"
 
-/* Match the native menu-font width calculation at 0x803A8368: glyphs
- * 0x2000..0x211E use 32 + 2 - left/right kerning. Measuring at creation lets
- * separately colored runs meet without an artificial gap or overlap. */
-static float compact_width(char *ascii) {
-    u8 glyphs[64];
-    int bytes = Text_ConvertToMenuText((char *)glyphs, ascii);
-    const u8 *kerning = (const u8 *)0x8040CB00;
-    float width = 0;
-    for (int i = 0; i + 1 < bytes; i += 2) {
-        unsigned code = ((unsigned)glyphs[i] << 8) | glyphs[i + 1];
-        if (code < 0x2000 || code >= 0x211F) continue;
-        unsigned index = (code - 0x2000) * 2;
-        width += 34 - kerning[index] - kerning[index + 1];
-    }
-    return width;
+/* ESC followed by eight uppercase hex digits emits a native 0x0C color
+ * command in the patched ASCII converter. One centered row owns every run. */
+static char *append_color(char *out, uint32_t color) {
+    static const char hex[] = "0123456789ABCDEF";
+    *out++ = 0x1B;
+    for (int shift = 28; shift >= 0; shift -= 4) *out++ = hex[(color >> shift) & 15];
+    return out;
+}
+static char *append_text(char *out, const char *in) {
+    while (*in) *out++ = *in++;
+    return out;
 }
 void OSD_FormatTiming(MsgData *msg, int inline_layout, int y) {
     if (msg->timing_frame < 0) return;
-    float center = inline_layout ? 55 : 0, scale = 0.7f;
+    if (!inline_layout && !msg->timing_hitlag && !msg->timing_turn && !msg->timing_encoded) return;
+    char line[112], part[24];
+    char *out = line;
     if (inline_layout) {
-        Text_SetText(msg->text, 0, "Wavedash");
-        Text_SetPosition(msg->text, 0, -70, y);
-        msg->timing_subtext = Text_AddSubtext(msg->text, center, y, "%df", msg->timing_frame);
-        Text_SetScale(msg->text, 0, scale, scale);
-        Text_SetScale(msg->text, msg->timing_subtext, scale, scale);
-    } else y += msg->timing_subtext * MSGTEXT_YOFFSET;
-    if (msg->timing_hitlag) {
-        char prefix[24], result[24];
-        /* No right-arrow exists in the native 287-glyph lookup. ASCII -> is
-         * the supported fallback, with no surrounding spaces. */
-        sprintf(prefix, "%dhl->", msg->timing_hitlag);
-        sprintf(result, msg->settings_id == 1 ? "%df/7f" : "%df", msg->timing_frame);
-        float prefix_width = compact_width(prefix) * scale;
-        float result_width = compact_width(result) * scale;
-        Text_SetText(msg->text, msg->timing_subtext, result);
-        Text_SetPosition(msg->text, msg->timing_subtext, center + prefix_width / 2, y);
-        Text_SetScale(msg->text, msg->timing_subtext, scale, scale);
-        msg->timing_prefix = Text_AddSubtext(msg->text, center - result_width / 2, y, prefix);
-        Text_SetScale(msg->text, msg->timing_prefix, scale, scale);
+        out = append_text(out, "Wavedash ");
+        msg->timing_subtext = 0; /* Title + timing share a single centered first row. */
     }
+    if (msg->timing_hitlag) {
+        out = append_color(out, 0xFFFFFFFF);
+        sprintf(part, "%dhl->", msg->timing_hitlag);
+        out = append_text(out, part);
+    }
+    if (msg->timing_turn) {
+        out = append_color(out, OSD_TimingColor(msg->timing_turn));
+        sprintf(part, "%dtrn->", msg->timing_turn);
+        out = append_text(out, part);
+    }
+    out = append_color(out, msg->timing_second_turn ? 0xFFA2BAFF :
+        OSD_TimingColorFor(msg->timing_frame, msg->timing_best));
+    sprintf(part, msg->timing_second_turn ? "%dtrn" : msg->settings_id == 1 ? "%df/7f" : "%df", msg->timing_frame);
+    out = append_text(out, part); *out = 0;
+    Text_SetText(msg->text, msg->timing_subtext, line);
+    Text_SetPosition(msg->text, msg->timing_subtext, 0, inline_layout ? y : y + msg->timing_subtext * MSGTEXT_YOFFSET);
+    Text_SetScale(msg->text, msg->timing_subtext, 1.f, 1.f);
+    msg->timing_prefix = -1; msg->timing_encoded = 1;
 }
 
 void OSD_ApplyMessageStyle(MsgData *msg) {
@@ -48,7 +47,7 @@ void OSD_ApplyMessageStyle(MsgData *msg) {
     uint32_t rgba = OSD_PaletteColor(choice);
     GXColor title = {rgba >> 24, rgba >> 16, rgba >> 8, rgba};
     Text_SetColor(msg->text, 0, &title);
-    if (msg->timing_frame >= 0) {
+    if (msg->timing_frame >= 0 && !msg->timing_encoded) {
         rgba = OSD_TimingColorFor(msg->timing_frame, msg->timing_best);
         GXColor result = {rgba >> 24, rgba >> 16, rgba >> 8, rgba};
         Text_SetColor(msg->text, msg->timing_subtext, &result);
