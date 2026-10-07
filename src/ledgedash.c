@@ -28,6 +28,7 @@ enum menu_options
     OPT_PROTECTION,
     OPT_EGG,
     OPT_ABOUT,
+    OPT_DEFAULTS,
     OPT_EXIT,
 };
 
@@ -68,6 +69,9 @@ static void Ledgedash_ApplyOverlay(LedgedashData *data, GOBJ *fighter);
 static void Ledgedash_UpdateAttempt(LedgedashData *data, FighterData *fighter);
 static void Ledgedash_CleanupScene(void *unused);
 static int Ledgedash_EggDamage(GOBJ *object);
+static void Ledgedash_ChangeSavedSetting(GOBJ *menu, int value);
+static void Ledgedash_ChangeTips(GOBJ *menu, int value);
+static void Ledgedash_ResetSettings(GOBJ *menu);
 typedef char ldsh_event_fits[(sizeof(LedgedashData) <= EVENT_DATASIZE) ? 1 : -1];
 static struct {
     GOBJ *object, *retiring;
@@ -123,11 +127,12 @@ static EventOption LdshOptions_Main[] = {
     {
         .kind = OPTKIND_STRING,
         .value_num = sizeof(LdshOptions_Reset) / 4,
-        .val = OPTRESET_SAME_SIDE,
+        .val = TM_LEDGE_DEFAULT_RESET,
         .name = "Reset",
         .desc = {"Change where the fighter gets placed",
                  "after a ledgedash attempt."},
         .values = LdshOptions_Reset,
+        .OnChange = Ledgedash_ChangeSavedSetting,
     },
     {
         .kind = OPTKIND_TOGGLE,
@@ -140,8 +145,8 @@ static EventOption LdshOptions_Main[] = {
         .kind = OPTKIND_TOGGLE,
         .name = "Tips",
         .desc = {"Toggle the onscreen display of tips."},
-        .val = 1,
-        .OnChange = Tips_Toggle,
+        .val = TM_LEDGE_DEFAULT_TIPS,
+        .OnChange = Ledgedash_ChangeTips,
     },
     {
         .kind = OPTKIND_STRING,
@@ -176,10 +181,11 @@ static EventOption LdshOptions_Main[] = {
         .kind = OPTKIND_STRING,
         .value_num =
             sizeof(LdshOptions_ResetDelay) / sizeof(*LdshOptions_ResetDelay),
-        .val = 1,
+        .val = TM_LEDGE_DEFAULT_DELAY,
         .name = "Reset Delay",
         .desc = {"Change how quickly you can start a new ledgedash."},
         .values = LdshOptions_ResetDelay,
+        .OnChange = Ledgedash_ChangeSavedSetting,
     },
     {
         .kind = OPTKIND_STRING, .value_num = 2, .name = "Ledge",
@@ -207,6 +213,11 @@ static EventOption LdshOptions_Main[] = {
              "This is most commonly done by dropping off ledge, double jumping ",
              "immediately, and quickly airdodging onto stage. Each input",
              "is performed quickly after the last, making it difficult and risky."},
+    },
+    {
+        .kind = OPTKIND_FUNC, .name = "Reset Event Settings",
+        .desc = {"Restore this event's defaults, including saved choices.", "Global Settings and other events are unchanged."},
+        .OnSelect = Ledgedash_ResetSettings,
     },
     {
         .kind = OPTKIND_FUNC,
@@ -242,9 +253,60 @@ static EventMenu LdshMenu_Main = {
     .shortcuts = &Ldsh_ShortcutList,
 };
 
+static const u8 saved_ledge_rows[TM_LEDGE_PREF_COUNT] = {
+    OPT_POS, OPT_RESET, OPT_CRITERION, OPT_RESETDELAY, OPT_TIPS,
+};
+static void Ledgedash_LoadSettings(void) {
+    for (unsigned i = 0; i < TM_LEDGE_PREF_COUNT; ++i) {
+        EventOption *option = &LdshOptions_Main[saved_ledge_rows[i]];
+        option->val = option->val_prev = TM_GetSetting(TM_SETTING_LEDGEDASH, i);
+    }
+    if (LdshOptions_Main[OPT_CRITERION].val == LDSH_POP_EGG) LdshOptions_EggMenu[EGG_ENABLE].val = 1;
+    sprintf(criterion_text, "%s", LdshCriterionLabels[LdshOptions_Main[OPT_CRITERION].val]);
+}
+static void Ledgedash_ChangeSavedSetting(GOBJ *menu, int value) {
+    MenuData *data = menu->userdata;
+    if (data->curr_menu != &LdshMenu_Main) return;
+    unsigned row = data->curr_menu->scroll + data->curr_menu->cursor;
+    for (unsigned i = 0; i < TM_LEDGE_PREF_COUNT; ++i)
+        if (saved_ledge_rows[i] == row) TM_SetSetting(TM_SETTING_LEDGEDASH, i, value);
+}
+static void Ledgedash_ChangeTips(GOBJ *menu, int value) {
+    TM_SetSetting(TM_SETTING_LEDGEDASH, TM_LEDGE_TIPS, value);
+    Tips_Toggle(menu, value);
+}
+static void Ledgedash_ResetSettings(GOBJ *menu) {
+    /* Defaults for the event-local choices too; callbacks run once after the batch. */
+    static const u8 main_defaults[OPT_EGG] = {
+        [OPT_RESET] = TM_LEDGE_DEFAULT_RESET, [OPT_HUD] = 1, [OPT_TIPS] = TM_LEDGE_DEFAULT_TIPS,
+        [OPT_RESETDELAY] = TM_LEDGE_DEFAULT_DELAY, [OPT_PROTECTION] = 1,
+    };
+    static const u8 egg_defaults[EGG_DAMAGE + 1] = {
+        [EGG_DISTANCE] = 20, [EGG_MIN_DISTANCE] = 10, [EGG_MAX_DISTANCE] = 35, [EGG_DAMAGE] = 10,
+    };
+    int old_criterion = LdshOptions_Main[OPT_CRITERION].val;
+    for (unsigned i = 0; i < countof(main_defaults); ++i)
+        LdshOptions_Main[i].val = LdshOptions_Main[i].val_prev = main_defaults[i];
+    for (unsigned i = 0; i < countof(egg_defaults); ++i)
+        LdshOptions_EggMenu[i].val = LdshOptions_EggMenu[i].val_prev = egg_defaults[i];
+    TM_SetSetting(TM_SETTING_EVENT_RESET, TM_EVENT_LEDGEDASH, 1);
+    Ledgedash_LoadSettings();
+    LedgedashData *data = event_vars->event_gobj->userdata;
+    data->ledge = -1;
+    if (old_criterion != LDSH_GALINT) {
+        data->hud.total_count = data->hud.successful_count = 0;
+        Ledgedash_UpdateRate(data);
+    }
+    Ledgedash_ChangeShowHUD(menu, 1);
+    Ledgedash_ChangeCamMode(menu, 0);
+    Tips_Toggle(menu, TM_LEDGE_DEFAULT_TIPS);
+    Fighter_PlaceOnLedge();
+}
+
 // Init Function
 void Event_Init(GOBJ *gobj)
 {
+    Ledgedash_LoadSettings();
     LedgedashData *event_data = gobj->userdata;
     Ledgedash_EggCleanup();
     GOBJ *cleanup = GObj_Create(0, 0, 0);
@@ -319,6 +381,7 @@ void Event_Think(GOBJ *event)
 }
 void Event_Exit(GOBJ *menu)
 {
+    Memcard_SaveIfChanged();
     Ledgedash_EggCleanup();
     event_vars->set_local_overlay(Fighter_GetGObj(0), 0);
     // end game
@@ -496,6 +559,7 @@ void Ledgedash_InitVariables(LedgedashData *event_data)
 // Menu Toggle functions
 void Ledgedash_ToggleStartPosition(GOBJ *menu_gobj, int value)
 {
+    TM_SetSetting(TM_SETTING_LEDGEDASH, TM_LEDGE_START, value);
     Fighter_PlaceOnLedge();
 }
 
@@ -1401,6 +1465,7 @@ static void Ledgedash_ChangeLedge(GOBJ *menu, int value) {
     Fighter_PlaceOnLedge();
 }
 static void Ledgedash_ChangeCriterion(GOBJ *menu, int value) {
+    TM_SetSetting(TM_SETTING_LEDGEDASH, TM_LEDGE_CRITERION, value);
     LedgedashData *data = event_vars->event_gobj->userdata;
     data->hud.total_count = 0; data->hud.successful_count = 0;
     if (value == LDSH_POP_EGG && !LdshOptions_EggMenu[EGG_ENABLE].val) LdshOptions_EggMenu[EGG_ENABLE].val = 1;

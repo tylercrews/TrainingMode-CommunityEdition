@@ -19,6 +19,9 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Saved Ledgedash Starting Position, Reset, Success Criteria, Reset Delay and Tips, plus Eggs-ercise damage threshold, scale, spawn velocity, collision display and infinite/Free Practice mode.
+- Added Reset Event Settings to both events; Eggs-ercise resets by restarting in timed mode. Settings use 25 previously reserved bits, leaving four; high scores retain their storage and Eggs-ercise local trail settings are not saved.
+
 - Renamed the recovery control Actionable Yellow>Green and regrouped both Global Settings menus as OSDs, CPU override, ALL override, separator, then overlays/shared controls.
 
 - Fixed the remaining hitlag pointer warnings and duplicate/blank shine text by teaching the native setter to count inline RGB commands when replacing an existing row.

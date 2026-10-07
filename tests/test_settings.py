@@ -306,6 +306,27 @@ class RelocatedDATSettingsTests(unittest.TestCase):
         m.call("DAT_Set", 11, 7, 1)
         self.assertEqual(m.record(), before)
 
+    def test_event_preferences_through_real_dat_relocation_and_reload(self):
+        m = self.m
+        m.init()
+        m.call("DAT_Set", 11, 8, 1)
+        m.call("DAT_Set", 18, 4, 0)  # Hints Off.
+        m.call("DAT_Set", 18, 0, 4)
+        m.call("DAT_Set", 19, 0, 199)
+        m.call("DAT_Set", 19, 4, 1)  # Infinite mode On.
+        saved = m.record()
+        fresh = Machine()
+        fresh.put(saved)
+        for _ in range(10):
+            self.assertEqual(m.call("DAT_Get", 18, 4), 0)
+            self.assertEqual(m.call("DAT_Get", 19, 4), 1)
+            self.assertEqual(fresh.call("Settings_Get", 18, 0), 4)
+            self.assertEqual(fresh.call("Settings_Get", 19, 0), 199)
+            self.assertEqual(fresh.call("Settings_Get", 19, 4), 1)
+            self.assertEqual(fresh.call("Settings_Get", 11, 8), 1)
+        self.assertEqual(fresh.record(), saved)
+        self.assertEqual(fresh.call("TestDirty"), 0)
+
 
 class SettingsTests(unittest.TestCase):
     def setUp(self):
@@ -440,7 +461,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(m.record()[7:10], b"\0\0\0")
         self.assertEqual(m.record()[12:30], b"\0" * 18)
         self.assertEqual(m.record()[37] & 0xFE, 0xFE)
-        self.assertEqual(m.record()[40:44], b"KEEP")
+        self.assertEqual(m.record()[40:44], b"K@EP")  # Invalid saved start=5 is repaired; free bits survive.
 
     def test_foreign_and_future_records_are_not_modified(self):
         m = self.m
@@ -511,6 +532,141 @@ class SettingsTests(unittest.TestCase):
         m.call("TestSettingsWrite", IDS[5], 1)
         self.assertEqual(m.call("Settings_Get", 15, IDS[5]), 1)
         self.assertEqual(m.call("TestDirty"), 1)
+
+
+class EventPreferenceTests(unittest.TestCase):
+    LEDGE = 18
+    EGGS = 19
+    RESET = 20
+    defaults = {LEDGE: [0, 1, 0, 1, 1], EGGS: [12, 0, 1, 0, 0]}
+    counts = {LEDGE: [5, 5, 4, 4, 2], EGGS: [200, 3, 2, 2, 2]}
+
+    def setUp(self):
+        self.m = Machine()
+        self.m.init()
+
+    def tearDown(self):
+        self.assertEqual(bytes(self.m.cpu.mem_read(RECORD - 8, 8)), b"\xA5" * 8)
+        self.assertEqual(bytes(self.m.cpu.mem_read(RECORD + 44, 8)), b"\xA5" * 8)
+
+    def values(self, m):
+        return {field: [m.read(field, i) for i in range(len(values))] for field, values in self.defaults.items()}
+
+    def test_old_format_three_uses_read_only_defaults_until_first_edit(self):
+        m = self.m
+        old = bytearray(m.record())
+        old[40:44] = b"\xf0\xff\xff\xff"  # Initialization bit clear, arbitrary old reserve payload.
+        m.put(old)
+        self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
+        self.assertEqual(self.values(m), self.defaults)
+        self.assertEqual(m.record(), old)
+        self.assertEqual(m.call("Settings_Get", self.EGGS, 4), 0)
+        self.assertEqual(m.call("TestDirty"), 0)
+        m.call("Settings_Set", self.LEDGE, 4, 0)
+        self.assertEqual(m.call("TestDirty"), 1)
+        self.assertEqual(m.record()[:40], old[:40])
+        self.assertEqual(m.record()[40] & 0x80, 0x80)
+        self.assertEqual(m.record()[43] & 0xE0, 0xE0)
+        self.assertEqual(self.values(m), {self.LEDGE: [0, 1, 0, 1, 0], self.EGGS: self.defaults[self.EGGS]})
+
+    def test_every_supported_value_round_trips_without_changing_other_choices(self):
+        m = self.m
+        reserve = bytearray(m.record())
+        reserve[40] |= 0x87
+        reserve[43] |= 0xE0
+        m.put(reserve)
+        for field, counts in self.counts.items():
+            for index, count in enumerate(counts):
+                for value in range(count):
+                    before = self.values(m)
+                    m.write(field, index, value)
+                    before[field][index] = value
+                    self.assertEqual(self.values(m), before)
+                    self.assertEqual(m.record()[:40], reserve[:40])
+                    self.assertEqual(m.record()[40] & 0x87, 0x87)
+                    self.assertEqual(m.record()[43] & 0xE0, 0xE0)
+                    saved = m.record()
+                    self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
+                    self.assertEqual(m.record(), saved)
+
+    def test_exact_packed_budget_and_free_bits(self):
+        m = self.m
+        r = bytearray(m.record()); r[40] = 0x87; r[43] = 0xE0; m.put(r)
+        for field, values in [(self.LEDGE, [4, 4, 3, 3, 0]), (self.EGGS, [199, 2, 0, 1, 1])]:
+            for index, value in enumerate(values): m.write(field, index, value)
+        self.assertEqual(m.record()[40:44], b"\xbf\xe4\xc7\xfa")
+        self.assertEqual(m.record()[10] >> 6, 3)
+        self.assertEqual(len(m.record()), 44)
+
+    def test_reject_invalid_writes_before_initializing_the_record(self):
+        m = self.m
+        before = m.record()
+        for field, counts in self.counts.items():
+            for index, count in enumerate(counts):
+                for value in (count, 0xFFFFFFFF):
+                    self.assertEqual(m.write(field, index, value), 0)
+                    self.assertEqual(m.record(), before)
+            self.assertEqual(m.write(field, len(counts), 0), 0)
+            self.assertEqual(m.read(field, len(counts)), 0)
+        for index, value in [(2, 1), (0, 0), (1, 2)]:
+            self.assertEqual(m.write(self.RESET, index, value), 0)
+        self.assertEqual(m.record(), before)
+
+    def test_corrupt_initialized_values_repair_individually_and_idempotently(self):
+        m = self.m
+        r = bytearray(m.record()); r[40:44] = b"\xff\xff\xff\xff"; m.put(r)
+        self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 2)
+        self.assertEqual(self.values(m), {self.LEDGE: [0, 1, 3, 3, 1], self.EGGS: [12, 0, 1, 1, 1]})
+        self.assertEqual(m.record()[40:44], b"\xff\xc8\x0c\xfc")
+        self.assertEqual(m.record()[:40], r[:40])
+        saved = m.record()
+        self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
+        self.assertEqual(m.record(), saved)
+
+    def test_event_resets_preserve_sibling_preferences_flags_and_free_bits(self):
+        m = self.m
+        r = bytearray(m.record()); r[40] = 0x87; r[43] = 0xE0; m.put(r)
+        for field, counts in self.counts.items():
+            for index, count in enumerate(counts): m.write(field, index, count - 1)
+        eggs = self.values(m)[self.EGGS]
+        m.write(self.RESET, 0, 1)
+        self.assertEqual(self.values(m), {self.LEDGE: self.defaults[self.LEDGE], self.EGGS: eggs})
+        m.write(self.LEDGE, 4, 0)
+        ledge = self.values(m)[self.LEDGE]
+        m.write(self.RESET, 1, 1)
+        self.assertEqual(self.values(m), {self.LEDGE: ledge, self.EGGS: self.defaults[self.EGGS]})
+        self.assertEqual(m.record()[40] & 0x87, 0x87)
+        self.assertEqual(m.record()[43] & 0xE0, 0xE0)
+        self.assertEqual(m.record()[:40], r[:40])
+
+    def test_infinite_mode_and_hints_are_independent_and_survive_fresh_service(self):
+        m = self.m
+        m.call("Settings_Set", self.LEDGE, 4, 0)
+        m.call("Settings_Set", self.EGGS, 4, 1)
+        saved = m.record()
+        fresh = Machine(); fresh.put(saved)
+        self.assertEqual(fresh.call("Settings_Get", self.LEDGE, 4), 0)
+        self.assertEqual(fresh.call("Settings_Get", self.EGGS, 4), 1)
+        self.assertEqual(fresh.call("TestDirty"), 0)
+        self.assertEqual(fresh.record(), saved)
+        fresh.call("Settings_Set", self.LEDGE, 4, 1)
+        self.assertEqual(fresh.call("Settings_Get", self.EGGS, 4), 1)
+
+    def test_foreign_and_unsupported_records_only_use_private_event_preferences(self):
+        for foreign in (False, True):
+            m = Machine(); m.init()
+            m.write(self.EGGS, 4, 1)
+            if foreign: m.cpu.mem_write(0x80000000, b"GTME01")
+            else:
+                r = bytearray(m.record()); r[10] &= 0x3F; m.put(r)
+            saved = m.record()
+            self.assertEqual(m.call("Settings_Get", self.EGGS, 4), 0)
+            m.call("Settings_Set", self.LEDGE, 4, 0)
+            m.call("Settings_Set", self.EGGS, 4, 1)
+            self.assertEqual(m.call("Settings_Get", self.EGGS, 4), 1)
+            self.assertEqual(m.call("Settings_Get", self.LEDGE, 4), 0)
+            self.assertEqual(m.record(), saved)
+            self.assertEqual(m.call("TestDirty"), 0)
 
 
 class TrailTests(unittest.TestCase):
@@ -1071,10 +1227,10 @@ class OSDEditorTests(unittest.TestCase):
     def test_cpu_override_editor_row_and_saved_bit_are_independent(self):
         m=self.m
         m.write(14,20,6); m.write(15,29,1)  # An unknown old enable bit must survive this row allocation.
-        reserved=bytearray(m.record()); reserved[40:44]=b"\xf8ABC"; m.put(reserved)
+        reserved=bytearray(m.record()); reserved[40:44]=b"\xf0ABC"; m.put(reserved)
         m.call("TestEditorInit"); m.call("TestEditorInput",0x200,19)
         self.assertEqual(m.read(11,8),1)
-        self.assertEqual(m.record()[40:44],b"\xfcABC")
+        self.assertEqual(m.record()[40:44],b"\xf4ABC")
         self.assertEqual(m.read(15,29),1)
         self.assertEqual(m.read(14,20),6)
         self.assertEqual(m.call("TestEditorHidden",19),0)
@@ -1459,7 +1615,7 @@ class ActionCueTests(unittest.TestCase):
         m.call("TestCueTick", 2)
         self.assertEqual(struct.unpack(">f", m.cpu.mem_read(ptr + 0x1998, 4))[0], 8)
 
-    def test_version_one_migration_initializes_new_bit_and_preserves_29_reserved_bits(self):
+    def test_version_one_migration_clears_new_flags_and_event_initialization(self):
         m = self.m
         old = bytearray(m.record())
         old[10] = 0x7F
@@ -1467,11 +1623,11 @@ class ActionCueTests(unittest.TestCase):
         m.put(old)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 1)
         self.assertEqual(m.record()[10], 0xFF)
-        self.assertEqual(m.record()[40:44], b"\xF8ABC")
+        self.assertEqual(m.record()[40:44], b"\xF0ABC")
         self.assertEqual(m.read(11, 6), 0)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
         m.write(16, 17, 1)
-        self.assertEqual(m.record()[40:44], b"\xF9ABC")
+        self.assertEqual(m.record()[40:44], b"\xF1ABC")
         self.assertEqual(m.record()[10], 0xFF)  # Version bits do not change.
         for row, flag in [(7, 3), (11, 4), (17, 6), (23, 5)]:
             self.assertEqual(m.read(16, row), m.read(11, flag))
@@ -1593,7 +1749,7 @@ class ActionCueTests(unittest.TestCase):
         m.call("TestCueProtection", 0, 2, 0, 0)
         self.assertEqual(self.show(3, 341, 4), 0x4BE16470)  # Move-granted protection has no state whitelist.
 
-    def test_version_two_migration_preserves_turnrun_and_30_reserved_bits(self):
+    def test_version_two_migration_preserves_turnrun_and_clears_event_initialization(self):
         m = self.m
         old = bytearray(m.record())
         old[10] = 0xBF
@@ -1601,7 +1757,7 @@ class ActionCueTests(unittest.TestCase):
         m.put(old)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 1)
         self.assertEqual(m.record()[10], 0xFF)
-        self.assertEqual(m.record()[40:44], b"\xF9ABC")
+        self.assertEqual(m.record()[40:44], b"\xF1ABC")
         self.assertEqual(m.read(11, 6), 1)
         self.assertEqual(m.read(11, 7), 0)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
@@ -1609,7 +1765,7 @@ class ActionCueTests(unittest.TestCase):
         m.call("TestEditorInput", 0x200, 28)  # Protection at final grouped row.
         m.call("TestEditorAnimate", 28)
         m.write(16, 25, m.call("TestEditorCache", 28))
-        self.assertEqual(m.record()[40:44], b"\xFBABC")
+        self.assertEqual(m.record()[40:44], b"\xF3ABC")
         fresh = Machine()
         fresh.put(m.record())
         self.assertEqual(fresh.call("Settings_Get", 11, 7), 1)

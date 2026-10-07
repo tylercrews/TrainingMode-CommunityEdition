@@ -17,6 +17,13 @@
 #define TM_SETTINGS_SIGNATURE_OFFSET 38
 #define TM_SETTINGS_RESERVED_OFFSET 40
 #define TM_SETTINGS_EXTRA_FLAGS_OFFSET 40 /* Bits 0/1/2: TurnRun/protection/CPU OSD override. */
+#define TM_SETTINGS_EVENT_INITIALIZED 0x08 /* Byte 40 bit 3; older format-3 saves leave it clear. */
+#define TM_SETTINGS_EVENT_DELAY_MASK 0x30 /* Byte 40 bits 4-5: Ledgedash reset delay. */
+#define TM_SETTINGS_EVENT_TIPS_MASK 0x40 /* Byte 40 bit 6: Ledgedash hints. */
+#define TM_SETTINGS_FREE_MASK 0x80 /* Byte 40 bit 7 remains reserved. */
+#define TM_SETTINGS_EGGS_FREE_MASK 0xE0 /* Byte 43 bits 5-7: three more reserve bits. */
+#define TM_SETTINGS_LEDGE_OFFSET 41
+#define TM_SETTINGS_EGGS_OFFSET 42
 
 /* Shared labels and native L-menu row bindings. Build-generated ASM uses these names too. */
 #define TM_GLOBAL_TRAIL_VERY_FAST_ROW 2
@@ -71,7 +78,26 @@ enum TMSettingsField {
     TM_SETTING_OSD_ENABLED,
     TM_SETTING_NATIVE_ROW,
     TM_SETTING_EDITOR_ROW, /* Native physical row ID -> grouped editor binding. */
+    TM_SETTING_LEDGEDASH,
+    TM_SETTING_EGGS,
+    TM_SETTING_EVENT_RESET, /* Write 1, index TM_EVENT_*: reset only this event's saved fields. */
 };
+
+/* Stable preference IDs, independent of either event's menu row order. */
+enum TMLedgedashPreference {
+    TM_LEDGE_START, TM_LEDGE_RESET, TM_LEDGE_CRITERION, TM_LEDGE_RESET_DELAY, TM_LEDGE_TIPS,
+    TM_LEDGE_PREF_COUNT,
+};
+enum TMEggsPreference {
+    TM_EGGS_DAMAGE, TM_EGGS_SCALE, TM_EGGS_VELOCITY, TM_EGGS_COLLISION,
+    TM_EGGS_FREE_PRACTICE, TM_EGGS_PREF_COUNT,
+};
+enum TMEventPreferenceID { TM_EVENT_LEDGEDASH, TM_EVENT_EGGS, TM_EVENT_PREF_COUNT };
+#define TM_LEDGE_DEFAULT_RESET 1
+#define TM_LEDGE_DEFAULT_DELAY 1
+#define TM_LEDGE_DEFAULT_TIPS 1
+#define TM_EGGS_DEFAULT_DAMAGE 12
+#define TM_EGGS_DEFAULT_VELOCITY 1
 
 extern const uint8_t TMSettings_OSDIDs[TM_SETTINGS_OSDS];
 extern const uint8_t TMSettings_EditorIDs[29];

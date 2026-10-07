@@ -12,14 +12,42 @@ static JOBJ *hud_score_jobj, *hud_best_jobj;
 static int canvas;
 static Text *hud_score_text, *hud_best_text;
 
+static const u8 saved_eggs_rows[] = {OPT_DAMAGETHRESHOLD, OPT_SCALE, OPT_VELOCITY, OPT_COLLISION};
+static void Eggs_LoadSettings(void) {
+    for (unsigned i = 0; i < countof(saved_eggs_rows); ++i) {
+        EventOption *option = &Options_Main[saved_eggs_rows[i]];
+        option->val = option->val_prev = TM_GetSetting(TM_SETTING_EGGS, i);
+    }
+}
+void Eggs_ChangeSavedSetting(GOBJ *menu, int value) {
+    MenuData *data = menu->userdata;
+    if (data->curr_menu != &Menu_Main) return;
+    unsigned row = data->curr_menu->scroll + data->curr_menu->cursor;
+    for (unsigned i = 0; i < countof(saved_eggs_rows); ++i)
+        if (saved_eggs_rows[i] == row) TM_SetSetting(TM_SETTING_EGGS, i, value);
+}
+void Eggs_ResetSettings(GOBJ *menu) {
+    TM_SetSetting(TM_SETTING_EVENT_RESET, TM_EVENT_EGGS, 1);
+    Eggs_LoadSettings();
+    Options_HitboxTrails[OPT_HITBOXTRAILS_ENABLED].val =
+        Options_HitboxTrails[OPT_HITBOXTRAILS_ENABLED].val_prev = 0;
+    Options_HitboxTrails[OPT_HITBOXTRAILS_DECAY].val =
+        Options_HitboxTrails[OPT_HITBOXTRAILS_DECAY].val_prev = 0;
+    /* Restart to reset the challenge clock and Free Practice's disabled rows.
+     * No global trail preferences or scores are changed. */
+    Retry(menu);
+}
+
 void Exit(GOBJ *menu) 
 {
+    Memcard_SaveIfChanged();
     stc_match->state = 3;
     Match_EndVS();
 }
 
 void Retry(GOBJ *menu) 
 {
+    Memcard_SaveIfChanged();
     stc_match->end_kind = MATCHENDKIND_RETRY;
     stc_match->state = 3;
     Match_EndVS();
@@ -30,6 +58,7 @@ float RandomRange(float low, float high) {
 }
 
 void ChangeHitDisplay(GOBJ *menu_gobj, int value) {
+    if (menu_gobj) TM_SetSetting(TM_SETTING_EGGS, TM_EGGS_COLLISION, value);
     // loop through all fighters
     GOBJ *this_fighter = (*stc_gobj_lookup)[MATCHPLINK_FIGHTER];
     while (this_fighter != 0)
@@ -46,16 +75,19 @@ void ChangeHitDisplay(GOBJ *menu_gobj, int value) {
 }
 
 void StartFreePractice(GOBJ *gobj) {
+    TM_SetSetting(TM_SETTING_EGGS, TM_EGGS_FREE_PRACTICE, 1);
     Options_Main[OPT_FREEPRACTICE].disable = 1;
     Options_Main[OPT_DAMAGETHRESHOLD].disable = 0;
     Options_Main[OPT_SCALE].disable = 0;
     Options_Main[OPT_VELOCITY].disable = 0;
     Options_Main[OPT_COLLISION].disable = 0;
     stc_match->match.timer = MATCH_TIMER_COUNTUP;
+    ChangeHitDisplay(0, Options_Main[OPT_COLLISION].val);
 }
 
 void Egg_OnChangeSize(GOBJ *menu, int value)
 {
+    TM_SetSetting(TM_SETTING_EGGS, TM_EGGS_SCALE, value);
     if (egg_gobj != 0)
     {
         Item_Destroy(egg_gobj);
@@ -111,7 +143,9 @@ GOBJ *Egg_Spawn(void)
     }
     
     // random Y velocity on spawn
-    Vec3 rand_velocity = {0, (2 + HSD_Randf()) * Options_Main[OPT_VELOCITY].val, 0};
+    int velocity = stc_match->match.timer == MATCH_TIMER_COUNTUP ?
+        Options_Main[OPT_VELOCITY].val : TM_EGGS_DEFAULT_VELOCITY;
+    Vec3 rand_velocity = {0, (2 + HSD_Randf()) * velocity, 0};
     SpawnItem item_egg = {
         .it_kind = ITEM_EGG,
         .pos = coll_pos,
@@ -130,7 +164,9 @@ int Egg_OnTakeDamage(GOBJ *gobj)
     // gfx and sfx
     ItemData *egg_data = egg_gobj->userdata;
     accumulated_damage += egg_data->dmg.recent;
-    if (accumulated_damage >= Options_Main[OPT_DAMAGETHRESHOLD].val){
+    int threshold = stc_match->match.timer == MATCH_TIMER_COUNTUP ?
+        Options_Main[OPT_DAMAGETHRESHOLD].val : TM_EGGS_DEFAULT_DAMAGE;
+    if (accumulated_damage >= threshold){
         Effect_SpawnSync(1232, gobj, egg_data->pos);
         Item_PlayOnDestroySFXAgain(egg_data, 244, 127, 64);
         
@@ -144,6 +180,13 @@ int Egg_OnTakeDamage(GOBJ *gobj)
 
 void Event_Init(GOBJ *gobj)
 {
+    Eggs_LoadSettings();
+    /* A retry may reuse the event module. Rebuild gating from the saved mode,
+     * not from disabled-row state left by the previous practice session. */
+    Options_Main[OPT_FREEPRACTICE].disable = 0;
+    for (unsigned i = 0; i < countof(saved_eggs_rows); ++i) Options_Main[saved_eggs_rows[i]].disable = 1;
+    if (TM_GetSetting(TM_SETTING_EGGS, TM_EGGS_FREE_PRACTICE)) StartFreePractice(0);
+    else ChangeHitDisplay(0, 0);
     Eggs_ChangeHitboxTrails(0, 0);
 
     // initialize egg camera subject
@@ -237,14 +280,16 @@ void Event_Think(GOBJ *event)
 
         // apply scaling changes
         JOBJ *egg_jobj = Item_GetBoneJOBJ(egg_gobj, 0);
-        egg_jobj->scale.X = EggOptions_Size[Options_Main[OPT_SCALE].val];
-        egg_jobj->scale.Y = EggOptions_Size[Options_Main[OPT_SCALE].val];
-        egg_jobj->scale.Z = EggOptions_Size[Options_Main[OPT_SCALE].val];
-        egg_data->scale = EggOptions_Size[Options_Main[OPT_SCALE].val];
+        int scale = stc_match->match.timer == MATCH_TIMER_COUNTUP ? Options_Main[OPT_SCALE].val : 0;
+        egg_jobj->scale.X = EggOptions_Size[scale];
+        egg_jobj->scale.Y = EggOptions_Size[scale];
+        egg_jobj->scale.Z = EggOptions_Size[scale];
+        egg_data->scale = EggOptions_Size[scale];
 
         // show egg hurtbox
-        egg_data->show_hit = Options_Main[OPT_COLLISION].val;
-        egg_data->show_model = !Options_Main[OPT_COLLISION].val;
+        int collision = stc_match->match.timer == MATCH_TIMER_COUNTUP ? Options_Main[OPT_COLLISION].val : 0;
+        egg_data->show_hit = collision;
+        egg_data->show_model = !collision;
 
         // set this callback on every frame or else it gets overwritten
         egg_data->it_func->OnTakeDamage = Egg_OnTakeDamage;

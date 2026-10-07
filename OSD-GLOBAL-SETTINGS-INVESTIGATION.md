@@ -2,24 +2,29 @@
 
 **Running to-do list: audited October 6, 2026**
 
-The eleven-item correction request is implemented in section 36; the subsequent nine-item round is implemented in section 37, with its follow-up Wavedash/layout/shine corrections in section 38 and native text-pointer fixes in sections 39-40. These are remaining items from the earlier plan; optional extensions are identified separately. Historical sections describe the checkout at investigation time, not necessarily current behavior.
+The eleven-item correction request is implemented in section 36; the subsequent nine-item round is implemented in section 37, with its follow-up Wavedash/layout/shine corrections in section 38, native text-pointer fixes in sections 39-40, and final menu grouping in section 41. The user now reports that things look stable. That is useful gameplay feedback, although the exhaustive frame/card/performance checks below are not yet documented as complete. Sections 42-44 record the audit and requested next steps; **section 45 implements the first reserved-bit event preferences**. Historical sections describe the checkout at investigation time, not necessarily current behavior or the current storage budget.
 
-- [ ] Protect accurate imported-recording playback from the effective global Infinite Shields override while preserving its saved preference; show that override in Lab's local shield controls (section 15).
+- [ ] Protect accurate imported-recording playback from the effective global Infinite Shields override while preserving its saved preference (section 15). Lab's local shield controls **already show the global override**; that part is complete.
 - [ ] Decide whether Infinite Shields means full-health refill or literal never-break. The current implementation refills health; a single sufficiently damaging hit can still need a native break-boundary hook (section 15).
-- [ ] Add verified shieldstun boundaries to Actionable Yellow/Green (the initial phase-2 proposal included them). Hitstun, rolls/dodges, jumpsquat and character specials remain later expansion; current coverage is ordinary attacks and landing recovery (section 8).
+- [ ] Add verified shieldstun boundaries to Actionable Yellow>Green (the initial phase-2 proposal included them). Hitstun, rolls/dodges, jumpsquat and character specials remain later expansion; current coverage is ordinary attacks and landing recovery (section 8).
 - [ ] Extend Act OoWait source/opportunity tracking beyond the six native history slots. Normal/autocancel/aerial/special landing, tech/getup, throw and supported special labels now work for the supported short chains; long movement chains and character-specific recovery transitions still need explicit context (section 22).
 - [ ] Add elapsed **own-fighter** hitstun/shieldstun context (`hs`/`ss`) where useful, separate from the implemented `hl` prefix. Do not label an opponent's stun as the acting player's delay (section 21).
 - [ ] Complete live Dolphin frame-step validation: contact-frame/last-hitlag boundaries, shine on shield/body, fastfall, L-cancel, perfect protected ledgedashes, two yellow/two green frames, overlay priority, all start/reset/criterion modes, randomized eggs, FD fallback and moving platforms. Compiled tests do not replace those gameplay checks.
 - [ ] Complete real save/reload and upstream/Tyro switching on controlled GCI-folder/raw cards, including no-card/failed-save paths; measure actual allocated save blocks and free card capacity. Audit any required Dolphin per-game defaults under TYRE01 (sections 1, 16).
 - [ ] Measure live heap and rendering cost in dense multi-fighter/projectile matches, including Nana, teams, reflections, slow motion and recording restores. Static buffers and DAT sizes are measured; total engine allocations/performance are not (sections 6, 14).
 - [ ] **Optional:** provide an explicit copied import/conversion path for old GTME recordings/settings. New identity isolation is implemented; foreign recording import is not automatic (section 16).
-- [ ] **Optional:** persist Ledgedash egg/success/ledge choices, expose the reserved eighteenth Lab overlay condition, or retire high scores for a 204-byte settings extension. None is needed for the eleven corrections; event choices currently remain local and no score bytes have been reclaimed (sections 3, 14, 17).
+- [x] **Step 7, first subset:** persist core Ledgedash choices including Tips, and Eggs-ercise choices including infinite mode, using only reserved bits. Add **Reset Event Settings** to both main menus (section 45).
+- [ ] **Step 7, later expansion:** inventory/persist Training Lab and additional Ledgedash choices; add Lab's reset button. These need a separate storage decision beyond the four bits now free (section 43).
+- [ ] **New requested step 8:** implement an optional **Fixed** OSD grid: selected categories reserve cells from top left across, then down; results update in place without reordering or disappearing (section 44).
+- [ ] **Proposed step 9:** implement a **Practice Panel** alternative: stable compact category rows, latest results retained, optional bounded recent history and a reserved detail area (section 44).
+- [ ] **Optional:** provide a Lab editor for the eighteenth packed overlay condition. Its storage slot exists, but the condition is not exposed as an eighteenth editable row (section 3).
+- [ ] **Storage decision, not implemented:** use audited spare score positions, retire persistent high scores for the 204-byte extension, or create a separate Tyro preferences file if the new event inventory requires it. No score bytes have been reclaimed (sections 17, 43).
 
 Superseded requests: Very Very Fast decay was deliberately removed, and the Falling-start reset redesign is now reverted by request. They are not pending tasks. Global hitlag prefixes, landing labels, trails, flashes, protection, menu grouping and the current Ledgedash controls have implementations.
 
 Investigated October 4, 2026, initially against checkout `b3d6700`, with the additional filename, success-criteria, reset, and OSD investigations against `08640e8`. Steps 0-6 now have implementations: centralized V1.4.1T2 metadata, versioned outputs, the separate `TYRE01` identity, packed/migrated settings, global trails, both OSD editors, master suppression, shared flashes/shields, and the staged recovery cue. Sections 24-31 record implementation and validation. Step 6 still requires live Dolphin frame-step validation; Ledgedash is implemented in sections 35-36, and hitlag prefixes plus initial recovery-source labels are implemented in section 36. The running to-do list above records remaining work. The README contains the running Tyro-specific changelog.
 
-The requested phase-1 changes are feasible. A compact save format can accommodate the new global toggles, including Infinite Shields, OSD title colors, and a reserved phase-2 overlay inside the existing 44-byte settings area, with **29 bits still reserved for future use** after Run Turnaround, the global protection overlay, and CPU OSD suppression each allocate one bit. No current training feature needs to be removed for that design. If persistent event high scores are deliberately retired, their **204-byte region** can become a settings extension after its score access/reset paths are changed; section 17 explains the budget and work involved. Before changing the serialized format, give Tyro Edition its own stable game/save identity so switching to upstream cannot reinterpret Tyro settings. The yellow last-non-actionable-frame overlay is feasible for specific, understood action states; an accurate implementation covering every character and action needs separate research.
+The global features and the first saved event preferences fit inside the existing **44-byte format-3 settings record**. Global additions originally left 29 bits; section 45 assigns **25** to event preferences and initialization, leaving **four bits reserved**. No high-score storage has been reclaimed. Broader event persistence may need the audited **204-byte score region** or a separate preferences file; section 17 explains that conditional budget. Tyro's stable **TYRE01** identity is implemented. Actionable cues cover the documented ordinary attack/landing states; accurate coverage of further states remains separate research.
 
 **1. What “permanent memory” means in this project**
 
@@ -102,8 +107,8 @@ Retain the existing four-byte enable mask for assembly compatibility. Menu sette
 | Packed overlays, including phase-2 slot | 18 |
 | Packed OSD choices | 8 |
 | Format signature | 2 |
-| Extra flags byte (Run Turnaround bit 0, protection bit 1, CPU OSDs Off bit 2; five bits reserved) | 1 |
-| Fully unallocated reserve | 3 |
+| Extra flags byte (three global flags, initialization, reset delay, Tips; bit 7 reserved) | 1 |
+| Packed event preference bytes (Ledgedash/Eggs-ercise; three high bits of the last byte reserved) | 3 |
 | **Total** | **44** |
 
 Current byte placement (format 3):
@@ -115,10 +120,12 @@ Current byte placement (format 3):
 | `0x1F30–0x1F41` | Eighteen packed overlay bytes. |
 | `0x1F42–0x1F49` | Eight packed OSD-choice bytes. |
 | `0x1F4A–0x1F4B` | Format signature. |
-| `0x1F4C` | Run Turnaround flash in bit 0, protection overlay in bit 1, CPU OSDs Off in bit 2; bits 3-7 reserved. |
-| `0x1F4D-0x1F4F` | Three fully reserved bytes. |
+| `0x1F4C` | Run Turnaround bit 0, protection bit 1, CPU OSDs Off bit 2; event initialization bit 3, Ledgedash delay bits 4-5, Tips bit 6; bit 7 reserved. |
+| `0x1F4D` | Ledgedash Starting Position bits 0-2, Reset bits 3-5, Success Criteria bits 6-7. |
+| `0x1F4E` | Eggs-ercise damage threshold, 0-199. |
+| `0x1F4F` | Eggs-ercise scale bits 0-1, velocity bit 2, collision bit 3, infinite mode bit 4; bits 5-7 reserved. |
 
-Six flag bits cover TURN OSDS OFF, Very Fast trails, Instant trails, missed-L-cancel flash, two-frame yellow/green recovery cue, and Infinite Shields. Infinite Shields consumes the previously spare flag bit, so no flag bits remain free in this byte; step 6 adds Run Turnaround at byte `0x1F4C`, bit 0. **Five bits in that byte plus three full bytes remain: 29 reserved bits total.** A future independent global Very Very Fast toggle would need one of those bits, although the event-local decay preset still needs no save bytes. The flags plus version occupy one byte as a group. Use explicit masks/byte packing; an ordinary C enum can occupy four bytes, and C bitfield layout should not define a serialized format.
+Six flag bits cover TURN OSDS OFF, Very Fast trails, Instant trails, missed-L-cancel flash, two-frame yellow/green recovery cue, and Infinite Shields. No flag bits remain free in that first flags byte. After the additional globals and section 45's event preferences, **byte 40 bit 7 plus byte 43 bits 5-7 remain: four reserved bits total**. The flags plus version occupy one byte as a group. Use explicit masks/byte packing; an ordinary C enum can occupy four bytes, and C bitfield layout should not define a serialized format. Very Very Fast was removed and needs no allocation.
 
 A more direct palette indexed by all 32 bitfield IDs costs 12 bytes instead of eight. That alternative required the original four-byte reserve; after allocating Run Turnaround, it would overlap the extra flag and require a revised layout or extension. A three-bit palette allows eight values total; expanding beyond that would require a format change or additional storage.
 
@@ -955,3 +962,151 @@ The cue label is now exactly **Actionable Yellow>Green**, shared by both editors
 Both Global Settings menus now use this order: **nineteen OSDs, OVERRIDE CPU OSDS OFF, OVERRIDE ALL OSDS OFF, one blank separator, then the seven overlays/shared controls**. Native display rows 19/20 are CPU/ALL; row 21 is the disabled separator; rows 22-28 are the visual/gameplay controls. Native physical RSS IDs 16/17 now map to CPU/ALL and ID 18 to the separator. Logical flag IDs and serialized bits remain unchanged. Lab includes the same disabled empty row, and its initialization/callback offsets are shifted consistently.
 
 Existing compiled editor regressions cover the moved override rows, hidden separator checkbox, all native exit saves, preserved unknown OSD-mask bits and palette/flag round trips. The full native text-update regressions remain included. Format **3 / 44 bytes**, version **V1.4.1T2**, identity **TYRE01** and **29 free reserved bits** are unchanged. The README records these Tyro changes.
+
+
+**42. Current audit: what is actually unfinished**
+
+Audited October 6 against the current source, rather than treating the original proposal as an up-to-date implementation inventory. This is planning work; no gameplay code, save layout or release version changes in this review.
+
+| Item | Current status and remaining work |
+| --- | --- |
+| Original global settings, trails and Ledgedash feature set | Implemented, including both editors, title palettes, best-relative cyan/green/yellow/red timing, ALL/CPU suppression, shared trails, missed-cancel/turnaround pulses, protection, Infinite Shields, two yellow/two green frames, Ledgedash criteria and randomized ground/platform eggs. Sections 36-41 supersede earlier text and behavior. |
+| Imported-recording shield policy | **Unimplemented exception.** Lab turns its local shield option Off on an imported rwing recording, but the global refill service can still force full health. Suppress the effective global refill during accuracy-preserving playback without changing the saved toggle; provide an explicit return to modified practice. `Lab_RefreshShieldOverride` already supplies the local menu's status text. |
+| Literal unbreakable shields | **Not implemented.** Current mode refills full health. Audit native damage/break ordering before promising that no single hit can break a shield. This is a behavior decision/hook, not a new saved setting requirement. |
+| Expanded actionable cue | **Shieldstun still missing** from the initial proposed coverage. Hitstun, dodge/roll recovery, jumpsquat and specials are later candidates requiring individual actionable-boundary definitions. Landing, wavelanding/autocancel, aerial landing lag and ordinary ground/aerial attacks are already covered. |
+| Extended Act OoWait recovery context | Regular landing and short-chain recovery labels work. Longer chains remain bounded by the six native history entries and the existing opportunity-window checks; retaining the recovery episode beyond those limits is still future work. |
+| Own-fighter stun prefixes | `hl` and shine turnaround context are implemented. Additional actual victim `hs`/`ss` context is not. Contact that merely puts an opponent into hitstun/shieldstun must continue to be described as the acting fighter's hitlag, not its own stun. |
+| Event preference persistence and resets | Some Lab controls already persist in the 44-byte shared record. General per-event preferences and the three requested event reset buttons do not have a centralized persistent implementation. See step 7 below. |
+| Fixed grid / Practice Panel | Both are newly planned. The current renderer remains a recent-message queue. See steps 8-9 below. |
+| Optional legacy imports / eighteenth Lab overlay row | Explicit copied GTME settings/recording conversion and an editor for the eighteenth packed condition are not implemented. Identity isolation and seventeen-condition Lab persistence are implemented. |
+| Save capacity and score reclamation | The existing settings cost and score-region bounds are known. Actual card allocation/free blocks are not measured, and the 92/204-byte candidates remain owned by score/reset code. No extension has been allocated. |
+
+**Validation still outstanding, distinct from missing features:** complete the targeted live frame-step matrix, real card/no-card/failure/reload and GTME/TYRE switching, TYRE-specific Dolphin default audit, and dense-match heap/rendering measurements. The current 86 compiled PowerPC regressions and warning-free release build are established evidence; the user's stability report is additional evidence. Neither means that every listed combination has been checked. The recent pointer/layout fixes should not be listed as absent merely because broad validation remains open.
+
+Very Very Fast decay and the revised Falling-start reset lifecycle were deliberately removed/reverted. Do not re-add them as unfinished work. Keep score persistence until the storage decision explicitly changes it. Older tables in sections 2, 14, 17 and 23 contain historical budgets: **today the core is 44 bytes, format 3, with 29 reserved bits**; the current Ledgedash menu is larger than the early three-byte proposal.
+
+
+**43. New step 7: remembered event settings and event-scoped defaults**
+
+**Objective:** Training Lab, Ledgedash and Eggs-ercise should remember chosen preferences across leaving/re-entering an event and, with a valid Tyro memory card, across restarting the game. Each event gets **Reset Event Settings** in its main menu, before Exit. Begin with a shared session service to establish lifecycle/default behavior, then attach permanent storage; RAM-only remembering is an intermediate milestone, not completion of the requested memory-card behavior.
+
+**Inventory and scope:**
+
+| Event | Initial preference inventory | Exclusions / decisions |
+| --- | --- | --- |
+| Training Lab | General display/camera/HUD/game-speed/staling/local-trail choices; CPU behavior, DI/SDI/ASDI, counter actions/delay, shields/health/angle, tech/getup choices; info-panel presets/size/rows. Reuse existing saved input-display, control-binding and actor-overlay values rather than duplicating them. Audit advanced counter, dynamic character recovery and other submenus by stable field ID before promising a complete menu snapshot. | Frame Advance active state, live actor percent/position, recording/sample buffers, savestates, current playback phase, controllers and pointers are runtime state. Persist explicit target-percent/lock preferences only after defining entry semantics. Recording-file metadata remains part of the recording, not a copy of general preferences. |
+| Ledgedash | Twelve main preferences: Starting Position, Reset, HUD, Tips, Camera Mode, Keep Ledge Invincibility, Game Speed, Color Overlays, Reset Delay, initial Ledge, Success Criteria, Protection Highlight. Seven Egg Targets preferences: Enable, Target, Distance, Randomize Distance, Min, Max, Pop Damage. | Nineteen values fit in **19 bytes with one byte per choice**, or at least **52 packed bits / 7 bytes**, before headers. Do not save the current randomized target/distance, automatic side swaps, target object, attempt timer, success counters or active Frame Advance. Save the user's initial ledge selection, not the side selected by an automatic reset. |
+| Eggs-ercise | Damage threshold, scale preset, spawn velocity, fighter collision, local trail enable and decay: **six one-byte choices / 6 bytes** before headers. | Retry and Enable Free Practice are actions, not stored menu values. Initially retain normal challenge entry and remember tuning for when Free Practice is enabled; do not bypass its gating just by loading values. An optional remembered start mode would need a separate explicit design. Do not persist egg objects, spawned positions/RNG, timer or current score. |
+
+These are preference records, **not serialized `EventOption` structures**: those structures contain runtime pointers and callbacks. Define immutable defaults next to a typed, named field schema; menus, reset logic and load validation must use the same definitions. Distinguish schema field identity from menu-row indices so moving a row cannot reinterpret a save. Use byte enums where bounded, wider explicitly encoded fields where necessary; validate ranges and dependent choices such as min/max and Pop Egg requiring eggs enabled.
+
+**Storage feasibility and decision gate:**
+
+- The **29 reserved bits** cannot hold the requested event inventory; Ledgedash alone needs at least 52 bits. This step must not claim that all settings fit in the existing reserve.
+- The **92 bytes** at `0x1AE0-0x1B3B` are unused by the present event catalogue, but native indexed score/reset paths still own them. A small whitelist might fit after metadata; a full Lab inventory may not. Using them needs protected access/reset paths and a capacity policy for future events.
+- Retiring numeric event high scores would make **204 bytes** at `0x1A70-0x1B3B` available after all score read/write/reset ownership is changed. Preserve played flags and unrelated records. The native 216-byte records clear starting at `0x1A68` must not erase a preference extension.
+- An illustrative extension budget is **16 bytes of metadata + a provisional 96-byte Lab cap + 19 Ledgedash + 6 Eggs-ercise = 137 bytes**, leaving **67 of 204**. The Lab cap is a planning allowance, not a measured full-menu size. Finish the whitelist before selecting this layout; do not silently drop settings to meet the allowance. This example exceeds the 92-byte candidate.
+- A separate Tyro preference card file is a fallback if the desired inventory grows beyond the bounded native region or scores are retained. It adds file/block allocation, card lifecycle and failure handling; measure those costs before choosing it.
+- Keep the existing **44-byte format-3 core** intact. Its two-bit version tag is already 3, so blindly incrementing it to 4 is invalid. Give the extension its own magic/version/length, per-event schema and validation metadata. The score and core regions are noncontiguous; never cast them as a single continuous 248-byte structure. Foreign identities or unsupported future schemas must use private defaults without rewriting those bytes.
+- A header cannot stop an **older Tyro executable** from writing scores over a repurposed score region. Upstream GTME remains isolated by the implemented identity, but same-ID Tyro downgrade behavior needs its own policy. If preserving preferences through older Tyro builds is required, prefer a separately named preference file or restrict switching to compatible builds/copy-based tests. Detecting corruption and returning defaults is recovery, not preservation. This decision belongs in the storage comparison.
+
+**Recommended implementation sequence:**
+
+1. Produce the exact named field/default/range/serialized-size inventory for the three events, including Lab's nested menus. Mark transient and already-shared fields explicitly. Choose the initial whitelist and storage route from the measured total.
+2. Add event-preference accessors to the shared service so separate event DAT modules use one session copy. Load choices before initialization applies camera, HUD, actor setup and egg placement; reconcile dependent effects once after batch loading.
+3. Add **Reset Event Settings** to all three main menus using those immutable defaults. Update both menu values and their previous/derived values, restore visibility/disable rules, and apply the effective settings in one batch. One button press must not execute every callback's save/reposition independently.
+4. Attach the versioned card extension through native dirty/checksum/save machinery. Coalesce changes and save at a deliberate menu-close/exit checkpoint; no card writes on every frame, egg spawn, ledge touch, automatic reset or side swap. Preserve session choices if the card is unavailable or a save fails and show the existing appropriate save status.
+5. Keep recording imports/playback and automatic event behavior as **temporary effective overrides**. They must not overwrite the user's stored preferences. In particular, resolve recording-safe Infinite Shields policy before restoring saved Lab defaults into accuracy-preserving playback.
+6. Add migration/default validation and live card tests before considering the step complete. New fields get defaults; supported older event schemas migrate by named mapping. Future unsupported blocks remain untouched. Reenter all three events and reboot, testing card failure and an older compatible Tyro build as well as upstream isolation.
+
+**Reset scope:** reset only that event's preferences. Leave the other two events, shared Global Settings/title colors/overrides, recorded inputs/files and persistent high scores alone. Lab-owned controls/input display/actor overlays already stored in the shared record may reset with Lab; document that these are Lab preferences, distinct from Global Settings. Stop active playback/recording safely without deleting captured data. Ledgedash reset cancels the pending attempt and regenerates its target once; criterion statistics follow the existing criterion-change policy. Eggs-ercise restores challenge/free-practice gating coherently. Default Frame Advance remains Off on fresh event entry.
+
+**Checks:** validate each field and adjacent-byte canaries; reset and reload round trips; configuration changes without saving temporary RNG/side/recording state; all menu values/disabled rows after reset; one batch of side effects and one save checkpoint; corrupted/unsupported extension data; no-card/failed-card behavior; upstream/Tyro switching; records-reset preservation if a score region is chosen. Add a README gameplay changelog entry only when the feature is actually implemented.
+
+
+**44. New steps 8-9: stable OSD layouts and readable repetition**
+
+**Why the current display moves:** `Message_Add` removes a matching `(kind, settings_id)` result, shifts the queue and puts the newest message at index zero. `Message_Destroy` shifts surviving entries again. `Message_Manager` animates changed indices over **six updates**, animates deletion over six, and expires messages after **120 simulation updates** (about two seconds at normal unpaused 60 Hz). There are seven queues, eight messages each; configurable player OSDs are not one permanent category bank. Repeating several techniques therefore changes their location even when the set of enabled categories never changes. Disabling slide animation alone would make these position changes abrupt and would not solve the problem.
+
+Retain **Recent** as a compatibility choice. Add **Fixed** as requested and prototype the recommended **Practice Panel**. Both new styles should retain the latest completed result until replaced or the practice context resets: expiry marks it stale instead of removing its geometry. Current best-relative colors, title palettes, hitlag/turn prefixes, technique-specific baselines and non-timing outcome rules remain measurement rules, independent of layout.
+
+The conversation mockups compare these three styles with a user-triggered repetition sequence. They are schematic layout proposals, not native game screenshots or measured final font/cell dimensions. Browser checks confirm stable Fixed/Panel coordinates and deliberate Recent reordering at 320, 480 and 736 pixels; final game fit still needs the acceptance checks below.
+
+**Step 8 — Fixed grid:**
+
+- Assign enabled categories a canonical, stable order, then reserve cells from **top left across to the right, then down rows**. Empty cells show their title and `—` until a result arrives. New results replace only their own cell; no insertion, shifting, collapsing or expiry-based reflow.
+- Keep the mapping stable throughout practice. Rebuild deliberately after closing the settings editor or changing the eligible player set. ALL/CPU overrides hide the affected content without reshuffling the remaining cells; selected category preferences remain intact.
+- Key content by **player + canonical category**, retaining the exact technique/kind inside each result. Never allow P2/CPU results to overwrite P1's cell. For the common one-human/CPU-suppressed case, five enabled categories mean five reserved cells. Multiple players require labeled cells or deliberate per-player pages.
+- Start with two or three columns using measured 640x480 safe-area bounds and readable text. Keep space for the stage HUD, timer and three-row contextual displays, including long shine prefixes and Wavedash. Do not shrink all text to force nineteen categories into one screen.
+- Provide bounded, **manually selected pages** when the selection cannot fit; every selection has a stable logical slot/page. Never rotate pages automatically during repeated actions. Size page capacity from the prototype, rather than promising that all nineteen OSDs times all actors fit at once.
+- On death/reset/retry/rewind/new match, clear stale result/history as appropriate while retaining the chosen layout and category mapping. Clearly identify a retained value as **last result**, not current state.
+
+**Step 9 — recommended Practice Panel:**
+
+A single compact panel near a screen edge, with **one stable row per selected category**: title at left, latest timing/outcome at right, brief recovery context underneath only where needed. This avoids repeated full boxes and uses much less screen area than a five-card grid. The row never slides, disappears or changes height when another category fires.
+
+- Update the number in place when the measurement finishes. Keep the result until a newer attempt. Identical results refresh recency/repetition count without another flash. A small nonblinking new-result indicator is sufficient; avoid pulsing the whole box or repeatedly fading it out.
+- Give stale results a readable subdued treatment or an age marker. Keep frame colors legible and meaning intact; do not dim a result to near invisibility. Use a stable width for numeric/prefix content.
+- Optionally retain the **last three results** as small labeled history markers in the same reserved row width. This gives context for rapid repetition without a queue animation. Preserve full typed outcomes; do not assume frame advantage, angles, timing and counts share a universal average or success rule.
+- Allow a chosen focus row to show full Wavedash/shine/landing detail in a **reserved detail area**. Other rows stay fixed. Selecting a focus is explicit; an automatic focus that follows every new result would reintroduce distraction.
+- Coalesce duplicate notifications of the same actor/category/action episode, while retaining genuine separate attempts even when their numbers match. Apply the newest completed measurement immediately; do not delay feedback merely to keep it on screen. A bounded history handles bursts.
+
+**Shared architecture and cost:**
+
+1. Separate measurement/result capture from placement and lifetime. Keep a bounded per-player/category result bank and use the current message API as the compatibility entry point. Event/general feedback outside configurable categories can continue using its own recent queue and essential-event scope.
+2. Preserve the native caller contract: several producers recolor/edit the returned text object. Do not return NULL or destroy it before their edits. Preserve title/body subtext indices and the tested inline-RGB replacement lifecycle. Store finalized hitlag/turn/source metadata without creating two independently centered timing fragments.
+3. Category 8 has multiple character-specific techniques and alternate queue kinds. Fixed/Panel may show the latest technique in that category, but its title/detail/history must retain which technique produced it; never change the measurement producer's replacement semantics by conflating raw message kind with setting ID.
+4. Bound history, text objects and rendered cells. Up to nineteen categories across six player queues is **114 logical keys**, not a promise to allocate 114 heavy text/background objects. Render only the visible page/rows and measure actual text/GOBJ/heap cost; runtime history consumes RAM, not save space. Clear generations safely on stock loss, scene changes and restores.
+5. Expose the style in both editors. The native editor already fills 29 rows, so a useful route is expanding its existing X/Y display selector to the four Recent anchors plus Fixed and Practice Panel, rather than consuming the separator. Lab can expose a separate Display Style field. UI choices may be composite; stored layout mode and Recent anchor remain separate.
+6. **Proposed reserve allocation, not yet made:** two bits for `Recent / Fixed / Practice Panel / reserved`. Section 45 now owns byte 40 bits 3-6, so the earlier candidate there is unavailable. Use, for example, the remaining **byte 43 bits 5-6**. Keep position byte 4 in its existing 0-3 range: current readers sanitize 4/5, so writing new modes there would lose the selection on older builds. Setters must preserve the other unknown bits. If allocated, reserve falls **4 -> 2 bits**; it is **four today**. Grid density, focus and history preferences would each need their own measured budget if persisted.
+
+**Acceptance checks:** five selected categories keep identical coordinates over rapid alternating/repeated results and expiry; placeholders and stale values are unambiguous; title/result/source and mixed inline colors fit without clipping at standard aspect ratios; human/CPU/all overrides preserve the map; multiple humans and category subtypes remain distinct; no automatic page/focus movement; frame advance, pause, slow motion, rewind, stock loss and retries preserve correct lifetimes; heavy matches have bounded allocations and acceptable render time. Run existing native text lifecycle regressions alongside any new layout changes.
+
+**Recommended order:** finish the exact step-7 preference inventory and storage choice; implement session defaults/reset buttons and permanent persistence; then build the shared stable result bank plus Fixed; finally implement Practice Panel using that same bank. If screen movement is the immediate priority, Fixed and its result bank can be developed before permanent event storage because they depend only on the small shared display-mode preference, not the score extension. Keep the remaining shield-policy/frame/card checks in the release checklist throughout.
+
+
+**45. Step 7 first implementation: reserved-bit Ledgedash and Eggs-ercise preferences**
+
+The user narrowed the first implementation to these two events and existing reserve only, excluded Eggs-ercise local trail settings, and specifically requested saved Ledgedash hints and Eggs-ercise infinite mode. This section supersedes section 43's initial mode assumption and its full-event inventory as the scope of this first pass. Version remains **V1.4.1T2 / TYRE01**, core **44 bytes / format 3**; no scores or native records are repurposed.
+
+| Saved preference | Bits | Default |
+| --- | ---: | --- |
+| Ledgedash Starting Position | 3 | Ledge |
+| Ledgedash Reset | 3 | Same Side |
+| Ledgedash Success Criteria | 2 | GALINT |
+| Ledgedash Reset Delay | 2 | Normal |
+| Ledgedash Tips / hints | 1 | On |
+| Eggs-ercise damage threshold | 8 | 12 |
+| Eggs-ercise scale | 2 | Normal |
+| Eggs-ercise spawn velocity | 1 | On |
+| Eggs-ercise fighter collision display | 1 | Off |
+| Eggs-ercise infinite / Free Practice mode | 1 | Off (timed challenge) |
+| Initialization marker for both blocks | 1 | Clear on an older save; publish on first valid edit |
+| **Newly allocated** | **25** | **Four of the previous 29 bits remain free** |
+
+**Current reserve ledger (logical record bytes, not encoded card offsets):**
+
+| Location | Assignment |
+| --- | --- |
+| Byte 40 bits 0-2 | Existing Run Turnaround / protection / CPU OSD override |
+| Byte 40 bit 3 | Event preferences initialized (`0x08`) |
+| Byte 40 bits 4-5 | Ledgedash reset delay (`0x30`) |
+| Byte 40 bit 6 | Ledgedash Tips (`0x40`) |
+| Byte 40 bit 7 | **One free bit** (`0x80`) |
+| Byte 41 bits 0-2 / 3-5 / 6-7 | Ledgedash start / reset / criterion |
+| Byte 42 | Eggs-ercise damage threshold |
+| Byte 43 bits 0-1 / 2 / 3 / 4 | Eggs-ercise scale / velocity / collision / infinite mode |
+| Byte 43 bits 5-7 | **Three free bits** (`0xE0`) |
+| **Remaining reserve** | **Four bits; zero whole unused bytes** |
+
+Settings fields **18/19** append stable preference IDs through the existing shared accessors. Field **20** resets one saved event block. Explicit masks preserve unrelated globals and the remaining free bits; no C struct or enum size defines the card layout. The current record's two-bit format tag remains 3. Previously generated format-3 saves have the new initialization bit clear, so getters use immutable defaults without dirtying or interpreting old reserve payload. The first valid explicit edit initializes both blocks and sets the marker last. Version-1/2 migrations also clear that marker. Invalid enum/range data is repaired individually once initialized; invalid writes do not initialize the block. Unsupported/foreign core records continue using private runtime defaults without writes to their saved data.
+
+Ledgedash loads the five choices before initial placement; it sets current/previous menu values, updates the criterion label and enables eggs when Pop Egg requires them. Only explicit menu edits write preferences, so automatic resets, ledge side changes and egg RNG never alter saved choices. Other Ledgedash options, including egg target/distance controls, remain event-local in this first pass.
+
+Eggs-ercise remembers four tuning values and its infinite-mode choice. Selecting Enable Free Practice saves infinite mode; reentry restores the count-up timer and enabled tuning controls. Timed mode retains challenge gameplay defaults while staged tuning values are shown in disabled menu rows. Local trail preferences consume **no save bits**; global trail choices remain the shared controls. Active egg objects, positions, RNG, score and elapsed time are runtime state.
+
+Both main menus now have **Reset Event Settings**. Ledgedash restores all of its menu defaults in one batch, updates camera/HUD/tips and repositions once; criterion statistics follow the existing criterion-change policy. Eggs-ercise resets its saved values and restarts the event in timed mode, with a fresh clock and correct enabled/disabled rows. Neither reset changes another event, Global Settings or persistent high scores. A restart also returns unsaved local controls to their ordinary initial values.
+
+Explicit preference edits mark native card data dirty. Shared menu close and event exit/retry call the existing `Memcard_SaveIfChanged` checkpoint; there is no frame-by-frame save polling. Native card serialization/checksums and save identity remain responsible for disk writes. An absent/failing card can still leave the session copy usable, but permanent save/reload must be checked on a test card.
+
+Validation: **95 compiled PowerPC regressions pass**, including every legal saved value, rejected indices/ranges, exact packed bytes/canaries, all four remaining reserve bits, first-write initialization, individual repair/idempotence, sibling-event reset isolation, hints/infinite-mode reload, private foreign/future fallback and fresh optimized DAT relocation. Optimized event/ASM release builds and final ISO/archive payloads are checked separately. Live Dolphin card reload, no-card/failure paths and mode/reset/menu behavior remain the release checks.

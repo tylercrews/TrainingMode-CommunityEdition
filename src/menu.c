@@ -72,6 +72,9 @@ void EventMenu_ExitMenu(GOBJ *gobj) {
     Match_UnfreezeGame(1);
     Match_ShowHUD();
     Match_AdjustSoundOnPause(0);
+    /* Event preference callbacks mark dirty once per explicit edit. Flush at
+     * menu close, rather than issuing card writes during practice/reset loops. */
+    Memcard_SaveIfChanged();
 }
 
 void EventMenu_PrevMenu(GOBJ *gobj) {

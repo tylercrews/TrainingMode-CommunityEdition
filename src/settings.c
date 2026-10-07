@@ -65,6 +65,61 @@ static void write_color(uint8_t *r, unsigned slot, unsigned color) {
     if (shift > 5) r[byte + 1] = bits >> 8;
 }
 
+typedef struct EventPreference {
+    uint8_t byte, shift, width, count, default_value;
+} EventPreference;
+/* 24 value bits + one initialization bit. Bytes are explicit, never C bitfields.
+ * Keep byte 40's low three flags and the four remaining reserve bits independent. */
+static const EventPreference ledge_preferences[TM_LEDGE_PREF_COUNT] = {
+    {41, 0, 3, 5, 0}, /* Starting Position: Ledge */
+    {41, 3, 3, 5, TM_LEDGE_DEFAULT_RESET}, /* Reset: Same Side */
+    {41, 6, 2, 4, 0}, /* Success Criteria: GALINT */
+    {40, 4, 2, 4, TM_LEDGE_DEFAULT_DELAY}, /* Reset Delay: Normal */
+    {40, 6, 1, 2, TM_LEDGE_DEFAULT_TIPS}, /* Tips: On */
+};
+static const EventPreference eggs_preferences[TM_EGGS_PREF_COUNT] = {
+    {42, 0, 8, 200, TM_EGGS_DEFAULT_DAMAGE}, /* Damage threshold */
+    {43, 0, 2, 3, 0},    /* Scale: Normal */
+    {43, 2, 1, 2, TM_EGGS_DEFAULT_VELOCITY}, /* Spawn velocity: On */
+    {43, 3, 1, 2, 0},    /* Fighter collision: Off */
+    {43, 4, 1, 2, 0},    /* Free Practice / infinite mode: Off */
+};
+static const EventPreference *event_preference(unsigned field, unsigned index) {
+    if (field == TM_SETTING_LEDGEDASH && index < TM_LEDGE_PREF_COUNT) return &ledge_preferences[index];
+    if (field == TM_SETTING_EGGS && index < TM_EGGS_PREF_COUNT) return &eggs_preferences[index];
+    return 0;
+}
+static unsigned preference_raw(const uint8_t *r, const EventPreference *p) {
+    return (r[p->byte] >> p->shift) & ((1u << p->width) - 1);
+}
+static void preference_write(uint8_t *r, const EventPreference *p, unsigned value) {
+    unsigned mask = ((1u << p->width) - 1) << p->shift;
+    r[p->byte] = (r[p->byte] & ~mask) | (value << p->shift);
+}
+static void preference_defaults(uint8_t *r, unsigned field) {
+    unsigned count = field == TM_SETTING_LEDGEDASH ? TM_LEDGE_PREF_COUNT : TM_EGGS_PREF_COUNT;
+    for (unsigned i = 0; i < count; ++i) {
+        const EventPreference *p = event_preference(field, i);
+        preference_write(r, p, p->default_value);
+    }
+}
+static void preference_initialize(uint8_t *r) {
+    if (r[40] & TM_SETTINGS_EVENT_INITIALIZED) return;
+    preference_defaults(r, TM_SETTING_LEDGEDASH);
+    preference_defaults(r, TM_SETTING_EGGS);
+    r[40] |= TM_SETTINGS_EVENT_INITIALIZED; /* Publish only after both blocks are complete. */
+}
+static void preference_validate(uint8_t *r) {
+    if (!(r[40] & TM_SETTINGS_EVENT_INITIALIZED)) return;
+    for (unsigned field = TM_SETTING_LEDGEDASH; field <= TM_SETTING_EGGS; ++field) {
+        unsigned count = field == TM_SETTING_LEDGEDASH ? TM_LEDGE_PREF_COUNT : TM_EGGS_PREF_COUNT;
+        for (unsigned i = 0; i < count; ++i) {
+            const EventPreference *p = event_preference(field, i);
+            if (preference_raw(r, p) >= p->count) preference_write(r, p, p->default_value);
+        }
+    }
+}
+
 void TMSettings_Init(uint8_t r[TM_SETTINGS_SIZE]) {
     memset(r, 0, TM_SETTINGS_SIZE);
     r[4] = 1; /* Sides */
@@ -100,6 +155,9 @@ int TMSettings_Prepare(uint8_t r[TM_SETTINGS_SIZE], int owns_save) {
         r[10] = (r[10] & 0x3F) | (TM_SETTINGS_VERSION << 6);
         /* Version 1 owns neither extension flag; version 2 already owns TurnRun. */
         r[TM_SETTINGS_EXTRA_FLAGS_OFFSET] &= ~(old_version == 1 ? 7u : 6u);
+        /* These formats predate event preferences. Ignore their unowned payload;
+         * initialize it only on the first explicit event preference write. */
+        r[40] &= ~TM_SETTINGS_EVENT_INITIALIZED;
     }
     if (!signed_format) {
         /* Read both old lists before overwriting any of their overlapping bytes. */
@@ -119,6 +177,7 @@ int TMSettings_Prepare(uint8_t r[TM_SETTINGS_SIZE], int owns_save) {
         }
     }
     validate_prefix(r);
+    preference_validate(r);
     for (unsigned group = 0; group < TM_SETTINGS_OVERLAYS; ++group) {
         if ((r[12 + group] & 15) >= TM_SETTINGS_OVERLAY_CHOICES) r[12 + group] &= 0xF0;
         if ((r[12 + group] >> 4) >= TM_SETTINGS_OVERLAY_CHOICES) r[12 + group] &= 0x0F;
@@ -166,12 +225,32 @@ uint32_t TMSettings_Read(const uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsi
         return TMSettings_Read(r, TM_SETTING_OSD_ENABLED, index);
     case TM_SETTING_EDITOR_ROW:
         return TMSettings_EditorID(index) == 255 ? 0 : TMSettings_Read(r, TM_SETTING_NATIVE_ROW, TMSettings_EditorID(index));
+    case TM_SETTING_LEDGEDASH:
+    case TM_SETTING_EGGS: {
+        const EventPreference *p = event_preference(field, index);
+        if (!p) return 0;
+        unsigned value = preference_raw(r, p);
+        return !(r[40] & TM_SETTINGS_EVENT_INITIALIZED) || value >= p->count ? p->default_value : value;
+    }
     default: return 0;
     }
 }
 
 int TMSettings_Write(uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsigned index, uint32_t value) {
     if (r[38] != 'T' || r[39] != 'Y' || (r[10] >> 6) != TM_SETTINGS_VERSION) return 0;
+    if (field == TM_SETTING_LEDGEDASH || field == TM_SETTING_EGGS || field == TM_SETTING_EVENT_RESET) {
+        const EventPreference *p = event_preference(field, index);
+        if (field == TM_SETTING_EVENT_RESET) {
+            if (index >= TM_EVENT_PREF_COUNT || value != 1) return 0;
+        } else if (!p || value >= p->count) return 0;
+        uint8_t before[TM_SETTINGS_SIZE];
+        memcpy(before, r, sizeof(before));
+        preference_initialize(r);
+        if (field == TM_SETTING_EVENT_RESET)
+            preference_defaults(r, index == TM_EVENT_LEDGEDASH ? TM_SETTING_LEDGEDASH : TM_SETTING_EGGS);
+        else preference_write(r, p, value);
+        return bytes_differ(before, r);
+    }
     if (field == TM_SETTING_EDITOR_ROW) {
         unsigned id = TMSettings_EditorID(index);
         return id == 255 ? 0 : TMSettings_Write(r, TM_SETTING_NATIVE_ROW, id, value);

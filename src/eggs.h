@@ -13,6 +13,7 @@ enum options_main
     OPT_VELOCITY,
     OPT_COLLISION,
     OPT_HITBOXTRAILS,
+    OPT_DEFAULTS,
     OPT_EXIT,
 
     OPT_COUNT
@@ -29,6 +30,8 @@ float RandomRange(float low, float high);
 int Egg_OnTakeDamage(GOBJ *gobj);
 void Event_Think(GOBJ *event);
 void Eggs_ChangeHitboxTrails(GOBJ *menu_gobj, int value);
+void Eggs_ChangeSavedSetting(GOBJ *menu_gobj, int value);
+void Eggs_ResetSettings(GOBJ *menu);
 
 static GXColor text_gold = {255, 211, 0, 255};
 static GXColor text_white = {255, 255, 255, 255};
@@ -92,11 +95,12 @@ static EventOption Options_Main[OPT_COUNT] = {
         .kind = OPTKIND_INT,
         .name = "Egg Damage Threshold",
         .desc = { "Adjust the minimum damage needed to break an egg." },
-        .val = 12,
+        .val = TM_EGGS_DEFAULT_DAMAGE,
         .format = "%d",
         .value_min = 0,
         .value_num = 200,
-        .disable = 1
+        .disable = 1,
+        .OnChange = Eggs_ChangeSavedSetting,
     },
     {
         .kind = OPTKIND_STRING,
@@ -111,8 +115,9 @@ static EventOption Options_Main[OPT_COUNT] = {
         .kind = OPTKIND_TOGGLE,
         .name = "Egg Spawn Velocity",
         .desc = { "Toggle whether eggs spawn with vertical velocity." },
-        .val = 1,
-        .disable = 1
+        .val = TM_EGGS_DEFAULT_VELOCITY,
+        .disable = 1,
+        .OnChange = Eggs_ChangeSavedSetting,
     },
     {
         .kind = OPTKIND_TOGGLE,
@@ -128,6 +133,11 @@ static EventOption Options_Main[OPT_COUNT] = {
         .menu = &Menu_HitboxTrails,
         .name = "Hitbox Trails",
         .desc = {"Create a trail of your hitboxes to visualize spacing."},
+    },
+    {
+        .kind = OPTKIND_FUNC, .name = "Reset Event Settings",
+        .desc = {"Restore defaults and restart in timed mode.", "Global Settings and other events are unchanged."},
+        .OnSelect = Eggs_ResetSettings,
     },
     {
         .kind = OPTKIND_FUNC,
