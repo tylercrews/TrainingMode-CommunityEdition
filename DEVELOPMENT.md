@@ -366,3 +366,14 @@ The record is still 44 bytes, format 3. The feature uses twelve previously unuse
 `Settings_EventCharacters` appends export 39. CSS prepare/confirm hooks preserve all GPR/FPR/control state around it. The wrapper validates event/page IDs, obtains the current whitelist and CPU-selectability, and calls `Settings_Characters` to synchronize RAM-only CSS backups with the shared record. Restricted events do not overwrite general preferences. Their human selection is no longer cleared after the restore service selects an allowed fighter. Native forced-opponent preload/match rules remain effective. Deferred dirty/commit semantics stay intact; no in-match raw card write is added.
 
 132 PowerPC tests pass, including all 676 pairs through fresh record reloads, adjacent palette and recommended edits, malformed/unset/foreign data, restricted fallback, costume reuse/reset, and actual emitted native CSS hooks. Real card writes, cold boot, controller-port selection and gameplay round trips need Dolphin verification.
+
+
+## Compact OSD arrows and JC Shine hitlag
+
+The native ASCII converter now transforms contiguous `->` into an eleven-byte balanced run: `0E FFFF FFFF`, original native `0B 20FC 2100` glyph/control bytes, then `0F`. The private scale marker means 75% of the enclosing X/Y scale. Width hook `0x803A824C` and draw hook `0x803A8DB8` apply the same relative multiplier after the native scale push. Ordinary scale commands retain the native absolute handling. Native scale pop restores the enclosing state; this works when Practice Panel uses scale 2.2. Current font scaling is preserved rather than assuming a 1.0 row.
+
+The existing SetText old-length hook at `0x803A7068` skips the complete eleven-byte private run. Its inner `0F` must not terminate the old row. Color parsing still consumes opcode plus exactly three RGB bytes. The source text remains ASCII `->` for all producers; standalone hyphen/greater-than glyphs are untouched, and all users of the shared converter gain the compact pair.
+
+Message creation skips hitlag capture for JC Shine kind 64. `OSD_TimingText` independently suppresses that prefix for retained/imported JC messages. Jump Out Of Shine kind 8 retains hitlag. No data layout, export order, save format or storage budget changes: 44 bytes, format 3, four available audited bits.
+
+135 PowerPC tests pass. New tests execute native conversion, width, nested scales, native replacement/row-location and the actual assembled draw hook plus native scale push/pop. They verify relative scaling at multiple row sizes, restored size for following numbers, unchanged standalone glyphs and JC/Jump Out prefix differences. Final readability remains a Dolphin check.

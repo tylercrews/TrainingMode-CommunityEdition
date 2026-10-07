@@ -3,6 +3,7 @@
 **Running to-do list: audited October 6, 2026**
 
 - [x] Remember human/CPU character choices across unrestricted events and saved sessions inside the existing record (section 51).
+- [x] Reduce timing arrows to 75% of the surrounding font size and exclude post-action hitlag from JC Shine (section 52).
 - [ ] Confirm character persistence with a cold boot in Dolphin, including a restricted event between unrestricted events and Return-to-Event-Select autosaving.
 
 The eleven-item correction request is implemented in section 36; the subsequent nine-item round is implemented in section 37, with its follow-up Wavedash/layout/shine corrections in section 38, native text-pointer fixes in sections 39-40, and final menu grouping in section 41. The user now reports that things look stable. That is useful gameplay feedback, although the exhaustive frame/card/performance checks below are not yet documented as complete. Sections 42-44 record the audit and requested next steps; section 45 implements the first reserved-bit event preferences and **section 46 implements Fixed Grid and Practice Panel**. Historical sections describe the checkout at investigation time, not necessarily current behavior or the current storage budget.
@@ -1208,3 +1209,14 @@ Event whitelists are applied using CSS icon IDs, including Sheik's shared Zelda 
 Validation: **132 PowerPC regressions pass**, including every playable character pair across record reloads, OSD palette/recommended/event/layout edits, unset/invalid/foreign inputs, restricted exercise fallback, costume reset/reuse and native assembled CSS backup/restore hooks. Native card hardware is not exercised by these tests. Live Dolphin cold boot, controller ports, restricted-event round trips and successful card autosaves remain gameplay checks. Release payload verification is recorded with the build result.
 
 Final release verification: the warning-free build produced `TM-Tyro-V1.4.1T2.iso` and its release ZIP. Extracted `TM/eventMenu.dat` and `codes.gct` match the final compiled payloads byte-for-byte.
+
+
+**52. Smaller timing arrows and JC Shine context correction**
+
+Implemented October 7, 2026. The shared native ASCII converter recognizes each contiguous `->` pair and emits one balanced relative-scale run. Arrow glyphs are **75%** of the enclosing row's X/Y font scale. Both the native width parser and draw path apply the same factor; a normal native scale pop restores the surrounding row scale before the next number or FAIL. This preserves the existing single centered text stream and separate colors in Recent, Fixed Grid and Practice Panel, including the panel's enlarged 2.2-scale timing row. Standalone `>`/`-` symbols and non-arrow text are unchanged. Other text that uses this same ASCII conversion path also receives compact arrows; no unsupported Unicode glyph is introduced.
+
+Native scale commands are ordinarily absolute, so fixed 0.75 commands would shrink panel arrows excessively relative to its larger frame counts. The converter instead emits a private `0x0E FFFF FFFF` marker around the verified native hyphen/greater-than glyphs, followed by the existing `0x0F` scale pop. Small width/draw hooks interpret this marker as 0.75 times the current scale, while ordinary absolute-scale commands retain their native behavior. The old-text-length iterator skips the complete eleven-byte balanced arrow run when replacing rows, including its inner scale pop; otherwise it would stop early and corrupt subsequent text. Native row lookup remains unchanged.
+
+JC Shine (message kind 64, still sharing setting 8) no longer captures the current shine's hitlag at message creation. The common timing formatter also excludes hitlag for that kind, so retained or imported JC results cannot acquire a misleading prefix in a stable layout. Its jump-to-shine frame and Short Hop/Full Hop measurements/colors remain. Jump Out Of Shine (kind 8), turnaround context and other relevant OSD hitlag prefixes are unchanged.
+
+**135 PowerPC tests pass**, including exact conversion, measured 25% arrow-width reduction, unchanged standalone symbols, multiple arrows, nested enlarged row scales, the assembled draw hook with native scale-stack restoration, repeated native row replacement and JC/Jump Out context differences. Live Dolphin spacing remains a visual check. Save cost is **zero bits/bytes**; the record remains 44 bytes / format 3, with **four available audited bits** (two palette padding bits and two explicit reserved bits). No character/event preferences are repacked by this change.

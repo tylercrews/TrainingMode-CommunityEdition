@@ -15,7 +15,7 @@ static char *append_text(char *out, const char *in) {
 void OSD_TimingText(MsgData *msg, char *line, int which) {
     char part[24];
     char *out = line;
-    if (which != 2 && msg->timing_hitlag) {
+    if (which != 2 && msg->timing_hitlag && msg->kind != 64) {
         out = append_color(out, 0xFFFFFFFF);
         sprintf(part, "%dhl->", msg->timing_hitlag);
         out = append_text(out, part);

@@ -11,6 +11,15 @@
 
     backup
 
+    # A compact arrow run uses relative 75% scale in both native parsers.
+    # FFFF/FFFF is private: the ordinary native scale opcode is absolute.
+    cmpwi r10, 0x2D
+    bne CheckInlineColor
+    lbz r11, 1(r6)
+    cmpwi r11, 0x3E
+    beq SmallArrow
+CheckInlineColor:
+
     # ESC + eight hexadecimal digits: RGBA input, native RGB text command.
     # Native 0x0C consumes THREE color bytes; alpha is not a fourth payload byte.
     cmpwi r10, 0x1B
@@ -47,6 +56,28 @@ CharacterFound:
     # branch to 803a6b70, will increment r5 and r6 by 1 to get next offset in ASCII string and loop
     restore
     branch r12, 0x803a6b70
+
+SmallArrow:
+    bl SmallArrowBytes
+    mflr r28
+    li r29, 0
+SmallArrow_Copy:
+    lbzx r11, r28, r29
+    stbx r11, r3, r9
+    addi r9, r9, 1
+    addi r29, r29, 1
+    cmpwi r29, 11
+    blt SmallArrow_Copy
+    addi r5, r5, 1
+    addi r6, r6, 1
+    restore
+    branch r12, 0x803a6b70
+SmallArrowBytes:
+    blrl
+    .byte 0x0E, 0xFF, 0xFF, 0xFF, 0xFF
+    .byte 0x0B, 0x20, 0xFC, 0x21, 0x00  # Native '-' and '>' from the original converter.
+    .byte 0x0F                          # Restore the enclosing row scale.
+    .align 2
 
 CharacterFound_Resume:
     lbz r10, 0x1(CurrentDictOffset) # Load Override Character

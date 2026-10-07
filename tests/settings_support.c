@@ -177,6 +177,7 @@ int Text_AddSubtext(Text *text, float x, float y, char *format, ...) {
 void TestStyleFormat(unsigned hitlag, int inline_layout, int y) {
     style_message.timing_hitlag = hitlag; OSD_FormatTiming(&style_message, inline_layout, y);
 }
+void TestStyleKind(int kind) { style_message.kind = kind; }
 unsigned TestStyleStringChar(unsigned line, unsigned index) { return style_strings[line][index]; }
 int TestStyleScale100(unsigned line) { return style_scales[line][0] * 100 + 0.5f; }
 int TestStylePrefix(void) { return style_message.timing_prefix; }

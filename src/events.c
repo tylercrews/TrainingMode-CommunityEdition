@@ -1802,7 +1802,7 @@ GOBJ *Message_Display(int msg_kind, int queue_num, int msg_color, char *format, 
     char buffer[MSG_LINEMAX * MSG_CHARMAX + 1];
     va_start(args, format);
     msg_data->timing_frame = OSD_ReadMessageTimingArgument(args, msg_kind);
-    if (msg_data->timing_frame >= 0)
+    if (msg_data->timing_frame >= 0 && msg_data->kind != 64) /* JC Shine precedes shine hitlag. */
         msg_data->timing_hitlag = OSDContext_MessageHitlag(queue_num, msg_data->settings_id);
     vsprintf(buffer, format, args);
     va_end(args);

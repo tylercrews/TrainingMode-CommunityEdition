@@ -102,6 +102,7 @@ class Machine:
 
     def native_width(self, encoded):
         """Execute the native parser at the PC shown in the user's warning."""
+        self.install_hook(0x803A824C,0x80482000)
         stream,text,output,sis=0x80403400,0x80403600,0x80403800,0x80403A00
         self.cpu.mem_write(stream,encoded+b"\0")
         self.cpu.mem_write(text,bytes(0xA4))
@@ -1527,6 +1528,66 @@ class ShineEpisodeTests(unittest.TestCase):
 class OSDStyleTests(unittest.TestCase):
     def setUp(self):
         self.m = Machine()
+
+    def test_arrow_conversion_and_width_shrink_only_the_arrow_pair(self):
+        m=self.m
+        plain=b'\x0b\x20\xfc\x21\0'
+        small=m.native_text(b'->')
+        self.assertEqual(small,b'\x0e\xff\xff\xff\xff'+plain+b'\x0f')
+        before=m.native_width(plain)[0];after=m.native_width(small)[0]
+        self.assertAlmostEqual(after,before*0.75,places=5)
+        # A nested arrow restores the enclosing row scale before the next glyph.
+        tail=m.native_text(b'1f')
+        self.assertAlmostEqual(m.native_width(small+tail)[0],after+m.native_width(tail)[0],places=5)
+        outer=b'\x0e\x02\x33\x02\x33'
+        self.assertAlmostEqual(m.native_width(outer+small+tail+b'\x0f')[0],
+                               (after+m.native_width(tail)[0])*(563/256),places=4)
+        self.assertNotIn(b'\xff\xff\xff\xff',m.native_text(b'- > > -'))
+        self.assertEqual(m.native_text(b'>'),b'\x21\0')
+        # Conversion of multiple adjacent and colored arrows stays balanced.
+        self.assertEqual(m.native_text(b'->->').count(b'\x0e'),2)
+        m.native_rewrite_rows([b'Jump Out Of Shine',b'1f',b'Landing'],
+            [(1,b'\x1BFFFFFFFF2hl->\x1B00FFFFFF1trn->\x1BFFA2BAFFFAIL'),
+             (1,b'1f'),(1,b'\x1BFFF000FF3trn->\x1BFFA2BAFF1trn')]*5)
+
+    def test_relative_arrow_draw_hook_matches_width_and_restores_row_scale(self):
+        m=self.m;stream,text,stack=0x80403400,0x80403600,0x80403800
+        m.cpu.mem_write(stream,b'\x0e\xff\xff\xff\xff')
+        m.cpu.mem_write(text,bytes(0xA4))
+        m.cpu.mem_write(text+0x68,struct.pack('>IHH',stack,0,64))
+        m.symbols['NativeScalePush']=0x803A7684;m.symbols['NativeScalePop']=0x803A7F0C
+        start=m.install_hook(0x803A8DB8,0x80483000)
+        saved_r2=m.cpu.reg_read(gpr(2));m.cpu.reg_write(gpr(2),0x804DF9E0)
+        try:
+            for x,y in [(1.0,1.0),(2.2,2.2),(0.72,1.05)]:
+                m.cpu.mem_write(text+0x80,struct.pack('>2f',x,y))
+                m.call('NativeScalePush',text,stream,3)
+                m.cpu.reg_write(gpr(30),stream);m.cpu.reg_write(gpr(31),text)
+                m.cpu.reg_write(reg.UC_PPC_REG_LR,STOP)
+                m.cpu.emu_start(start,0x803A937C,count=1000)
+                actual=struct.unpack('>2f',m.cpu.mem_read(text+0x80,8))
+                self.assertAlmostEqual(actual[0],x*0.75,places=5)
+                self.assertAlmostEqual(actual[1],y*0.75,places=5)
+                self.assertEqual(m.cpu.reg_read(gpr(30)),stream+4)
+                self.assertEqual(m.cpu.reg_read(reg.UC_PPC_REG_LR),STOP)
+                m.call('NativeScalePop',text,3)
+                restored=struct.unpack('>2f',m.cpu.mem_read(text+0x80,8))
+                # Native scale-stack format quantizes stored values to 1/256.
+                self.assertAlmostEqual(restored[0],int(x*256)/256,places=5)
+                self.assertAlmostEqual(restored[1],int(y*256)/256,places=5)
+        finally:m.cpu.reg_write(gpr(2),saved_r2)
+
+    def test_jc_shine_ignores_post_shine_hitlag_but_jump_out_keeps_it(self):
+        m=self.m
+        for kind,expected in [(64,'2f'),(8,'3hl->2f')]:
+            m.call('TestStyleInit',8,2,1,1);m.call('TestStyleKind',kind)
+            m.call('TestStyleFormat',3,0,-15)
+            text,colors,raw=styled_ascii(m,1)
+            self.assertEqual(text,expected)
+            m.native_rewrite_rows([b'JC Shine' if kind==64 else b'Jump Out Of Shine',b'1f'],[(1,raw)])
+        # Snapshot exclusion is at creation, not just a layout-specific redraw.
+        source=(ROOT/'src/events.c').read_text()
+        self.assertIn('msg_data->timing_frame >= 0 && msg_data->kind != 64',source)
 
     def test_real_native_setter_replaces_colored_rows_without_orphaned_color_bytes(self):
         original=[b"Jump Out Of Shine",b"4f",b"Landing"]

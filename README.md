@@ -19,6 +19,9 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Shrink `->` arrows to 75% of the surrounding OSD text size while preserving full-size frame counts, colors and single-row alignment in all layouts.
+- Exclude post-shine hitlag from JC Shine timing; Jump Out Of Shine retains its relevant hitlag context.
+
 - Remember the last human and CPU characters across unrestricted events and saved sessions; required event fighters use local fallbacks without replacing those choices.
 - Pack character selections into 12 previously unused bits within the existing 44-byte settings record; scores and the two explicit reserved bits remain untouched.
 
