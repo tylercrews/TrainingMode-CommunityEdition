@@ -342,6 +342,17 @@ class RelocatedDATSettingsTests(unittest.TestCase):
         self.assertEqual(m.record(),saved)
         self.assertEqual(m.record()[40:43],before[40:43])
 
+    def test_relocated_pending_save_survives_native_dirty_reset(self):
+        m=self.m;m.init();m.call('DAT_Set',18,4,0);m.call('DAT_Set',19,4,1)
+        self.assertEqual(m.call('TestDirty'),0)
+        m.call('DAT_Commit');self.assertEqual(m.call('TestDirty'),0)
+        m.cpu.mem_write(0x80433318,bytes(0x68))
+        m.cpu.mem_write(0x80433330,struct.pack('>I',1))
+        m.cpu.mem_write(0x80433374,struct.pack('>I',0x80407000))
+        m.cpu.mem_write(0x80432A68,struct.pack('>2I',0x80409000,0x8040A000))
+        m.call('DAT_Commit');self.assertEqual(m.call('TestDirty'),1)
+        self.assertEqual(m.call('DAT_Get',18,4),0);self.assertEqual(m.call('DAT_Get',19,4),1)
+
 
 class NativeCardSaveTests(unittest.TestCase):
     STATE=0x80433318

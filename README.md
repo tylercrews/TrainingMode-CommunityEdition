@@ -19,6 +19,9 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T2 (V1.4.1T2, unreleased)
 
+- Fixed event-setting crashes from native autosave using unloaded card icon/work resources; defer pending settings until Event Select's initialized card service can accept the save.
+- Guarded native save polling and synchronous save waits, and corrected the SDK's two native word-sized card flags; added regressions reproducing the exact reported PC/null read.
+
 - Reworked Practice Panel into smaller rows with stacked titles, a separator, a large latest result and three previous results vertically at the right; retained hitlag/turn context and native detail colors.
 - Expanded Fixed Grid to five OSDs per row, ten per page.
 - Added red FAIL for Jump Out Of Shine after fifteen unfrozen opportunities without a jump or second turn, including released shines; jumps/second turns at the boundary win.
