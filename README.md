@@ -19,6 +19,8 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T3 (V1.4.1T3)
 
+- Add numbered Side-B Sweetspot distance guides for Fox and Falco at ledge-grab height using total distance including drift, with smaller labels. Remember Enable Line Guides on the memory card, defaulting On; preserve the unused underside guide and dash-only distances in comments.
+
 - Include Marth and Roy's active grounded/aerial counter windows in the player-colored Invincibility Overlay, using native counter collision flags without adding saved settings.
 
 - Increment the centralized release version to V1.4.1T3 for the Training Lab menu rework.

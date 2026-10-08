@@ -166,6 +166,7 @@ int TMSettings_Prepare(uint8_t r[TM_SETTINGS_SIZE], int owns_save) {
         /* These formats predate event preferences. Ignore their unowned payload;
          * initialize it only on the first explicit event preference write. */
         r[40] &= ~TM_SETTINGS_EVENT_INITIALIZED;
+        r[40] &= ~TM_SETTINGS_SWEETSPOT_LINES_OFF_MASK; /* Older formats default guides On. */
         r[43] &= ~TM_SETTINGS_LAYOUT_MASK;
     }
     if (!signed_format) {
@@ -212,6 +213,8 @@ uint32_t TMSettings_Read(const uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsi
     case TM_SETTING_OSD_POSITION: return r[4];
     case TM_SETTING_EVENT_PAGE: return r[5];
     case TM_SETTING_RECOMMENDED: return r[6] & 1;
+    case TM_SETTING_SWEETSPOT_LINES:
+        return index == 0 ? !(r[40] & TM_SETTINGS_SWEETSPOT_LINES_OFF_MASK) : 0;
     case TM_SETTING_CHARACTER: {
         if (index > 1 || (r[6] & 0xC0) != 0x80) return UINT32_MAX;
         unsigned code = (r[index ? 37 : 6] >> 1) & 31;
@@ -258,6 +261,13 @@ uint32_t TMSettings_Read(const uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsi
 
 int TMSettings_Write(uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsigned index, uint32_t value) {
     if (r[38] != 'T' || r[39] != 'Y' || (r[10] >> 6) != TM_SETTINGS_VERSION) return 0;
+    if (field == TM_SETTING_SWEETSPOT_LINES) {
+        if (index != 0 || value > 1) return 0;
+        uint8_t old = r[40];
+        r[40] = (r[40] & ~TM_SETTINGS_SWEETSPOT_LINES_OFF_MASK) |
+            (value ? 0 : TM_SETTINGS_SWEETSPOT_LINES_OFF_MASK);
+        return r[40] != old;
+    }
     if (field == TM_SETTING_CHARACTER) {
         if (index > 1 || (value >= 26 && value != UINT32_MAX)) return 0;
         uint8_t before[TM_SETTINGS_SIZE];

@@ -85,10 +85,13 @@ static void UpdateCameraBox(GOBJ *fighter) {
 
 void Exit(GOBJ *menu);
 void Reset(int side_idx);
+static void ChangeLineGuides(GOBJ *menu, int value) {
+    TM_SetSetting(TM_SETTING_SWEETSPOT_LINES, 0, value);
+}
 
 enum menu_options {
     OPT_VERTICAL_LINES,
-    OPT_HORIZONTAL_LINES,
+    // OPT_EXTRA_UNDERSIDE_LINES,
 };
 
 enum ledge_direction {
@@ -100,16 +103,21 @@ enum ledge_direction {
 static EventOption Options_Main[] = {
     {
         .kind = OPTKIND_TOGGLE,
-        .name = "Vertical Line Guides",
+        .name = "Enable Line Guides",
+        .val = 1,
+        .val_prev = 1,
+        .OnChange = ChangeLineGuides,
         .desc = {"Side-B just above the line guide",
                  "to sweetspot the ledge."},
     },
+    /* Extra underside guide retained for reference; excluded from the menu.
     {
         .kind = OPTKIND_TOGGLE,
-        .name = "Horizontal Line Guides",
+        .name = "Extra Underside Distance Markings, Totally Unnecessary",
         .desc = {"B timing: 1/2 shortest, 3/4 longer.",
                  "0 = full range (no shorten)."},
     },
+    */
     {
         .kind = OPTKIND_INFO,
         .name = "Help",
@@ -159,11 +167,17 @@ static int state = STATE_ENDLAG;
 //                 1/2      3       4       0 (no second B)
 // Fox             27.58    46.30   65.02   83.74
 // Falco           27.58    44.08   60.58   77.08
+// Archived dash-only distances WITHOUT drift (not used by the sweetspot guide):
+//                 1/2      3       4       0
+// Fox              0.00    18.72   37.44   56.16
+// Falco            0.00    16.50   33.00   49.50
+// const float fox_dash_only[4] = { 0.00f, 18.72f, 37.44f, 56.16f };
+// const float falco_dash_only[4] = { 0.00f, 16.50f, 33.00f, 49.50f };
 // Startup drift, knockback, walls, landing and ledge catches can alter actual
 // travel. Guides describe aerial recovery from the dash origin, not hitboxes.
 // Physics/order reference:
 // https://github.com/doldecomp/melee/blob/master/src/melee/ft/kinds/ftFox/ftfoxspecials.c
-static void GetHorizontalRanges(FighterData *fighter, float ranges[4]) {
+static void GetHorizontalRanges(FighterData *fighter, float ranges[4], bool with_drift) {
     float step = (fighter->kind == FTKIND_FOX ? 78.0f : 60.0f) / 4.0f;
     step *= fighter->attr.model_scaling * fighter->scale.Y;
 
@@ -175,7 +189,7 @@ static void GetHorizontalRanges(FighterData *fighter, float ranges[4]) {
     float friction = attributes[0x40 / sizeof(float)];
     float drift = 0;
     // Aerial endlag lasts 40 frames; after that, freefall is steerable.
-    for (int i = 0; i < 40; i++) {
+    for (int i = 0; with_drift && i < 40; i++) {
         speed -= friction;
         if (speed <= 0)
             break;
@@ -199,57 +213,59 @@ static void DrawRangeNumber(int number, float x, float y, GXColor color) {
     for (int i = 0; i < 7; i++)
         if (masks[number] & (1 << i))
             count += 2;
-    event_vars->GFX_Start(count, (GFX_Params) { .shape = GX_LINES, .size = 12 });
+    const float scale = 0.65f; // About 19% smaller again (was 0.8).
+    event_vars->GFX_Start(count, (GFX_Params) { .shape = GX_LINES, .size = 8 });
     for (int i = 0; i < 7; i++) {
         if (!(masks[number] & (1 << i)))
             continue;
-        GFX_AddVtx(x - 0.75f + segments[i][0], y + segments[i][1], 0, color);
-        GFX_AddVtx(x - 0.75f + segments[i][2], y + segments[i][3], 0, color);
+        GFX_AddVtx(x + (segments[i][0] - 0.75f) * scale, y + segments[i][1] * scale, 0, color);
+        GFX_AddVtx(x + (segments[i][2] - 0.75f) * scale, y + segments[i][3] * scale, 0, color);
     }
 }
 
-static void DrawHorizontalLines(FighterData *fighter) {
-    float ranges[4];
-    GetHorizontalRanges(fighter, ranges);
-    Vec3 origin = sideb.attempted ? sideb.range_origin : fighter->phys.pos;
-    float direction = sideb.attempted ? sideb.dir : fighter->facing_direction;
-    GXColor yellow = { 0xff, 0xe0, 0x00, 0xff };
+static void DrawRangeGuide(Vec3 origin, float direction, float ranges[4], GXColor color) {
     GXColor white = { 0xff, 0xff, 0xff, 0xff };
 
     event_vars->GFX_Start(2, (GFX_Params) { .shape = GX_LINES, .size = 12 });
-    GFX_AddVtx(origin.X, origin.Y, 0, yellow);
-    GFX_AddVtx(origin.X + direction * ranges[3], origin.Y, 0, yellow);
+    GFX_AddVtx(origin.X, origin.Y, 0, color);
+    GFX_AddVtx(origin.X + direction * ranges[3], origin.Y, 0, color);
     event_vars->GFX_Start(4, (GFX_Params) { .shape = GX_POINTS, .size = 42 });
     for (int i = 0; i < 4; i++)
         GFX_AddVtx(origin.X + direction * ranges[i], origin.Y, 0,
-                   i == 3 ? white : yellow);
+                   i == 3 ? white : color);
 
     float shortest_x = origin.X + direction * ranges[0];
     // Same endpoint, two input timings: label above/below the shared dot.
-    DrawRangeNumber(1, shortest_x, origin.Y + 2, yellow);
-    DrawRangeNumber(2, shortest_x, origin.Y - 5, yellow);
-    DrawRangeNumber(3, origin.X + direction * ranges[1], origin.Y + 2, yellow);
-    DrawRangeNumber(4, origin.X + direction * ranges[2], origin.Y + 2, yellow);
+    DrawRangeNumber(1, shortest_x, origin.Y + 2, color);
+    DrawRangeNumber(2, shortest_x, origin.Y - 3.95f, color);
+    DrawRangeNumber(3, origin.X + direction * ranges[1], origin.Y + 2, color);
+    DrawRangeNumber(4, origin.X + direction * ranges[2], origin.Y + 2, color);
     DrawRangeNumber(0, origin.X + direction * ranges[3], origin.Y + 2, white);
 }
+
+/* Extra Underside Distance Markings, Totally Unnecessary
+static void DrawExtraUndersideDistanceMarkings(FighterData *fighter) {
+    float ranges[4];
+    GetHorizontalRanges(fighter, ranges, true);
+    Vec3 origin = sideb.attempted ? sideb.range_origin : fighter->phys.pos;
+    float direction = sideb.attempted ? sideb.dir : fighter->facing_direction;
+    DrawRangeGuide(origin, direction, ranges, (GXColor) { 0xff, 0xe0, 0x00, 0xff });
+}
+*/
 
 void Draw_Lines(void) {
     GOBJ *hmn = Fighter_GetGObj(0);
     FighterData *hmn_data = hmn->userdata;
     CollData *coll_data = &hmn_data->coll_data;
 
-    if (!Options_Main[OPT_VERTICAL_LINES].val && !Options_Main[OPT_HORIZONTAL_LINES].val)
+    if (!Options_Main[OPT_VERTICAL_LINES].val)
         return;
 
     COBJ *cur_cam = COBJ_GetCurrent();
     CObj_SetCurrent(*stc_matchcam_cobj);
 
-    if (Options_Main[OPT_HORIZONTAL_LINES].val)
-        DrawHorizontalLines(hmn_data);
-    if (!Options_Main[OPT_VERTICAL_LINES].val) {
-        CObj_SetCurrent(cur_cam);
-        return;
-    }
+    // if (Options_Main[OPT_EXTRA_UNDERSIDE_LINES].val)
+    //     DrawExtraUndersideDistanceMarkings(hmn_data);
 
     // Melee calculation for the top of the ledgegrab box
     float ledgegrab_offset = coll_data->cliffgrab_y_offset + 0.5 * coll_data->cliffgrab_height;
@@ -262,7 +278,7 @@ void Draw_Lines(void) {
     float x = hmn_data->phys.pos.X; 
     GXColor color = { 0x00, 0x00, 0xff, 0xff };
     if (sideb.attempted) {
-        x = sideb.pos.X;
+        x = sideb.range_origin.X;
         y = sideb.pos.Y + ledgegrab_offset;
 
         Vec2 target_ledge;
@@ -281,13 +297,17 @@ void Draw_Lines(void) {
         }
     }
 
-    // draw line at top of ledgegrab box
-    event_vars->GFX_Start(6, (GFX_Params) { .shape = GX_LINES, .size = 16 });
-    GFX_AddVtx(-300, y, 0, color);
-    GFX_AddVtx(300, y, 0, color);
+    // Sweetspot targets use the full aerial distances INCLUDING endlag drift,
+    // at the original ledge-grab height with the original result colors.
+    float ranges[4];
+    // GetHorizontalRanges(hmn_data, ranges, false); // Archived dash-only guide.
+    GetHorizontalRanges(hmn_data, ranges, true);
+    float direction = sideb.attempted ? sideb.dir : hmn_data->facing_direction;
+    DrawRangeGuide((Vec3) { x, y, 0 }, direction, ranges, color);
 
     // draw line from left edge
     GXColor white = { 0xff, 0xff, 0xff, 0xff };
+    event_vars->GFX_Start(4, (GFX_Params) { .shape = GX_LINES, .size = 16 });
     x = ledge_positions[0].X;
     y = ledge_positions[0].Y;
     GFX_AddVtx(x, y, 0, white);
@@ -303,6 +323,10 @@ void Draw_Lines(void) {
 }
 
 void Event_Init(GOBJ* gobj) {
+    Options_Main[OPT_VERTICAL_LINES].val = Options_Main[OPT_VERTICAL_LINES].val_prev =
+        TM_GetSetting(TM_SETTING_SWEETSPOT_LINES, 0);
+    // Archived underside option was session-only, never memory-card backed.
+    // Options_Main[OPT_EXTRA_UNDERSIDE_LINES].val = Options_Main[OPT_EXTRA_UNDERSIDE_LINES].val_prev = 0;
     GetLedgePositions(ledge_positions);
     GOBJ *draw_gobj = GObj_Create(0, 0, 0);
     GObj_AddGXLink(draw_gobj, Draw_Lines, 3, 0);
@@ -404,6 +428,7 @@ void Event_Think(GOBJ *menu) {
 }
 
 void Exit(GOBJ *menu) {
+    Memcard_SaveIfChanged();
     stc_match->state = 3;
     Match_EndVS();
 }
