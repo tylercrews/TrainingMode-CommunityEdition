@@ -19,17 +19,13 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T3 (V1.4.1T3)
 
+- Remember the highlighted event alongside the page on the memory card and restore its cursor/scroll position on boot; invalid event selections fall back to the first event.
+
 - Add numbered Side-B Sweetspot distance guides for Fox and Falco at ledge-grab height using total distance including drift, with smaller labels. Remember Enable Line Guides on the memory card, defaulting On; preserve the unused underside guide and dash-only distances in comments.
 
 - Include Marth and Roy's active grounded/aerial counter windows in the player-colored Invincibility Overlay, using native counter collision flags without adding saved settings.
 
-- Increment the centralized release version to V1.4.1T3 for the Training Lab menu rework.
-- Add the [Training Lab menu investigation](TRAINING-LAB-MENU-INVESTIGATION.md), including the baseline inventory, organization, styling research and interactive sketch.
-- Implement Training Lab's controller menu: eight visible category tabs, selections/values on the left, descriptions and one-row-per-option submenu previews with `>` markers on the right, plus alternating semantic row colors.
-- Use short menus and peer editor pages, retain parent selection, and add A-to-apply/B-to-cancel value pickers; preserve hold-Y shortcuts, L/R OSD paging, recording value IDs and the existing save format. Other events retain their existing renderer.
-- Move Boost Grab into Combat & Defense OSDs. The native build and PowerPC regression checks pass; live Dolphin layout/input validation remains pending.
-- Widen the Lab panels, enlarge text and space description/preview rows using the native glyph height; long previews use Left/Right pages instead of overlapping. Expand recording help and add specific unavailable reasons plus a [recording guide](TRAINING-LAB-RECORDING-GUIDE.md).
-- Expand the entire Lab menu frame horizontally by another 8%, including tabs/panels and text bounds, without stretching glyphs or changing its height.
+- Training Lab Event Menu Rework: eight visible category tabs, selections/values on the left, descriptions and one-row-per-option submenu previews with `>` markers on the right, plus alternating semantic row colors. Use short menus and peer editor pages, retain parent selection, and add A-to-apply/B-to-cancel value pickers; preserve hold-Y shortcuts, L/R OSD paging, recording value IDs and the existing save format. Other events retain their existing renderer.
 
 ### T2 (V1.4.1T2)
 

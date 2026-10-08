@@ -478,6 +478,37 @@ class NativeCardSaveTests(unittest.TestCase):
         self.ready();m.call('Settings_CommitPending');self.assertEqual(m.call('TestDirty'),1)
 
 
+class EventSelectionTests(unittest.TestCase):
+    def test_page_and_selection_round_trip_without_changing_neighbors(self):
+        m = Machine(); m.init()
+        original = m.record()
+        for page in range(3):
+            for event in range(64):
+                m.write(2, 0, page); m.write(26, 0, event)
+                self.assertEqual((m.read(2), m.read(26)), (page, event))
+                self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
+                self.assertEqual(m.record()[:5] + m.record()[6:], original[:5] + original[6:])
+        self.assertEqual(m.write(26, 0, 64), 0)
+
+    def test_native_init_restores_selection_and_preserves_context(self):
+        for selected, expected in [(0, 0), (12, 12), (63, 0)]:
+            m = Machine(); m.init(); m.write(26, 0, selected)
+            # Native hook invokes page count through the existing function table.
+            m.cpu.mem_write(0x102000, bytes.fromhex("386000144e800020"))
+            m.cpu.mem_write(0x80300000 - 200 + 5 * 4, struct.pack(">I", 0x102000))
+            m.cpu.mem_write(0x80300000 - 0x77C0, struct.pack(">I", RECORD - 0x1F24))
+            m.install_hook(0x8024e858)
+            for n in range(3, 32): m.cpu.reg_write(gpr(n), 100 + n)
+            m.cpu.reg_write(reg.UC_PPC_REG_CR, 0x24812481)
+            m.cpu.reg_write(reg.UC_PPC_REG_LR, STOP)
+            m.cpu.emu_start(0x8024e858, 0x8024e85C, count=300000)
+            self.assertEqual(m.cpu.reg_read(reg.UC_PPC_REG_PC), 0x8024e85C)
+            for n in range(3, 32):
+                self.assertEqual(m.cpu.reg_read(gpr(n)), expected if n == 30 else 100 + n)
+            self.assertEqual(m.cpu.reg_read(reg.UC_PPC_REG_CR), 0x24812481)
+            self.assertEqual(m.read(26), expected)
+
+
 class SettingsTests(unittest.TestCase):
     def setUp(self):
         self.m = Machine()

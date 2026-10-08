@@ -92,6 +92,7 @@ enum TMSettingsField {
     TM_SETTING_OSD_PAGE, /* Runtime-only manual page; no memory-card allocation. */
     TM_SETTING_CHARACTER, /* Index 0 human / 1 CPU; external ID, UINT32_MAX = unset. */
     TM_SETTING_SWEETSPOT_LINES, /* Index 0 only: Enable Line Guides; default On. */
+    TM_SETTING_EVENT_SELECTION, /* Byte 5 high six bits; page remains in low two. */
 };
 enum TMOSDLayout { TM_OSD_RECENT, TM_OSD_FIXED, TM_OSD_PANEL, TM_OSD_LAYOUT_COUNT };
 

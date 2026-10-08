@@ -3,6 +3,15 @@
 
     backup
 
+    # Remember the highlighted event, including the scroll offset. The shared
+    # setter only dirties the card when the value changes.
+    lwz r3, -0x4A40(r13)
+    lwz r3, 0x2C(r3)
+    lbz r4, 0(r3)
+    lwz r3, 4(r3)
+    add r3, r3, r4
+    SettingsWrite SettingsField_EventSelection, 3
+
     # Match scenes can unload card resources. Requeue settings only after the
     # native ESS card archive/work state is initialized; its autosave polls next.
     SettingsBackup
@@ -307,6 +316,8 @@ SwitchPage_CheckLow:
     b exit
 
 SwitchPage_ChangePage:
+    li r3, 0
+    SettingsWrite SettingsField_EventSelection, 3
     # Get Page Name string
     lwz r3, MemcardData(r13)
     SettingsRead SettingsField_Page, 3

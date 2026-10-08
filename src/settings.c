@@ -131,7 +131,7 @@ void TMSettings_Init(uint8_t r[TM_SETTINGS_SIZE]) {
 
 static void validate_prefix(uint8_t *r) {
     if (r[4] >= 4) r[4] = 1;
-    if (r[5] >= 3) r[5] = 1;
+    if ((r[5] & 3) >= 3) r[5] = 1;
     /* Old writers only produce 0/1 here. 10 in the top bits identifies the
      * character extension, so old palette padding cannot initialize it.
      * Codes 1..26 are playable external IDs + 1; 0 is unset. */
@@ -187,6 +187,10 @@ int TMSettings_Prepare(uint8_t r[TM_SETTINGS_SIZE], int owns_save) {
             }
         }
     }
+    /* Older layouts only own the page, never an event selection. */
+    if (!signed_format || old_version < TM_SETTINGS_VERSION) {
+        if (r[5] >= 3) r[5] = 1;
+    }
     validate_prefix(r);
     preference_validate(r);
     for (unsigned group = 0; group < TM_SETTINGS_OVERLAYS; ++group) {
@@ -211,7 +215,8 @@ uint32_t TMSettings_Read(const uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsi
     switch (field) {
     case TM_SETTING_OSD_MASK: return read_mask(r);
     case TM_SETTING_OSD_POSITION: return r[4];
-    case TM_SETTING_EVENT_PAGE: return r[5];
+    case TM_SETTING_EVENT_PAGE: return r[5] & 3;
+    case TM_SETTING_EVENT_SELECTION: return r[5] >> 2;
     case TM_SETTING_RECOMMENDED: return r[6] & 1;
     case TM_SETTING_SWEETSPOT_LINES:
         return index == 0 ? !(r[40] & TM_SETTINGS_SWEETSPOT_LINES_OFF_MASK) : 0;
@@ -328,7 +333,8 @@ int TMSettings_Write(uint8_t r[TM_SETTINGS_SIZE], unsigned field, unsigned index
     unsigned byte, shift = 0, width = 8, count;
     switch (field) {
     case TM_SETTING_OSD_POSITION: byte = 4; count = 4; break;
-    case TM_SETTING_EVENT_PAGE: byte = 5; count = 3; break;
+    case TM_SETTING_EVENT_PAGE: byte = 5; width = 2; count = 3; break;
+    case TM_SETTING_EVENT_SELECTION: byte = 5; width = 6; shift = 2; count = 64; break;
     case TM_SETTING_RECOMMENDED: byte = 6; width = 1; count = 2; break;
     case TM_SETTING_ADVANCE: byte = 7; width = 4; count = 5; break;
     case TM_SETTING_DECREMENT: byte = 7; width = 4; shift = 4; count = 6; break;

@@ -982,6 +982,7 @@
 .set SettingsField_OSDPage, 23
 .set SettingsField_Character, 24
 .set SettingsField_SweetspotLines, 25
+.set SettingsField_EventSelection, 26
 
 # Preserve the native hook's entire register context, including volatile FPRs,
 # r0, CR, CTR and XER. Leave ABI linkage/argument space below the saves.
