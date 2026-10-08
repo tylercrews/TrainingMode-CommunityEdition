@@ -21,6 +21,7 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 - Increment the centralized release version to V1.4.1T3 for the Training Lab menu rework.
 - Add the [Training Lab menu investigation](TRAINING-LAB-MENU-INVESTIGATION.md), including the current inventory, proposed organization, styling research, submenu previews, and an alternative UI sketch. Menu implementation remains pending.
+- Rebuild the menu sketch around joystick directions and A/B, with a category/page selector, preserved parent focus, and cancellable value pickers. Native game menu implementation remains pending.
 
 ### T2 (V1.4.1T2)
 

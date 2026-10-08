@@ -11,8 +11,9 @@ This is the working research and decision log for the Training Lab menu rework. 
 - [x] Propose a complete semantic grouping with row counts and a depth limit.
 - [x] Investigate alternating rows, contiguous color blocks, selection, and value styling.
 - [x] Establish how submenu descriptions can show purpose and contents before entry.
-- [x] Sketch an alternative category-rail interface for discussion.
-- [ ] Choose the hierarchy, labels, and whether to use the category rail.
+- [x] Sketch an alternative interface, then rebuild it around controller navigation after user feedback.
+- [x] Choose a single-cursor category selector/list direction in place of the mouse-oriented rail.
+- [ ] Finalize the hierarchy, labels, and native controller layout.
 - [ ] Choose zebra rows, color blocks, or the combined treatment.
 - [ ] Implement a presentation layer that preserves setting identities and callback behavior.
 - [ ] Implement purpose/contents previews, unavailable reasons, and override explanations.
@@ -569,7 +570,7 @@ Longest ordinary paths are **3 submenu entries**, for example Recording → Slot
 
 ## 5. View three: options by common task
 
-Depth here counts entering a top-level category from the root, then any child screens. A category rail would eliminate the first root-list entry step when switching categories.
+Depth here counts entering a top-level category from the root, then any child screens. The controller prototype's category selector avoids opening a separate root list when switching categories; the category contents appear as soon as its selector changes.
 
 | Player intent | Proposed route and relevant controls | Entries |
 | --- | --- | ---: |
@@ -678,24 +679,40 @@ For the modest tree here, authored four-line previews are the smallest first imp
 
 A layout redesign should reserve a fixed detail area: purpose, **Includes:** list, context/availability. Selection changes update the preview; opening the child should preserve the same names/order. Entering and returning should retain the selected row and page, so exploration does not reset the player to the top.
 
-## 8. Alternative UI: persistent category rail + short list + detail footer
+## 8. Controller-first UI: category selector + single list + detail footer
 
-Instead of repeatedly returning to a root list, keep the seven categories visible as a compact left rail, with Exit below. The right area shows the selected category's short list; a full-width footer shows the highlighted row's purpose and included options. Nested editors replace the right list and show a breadcrumb/back action. This gives the player a stable location and avoids a desktop-style three-column design that would squeeze text at 640×480.
+**October 7 follow-up:** the user requested a fresh direction optimized for a joystick that moves one direction at a time, with A to enter and B to go back. The earlier mouse-oriented rail/tree comparison is superseded. The new demo has one explicit controller cursor, a category selector above a single list, and a purpose/contents detail footer. There are no independently navigated columns or clickable tab requirements.
 
-The accompanying interactive sketch is [training-lab-menu-demo.html](docs/training-lab-menu-demo.html). It demonstrates category switching, submenu entry/back, previews before entry, alternating rows, color blocks, and page-based editors. Illustrative values change locally for discussion; it does not control the game. It is a proposal, not a screenshot of native output or proof of console fit.
+The accompanying interactive sketch is [training-lab-menu-demo.html](docs/training-lab-menu-demo.html). Its entire menu is reachable through four directions and A/B. Keyboard arrows simulate the stick; A/Enter enters or confirms; B/Escape backs out. Six on-screen buttons simulate those same inputs for touch/mouse review. A standard browser-mapped gamepad can use its stick/D-pad and south/east A/B buttons; nonstandard adapters require external keyboard mapping. Actual hardware support remains to be tested. Illustrative values change locally; the sketch does not control the game or prove native console fit.
 
-The demo uses the final tree in section 4. It represents a sample match with Fox CPU and Peach human on Fountain of Dreams; Stage/RNG/recovery variants remain fully inventoried above. Long editor lists use named pages rather than deeper children. The two conversation variants compare the category rail with a compact tree; the design controls compare Combined, Zebra, and Blocks row treatments. Directly opening the fragment shows the rail with Combined styling. Custom TDI and Export are destination sketches, not full emulations of the stick editor or card/keyboard flow. Values/ranges are illustrative subsets and the sketch does not emulate conditional availability, probability balancing, or per-hit/per-action recording state. The live game would retain those behaviors.
+The demo retains section 4's semantic destinations and the sample Peach/Fox match on Fountain of Dreams. Exit is the eighth category-selector position, containing Return to Event Select and Resume Practice. Starting category is Session. Global scope, actor-specific settings, and the catalog of conditional variants remain unchanged. Combined zebra/block styling is the default; optional design controls compare Combined, Zebra, and Blocks. Custom TDI and Export remain destination sketches rather than native editor/card-flow emulations. Values/ranges, availability, probability balancing, and per-hit/per-action data remain illustrative.
+
+### 8.1 Controller rules
+
+| Focus / situation | Up / Down | Left / Right | A | B |
+| --- | --- | --- | --- | --- |
+| Category selector | Enter first/last row | Previous/next category, one at a time | Enter the remembered row | Resume practice |
+| Category's option list | Move one row; boundaries wrap through selector | Change a focused setting by one value; submenu rows have no horizontal action | Open submenu, value picker, or action | Focus category selector |
+| Nested submenu | Move one row; wrap within list | Change a focused setting by one value | Open/activate focused row | Return to the exact parent row/page |
+| Paged editor's selector | Enter first/last row | Previous/next page | Enter list | Return to parent |
+| Value picker | Move one choice; wrap at ends | No action | Apply highlighted choice | Cancel without changing value |
+
+The selector is part of the same vertical focus sequence as the list. B at a category root reaches it in one press; the user does not have to climb through all rows to switch categories. A remembers the last focused row in a category, while Down explicitly enters its first row. Returning from a child preserves the parent's cursor, page, and viewport. Nested screens expose their breadcrumb without turning it into another focus region.
+
+Left/Right editing is deliberately restricted to the focused setting. Value pickers support a longer list with a maximum of nine visible choices and a position counter; the viewport follows the controller cursor. Pages such as Analog/Buttons and overlay groups use a focused page selector with the same directions and A/B, requiring no shoulder buttons or mouse tabs. Long values are displayed in the right column and explained in the footer.
+
+Keyboard repeat is ignored: each direction press moves once. The gamepad path similarly requires release/recentering between movements, resolves a diagonal stick to its dominant axis, and uses separate engage/release thresholds. A/B activate only on a press edge. Connection with a held input does not immediately activate an option. All input sources call the same navigation state machine; hover does not move the cursor. Pointer clicks on a row only select it, and the simulator's A activates it.
 
 | Alternative | Benefit | Cost / recommendation |
 | --- | --- | --- |
 | Reorganized existing list | Familiar controls, easiest incremental change, existing DAT background. | More backtracking between categories; recommended first game implementation. |
-| Category rail + short list + detail footer | Category stays visible; purpose/contents have a permanent home. | Needs new geometry, focus rules and controller testing; strongest alternative to prototype. |
+| Category rail + short list + detail footer | Category stays visible; purpose/contents have a permanent home. | Historical option; superseded by the single-cursor controller selector after user feedback. |
 | Two-column dashboard of settings cards | Related controls can be viewed simultaneously. | Less predictable controller navigation, tighter value widths and more visual density on CRT; not recommended first. |
 | Search-first interface | Fast on a keyboard. | Poor fit for a GameCube controller; category navigation must remain primary. |
 
-Proposed native rail controls: stick/D-pad Up/Down selects within the active region; A activates; B backs out, then returns focus to the rail at the category root; Left/Right edits a value while the list is active. Page switching needs an explicitly resolved binding. **Do not claim L/R or Y is free:** OSD paging, frame-step bindings, and hold-Y shortcuts already use those inputs. The browser sketch uses clicks and normal keyboard button activation, not emulated controller bindings.
+This direction reserves no L/R/Y bindings, leaving existing OSD paging, frame stepping, and hold-Y shortcuts for the later native implementation to preserve. The browser sketch's input behavior is implemented; integration with native pause handling is not.
 
-Keep the rail as an optional renderer direction until the console layout is measured. Prototype a 640×480 logical layout and overscan-safe bounds, with real fonts, before choosing it. The demo's responsive reflow is useful for reviewing here but is not the native game layout.
+The category rail remains a historical alternative in the comparison above, not the current recommended demo. Prototype the single-list layout at 640×480 with real fonts and overscan-safe bounds before committing native geometry. The browser's responsive layout is useful for review, not evidence of CRT fit.
 
 ## 9. Implementation constraints and a staged approach
 
@@ -721,7 +738,7 @@ The DAT asset references (`evMenu.menu`, `popup`, `scroll`) support geometry man
 2. **Introduce views:** map existing options into short screens; explicitly update callbacks and shortcuts. Keep values/save format/recording IDs stable.
 3. **Add descriptions:** purpose + contents + dynamic unavailable/override explanations; validate text fit using real labels.
 4. **Restyle the existing renderer:** full-width backgrounds, zebra/block treatment, clear selection/value distinction and subsection captions.
-5. **Evaluate the rail:** compare native category switching/fit against the reorganized list; adopt only if it improves the actual controller experience.
+5. **Evaluate the controller layout:** prototype the category/page selector and focus retention with native fonts/input; measure access and fit against the reorganized list.
 6. **Verify and record implementation:** add implemented changes to the README T3 changelog and dated sections here. Mark live checks only after they are actually performed.
 
 ## 10. Acceptance checks for later implementation
@@ -741,17 +758,20 @@ The DAT asset references (`evMenu.menu`, `popup`, `scroll`) support geometry man
 
 **October 7, 2026 — initial proposal.** Source definitions and runtime modifications were inspected. The centralized version is V1.4.1T3; the save identity stays TYRE01. This document is the starting inventory and design proposal. The demo is illustrative. No native menu implementation or new ISO is claimed by this research pass.
 
-Completed checks for this pass:
+Completed checks for the initial, now-superseded sketch:
 
 - Source-label coverage: every nonempty literal menu/option name in `lab.h` and `recovery.c`, plus the expanded shared global labels, appears in the inventory document. Dynamic inserted rows and alternate names were inspected separately in `lab.c`.
 - `./build.sh --version`: reports V1.4.1T3, TYRE01, and `TM-Tyro-V1.4.1T3.iso`.
 - Demo JavaScript syntax check passed. A temporary DOM harness exercised 44 menu destinations / 51 pages in both designs: row counts, links, entry/back navigation, focus previews, value changes, and the shared Analog/Buttons Frame selector passed. The menu graph has maximum depth 3 from the root.
 - Whitespace/content checks passed. No browser surface was available for screenshot/layout inspection; the harness is not browser-rendering validation. Native Dolphin/CRT fit and gameplay checks remain pending.
 
+Completed checks for the controller revision: JavaScript syntax passed; a temporary DOM harness traversed **44 reachable destinations and 261 row appearances** using only directional inputs and A/B. It checked submenu purpose/contents previews, exactly one controller selection, nine-row view limits, parent row/page/viewport restoration, category wrap and remembered rows, value-picker apply/cancel, one-value horizontal edits, keyboard repeat suppression, simulator dispatch, and simulated gamepad press edges/neutral thresholds/dominant diagonal direction. It also checked saved-state restoration and rejection of invalid menu destinations. These are code-level input checks; browser layout, actual gamepad hardware, and native game integration are still unverified.
+
 Record future decisions using this format:
 
 | Date | Decision / implemented change | Reason | Validation / remaining work |
 | --- | --- | --- | --- |
 | 2026-10-07 | Start T3 menu investigation and version bump. | Establish a complete inventory before reorganizing. | Source audit; metadata/diff checks. Native layout/gameplay validation remains pending. |
+| 2026-10-07 | Replace rail/tree sketch with a single-cursor controller menu. | User prioritizes joystick directions plus A/B, with easy access to elements. | Browser prototype navigation implemented; native integration and actual hardware/visual checks remain pending. |
 
-**Open design choices:** approve the final nine-row Recording hub; decide whether the extra Fighter Displays hub is worth its compact Visual Feedback root; choose the Action Timing group name; choose whether Human replaces HMN in display labels; select styling treatment; decide whether to prototype the category rail natively after the list reorganization.
+**Open design choices:** approve the final nine-row Recording hub; decide whether the extra Fighter Displays hub is worth its compact Visual Feedback root; choose the Action Timing group name; choose whether Human replaces HMN in display labels; select styling treatment; measure the controller selector/list layout natively. The mouse-oriented rail is no longer the active direction.
