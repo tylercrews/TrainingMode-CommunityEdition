@@ -23,6 +23,12 @@ int ActionCues_IsProtected(GOBJ *gobj) {
     if (!gobj || !gobj->userdata) return 0;
     FighterData *data = gobj->userdata;
     if (data->flags.dead) return 0;
+    /* Both swordsmen share ground/air counter stance states. The native
+     * counter script enables a special shield: 0x221B bits 7 + 6. Bit 6 can
+     * remain latched during recovery, so the live enable bit is essential. */
+    if ((data->kind == FTKIND_MARTH || data->kind == FTKIND_ROY) &&
+        (data->state_id == 369 || data->state_id == 371) &&
+        data->flags.shield_enable && data->flags.shield_x40) return 1;
     if (data->hurt.kind_script > 0 || data->hurt.kind_game > 0 ||
         Fighter_GetIntangibleFrames(gobj) > 0 || (data->kind == FTKIND_YOSHI && data->dmg.armor > 0)) return 1;
     /* SetAllHurtCapsules (script opcode 0x6C) does not set the aggregate status.

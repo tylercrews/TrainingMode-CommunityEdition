@@ -2376,6 +2376,58 @@ class ActionCueTests(unittest.TestCase):
         m.call("TestCueDraw", 0)
         self.assertEqual(m.call("TestCueDrawColor", 0), 0)
 
+    def test_marth_roy_counter_windows_follow_native_flags_and_overlay_toggle(self):
+        m=self.m;m.init();m.call('TestCueInit');m.write(11,7,1)
+        m.call('TestCuePlayer',0,1,0)
+        obj=m.call('TestCueObject',0);data=m.call('TestCueData',0)
+        for kind in (18,26):
+            m.call('TestCueKind',0,kind)
+            for state in (369,371):
+                m.call('TestCueState',0,state,10,60,100)
+                m.call('TestCueTick',1)
+                for flags,protected in ((0,0),(0x40,0),(0x80,0),(0xC0,1)):
+                    m.cpu.mem_write(data+0x221B,bytes([flags]))
+                    self.assertEqual(m.call('ActionCues_IsProtected',obj),protected)
+                    m.call('TestCueDraw',0)
+                    self.assertEqual(m.call('TestCueDrawColor',0),0x4691FF70 if protected else 0)
+                m.write(11,7,0);m.call('TestCueDraw',0)
+                self.assertEqual(m.call('TestCueDrawColor',0),0)
+                m.write(11,7,1)
+            # Retaliation/recovery or ordinary shield do not count as a counter.
+            for state in (370,372,179,341):
+                m.call('TestCueState',0,state,10,60,100)
+                self.assertEqual(m.call('ActionCues_IsProtected',obj),0)
+        m.call('TestCueKind',0,1);m.call('TestCueState',0,369,10,60,100)
+        self.assertEqual(m.call('ActionCues_IsProtected',obj),0)
+
+    def test_counter_native_animation_callbacks_open_and_close_overlay_window(self):
+        m=self.m;m.init();m.call('TestCueInit');m.write(11,7,1)
+        obj=m.call('TestCueObject',0);data=m.call('TestCueData',0)
+        dol=(ROOT/'build/Start.dol').read_bytes()
+        for address,end in ((0x80138AA8,0x80138C20),(0x8007B1B8,0x8007B23C)):
+            for section in range(18):
+                offset,base,length=[struct.unpack_from('>I',dol,at+section*4)[0] for at in (0,0x48,0x90)]
+                if base<=address and end<=base+length:
+                    m.cpu.mem_write(address,dol[offset+address-base:offset+end-base]);break
+        # Run the actual shield initializer and counter callbacks. Bound only
+        # the unrelated animation-end query so it stays in the stance.
+        m.cpu.mem_write(0x8006F238,bytes.fromhex('386000014e800020'))
+        attrs=0x80406000;m.cpu.mem_write(attrs,bytes(0x100))
+        m.cpu.mem_write(data+0x2D4,struct.pack('>I',attrs))
+        m.cpu.mem_write(data+0x5E8,struct.pack('>I',0x80406400))
+        m.cpu.mem_write(0x80406400,struct.pack('>I',0x80406800))
+        m.symbols['NativeGroundCounter']=0x80138AA8;m.symbols['NativeAirCounter']=0x80138B64
+        for kind in (18,26):
+            m.call('TestCueKind',0,kind)
+            for state,callback in ((369,'NativeGroundCounter'),(371,'NativeAirCounter')):
+                m.call('TestCueState',0,state,1,60,100)
+                m.cpu.mem_write(data+0x221B,b'\0')
+                for command,expected in ((0,0),(1,1),(2,1),(0,0)):
+                    m.cpu.mem_write(data+0x2204,struct.pack('>I',command))
+                    m.call(callback,obj)
+                    self.assertEqual(m.call('ActionCues_IsProtected',obj),expected)
+                self.assertEqual(bytes(m.cpu.mem_read(data+0x221B,1)),b'\x40')
+
     def test_yoshi_double_jump_armor_and_move_protection(self):
         m = self.m
         m.call("Settings_Set", 11, 7, 1)

@@ -19,6 +19,8 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 
 ### T3 (V1.4.1T3)
 
+- Include Marth and Roy's active grounded/aerial counter windows in the player-colored Invincibility Overlay, using native counter collision flags without adding saved settings.
+
 - Increment the centralized release version to V1.4.1T3 for the Training Lab menu rework.
 - Add the [Training Lab menu investigation](TRAINING-LAB-MENU-INVESTIGATION.md), including the baseline inventory, organization, styling research and interactive sketch.
 - Implement Training Lab's controller menu: eight visible category tabs, selections/values on the left, descriptions and one-row-per-option submenu previews with `>` markers on the right, plus alternating semantic row colors.

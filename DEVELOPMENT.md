@@ -387,3 +387,12 @@ The existing SetText old-length hook at `0x803A7068` skips the complete eleven-b
 Message creation skips hitlag capture for JC Shine kind 64. `OSD_TimingText` independently suppresses that prefix for retained/imported JC messages. Jump Out Of Shine kind 8 retains hitlag. No data layout, export order, save format or storage budget changes: 44 bytes, format 3, four available audited bits.
 
 135 PowerPC tests pass. New tests execute native conversion, width, nested scales, native replacement/row-location and the actual assembled draw hook plus native scale push/pop. They verify relative scaling at multiple row sizes, restored size for following numbers, unchanged standalone glyphs and JC/Jump Out prefix differences. Final readability remains a Dolphin check.
+
+
+## Marth/Roy counter-active overlay
+
+`ActionCues_IsProtected` includes Marth/Roy counter stance IDs 369/371 only when `flags.shield_enable` and `flags.shield_x40` are both set. Native shield initialization at 0x8007B1B8 enables mask 0x80 in byte 0x221B; shared ground/air counter animation callbacks at 0x80138AA8/0x80138B64 add mask 0x40. They clear mask 0x80 when their command variable closes the window, leaving 0x40 latched. Never treat the latter alone as active protection. Retaliation states 370/372 and other fighters do not satisfy this exception; existing hurt status/whole-body/Yoshi detection is preserved.
+
+The common renderer keeps player-colored translucent tint and its existing priority/toggle logic. No ABI, exports, combat logic or persistence allocation changes. Save storage remains 44 bytes / format 3 with four available audited bits.
+
+137 PowerPC tests pass. The new native-callback test executes the real ground/air counter callbacks and shield initialization against fixture collision data; only the animation-end query is stubbed. Additional rendering checks cover active flags, recovery, state/kind exclusion and live global disabling. Cold Dolphin frame-step validation remains a visual check.
