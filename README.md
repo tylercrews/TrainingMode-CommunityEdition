@@ -15,9 +15,19 @@ The Tyro version and stable game/save identity live in [version.h](version.h). U
 
 ## Tyro branch changelog
 
-This section records Tyro-specific changes. Add a bullet under the matching Tyro version whenever a change is implemented; keep the newest version first. Proposed gameplay changes stay in the [investigation and implementation plan](OSD-GLOBAL-SETTINGS-INVESTIGATION.md) until implemented.
+This section records Tyro-specific changes. Add a bullet under the matching Tyro version whenever a change is implemented; keep the newest version first. Proposed changes stay in the relevant [OSD investigation](OSD-GLOBAL-SETTINGS-INVESTIGATION.md) or [Training Lab menu investigation](TRAINING-LAB-MENU-INVESTIGATION.md) until implemented.
 
-### T2 (V1.4.1T2, unreleased)
+### T3 (V1.4.1T3)
+
+- Remember the highlighted event alongside the page on the memory card and restore its cursor/scroll position on boot; invalid event selections fall back to the first event.
+
+- Add numbered Side-B Sweetspot distance guides for Fox and Falco at ledge-grab height using total distance including drift, with smaller labels. Remember Enable Line Guides on the memory card, defaulting On; preserve the unused underside guide and dash-only distances in comments.
+
+- Include Marth and Roy's active grounded/aerial counter windows in the player-colored Invincibility Overlay, using native counter collision flags without adding saved settings.
+
+- Training Lab Event Menu Rework: eight visible category tabs, selections/values on the left, descriptions and one-row-per-option submenu previews with `>` markers on the right, plus alternating semantic row colors. Use short menus and peer editor pages, retain parent selection, and add A-to-apply/B-to-cancel value pickers; preserve hold-Y shortcuts, L/R OSD paging, recording value IDs and the existing save format. Other events retain their existing renderer.
+
+### T2 (V1.4.1T2)
 
 - Shrink `->` arrows to 75% of the surrounding OSD text size while preserving full-size frame counts, colors and single-row alignment in all layouts.
 - Exclude post-shine hitlag from JC Shine timing; Jump Out Of Shine retains its relevant hitlag context.

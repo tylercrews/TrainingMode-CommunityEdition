@@ -16,14 +16,14 @@
 #define TM_SETTINGS_COLORS_OFFSET 30
 /* Previously unused capacity: byte 6 bits 1-5 human ID+1, bits 6-7 marker 10;
  * byte 37 bits 1-5 CPU ID+1. Palette occupies byte 37 bit 0 only.
- * Byte 37 bits 6-7 and the two explicit reserved bits remain unused. */
+ * Byte 37 bits 6-7 and byte 43 bit 7 remain unused. */
 #define TM_SETTINGS_SIGNATURE_OFFSET 38
 #define TM_SETTINGS_RESERVED_OFFSET 40
 #define TM_SETTINGS_EXTRA_FLAGS_OFFSET 40 /* Bits 0/1/2: TurnRun/protection/CPU OSD override. */
 #define TM_SETTINGS_EVENT_INITIALIZED 0x08 /* Byte 40 bit 3; older format-3 saves leave it clear. */
 #define TM_SETTINGS_EVENT_DELAY_MASK 0x30 /* Byte 40 bits 4-5: Ledgedash reset delay. */
 #define TM_SETTINGS_EVENT_TIPS_MASK 0x40 /* Byte 40 bit 6: Ledgedash hints. */
-#define TM_SETTINGS_FREE_MASK 0x80 /* Byte 40 bit 7 remains reserved. */
+#define TM_SETTINGS_SWEETSPOT_LINES_OFF_MASK 0x80 /* Byte 40 bit 7: inverted; unset defaults On. */
 #define TM_SETTINGS_LAYOUT_MASK 0x60 /* Byte 43 bits 5-6: Recent / Fixed / Panel. */
 #define TM_SETTINGS_EGGS_FREE_MASK 0x80 /* Byte 43 bit 7 remains reserved. */
 #define TM_OSD_LAYOUT_NAMES "Recent", "Fixed Grid", "Practice Panel"
@@ -91,6 +91,8 @@ enum TMSettingsField {
     TM_SETTING_OSD_DISPLAY, /* Composite editor choice: four Recent anchors, Fixed, Panel. */
     TM_SETTING_OSD_PAGE, /* Runtime-only manual page; no memory-card allocation. */
     TM_SETTING_CHARACTER, /* Index 0 human / 1 CPU; external ID, UINT32_MAX = unset. */
+    TM_SETTING_SWEETSPOT_LINES, /* Index 0 only: Enable Line Guides; default On. */
+    TM_SETTING_EVENT_SELECTION, /* Byte 5 high six bits; page remains in low two. */
 };
 enum TMOSDLayout { TM_OSD_RECENT, TM_OSD_FIXED, TM_OSD_PANEL, TM_OSD_LAYOUT_COUNT };
 

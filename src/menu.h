@@ -44,6 +44,21 @@ typedef struct EventOption
     void (*OnChange)(GOBJ *menu_gobj, int value);   // function that runs when option is changed
     void (*OnSelect)(GOBJ *menu_gobj);              // function that runs when option is selected
 } EventOption;
+/* Presentation rows reference the canonical option, including runtime label,
+ * value and availability changes. Existing contiguous menus remain supported. */
+typedef struct EventMenuRow {
+    EventOption *option;
+    u8 group;
+} EventMenuRow;
+typedef struct EventMenuPage {
+    char *name;
+    u8 option_num;
+    EventMenuRow *rows;
+} EventMenuPage;
+typedef struct EventMenuTab {
+    char *name;
+    EventMenu *menu;
+} EventMenuTab;
 typedef struct Shortcut {
     int button_mask;
     EventOption *option;
@@ -61,6 +76,14 @@ struct EventMenu
     EventOption *options;          // pointer to all of this menu's options
     EventMenu *prev;               // pointer to previous menu, used at runtime
     ShortcutList *shortcuts;       // pointer to shortcuts when shortcut mode is entered on this menu
+    EventMenuRow *rows;            // optional referenced presentation rows
+    EventMenuPage *pages;          // optional peer pages within this editor
+    u8 page_num;
+    u8 page;
+    EventMenuTab *tabs;            // root-only: opt in to the controller renderer
+    u8 tab_num;
+    char *purpose;
+    const char *(*unavailable_reason)(EventOption *option); /* optional root context */
 };
 typedef enum MenuMode {
     MenuMode_Normal,
@@ -86,12 +109,46 @@ typedef struct MenuData
     GOBJ *custom_gobj;                               // onSelect gobj
     int (*custom_gobj_think)(GOBJ *custom_gobj);     // per frame function. Returns bool indicating if the program should check to unpause
     void (*custom_gobj_destroy)(GOBJ *custom_gobj);  // on destroy function
+    EventMenu *root_menu;
+    u8 tab;
+    u8 selector;                   // focus on the category tabs / editor page
+    Text *text_tabs;
+    Text *text_preview;
+    Text *text_hints;
+    JOBJ *tabboxes[8];
+    EventOption *picker;
+    s16 picker_value;              // draft; original option is untouched until A
+    u16 picker_scroll;
+    Text *text_panel_title;
+    EventMenu *preview_menu;
+    u8 preview_page;
+    u8 preview_pages;
 } MenuData;
+
+static inline int EventMenu_OptionCount(EventMenu *menu) {
+    return menu->page_num ? menu->pages[menu->page].option_num : menu->option_num;
+}
+static inline EventOption *EventMenu_GetOption(EventMenu *menu, int index) {
+    if (index < 0 || index >= EventMenu_OptionCount(menu)) return 0;
+    if (menu->page_num) return menu->pages[menu->page].rows[index].option;
+    return menu->rows ? menu->rows[index].option : &menu->options[index];
+}
+static inline EventOption *EventMenu_SelectedOption(MenuData *data) {
+    return EventMenu_GetOption(data->curr_menu, data->curr_menu->scroll + data->curr_menu->cursor);
+}
+static inline int EventMenu_OptionGroup(EventMenu *menu, int index) {
+    if (menu->page_num) return menu->pages[menu->page].rows[index].group;
+    return menu->rows ? menu->rows[index].group : 0;
+}
 
 
 GOBJ *EventMenu_Init(EventMenu *start_menu);
 void EventMenu_Draw(GOBJ *eventMenu);
 void EventMenu_Update(GOBJ *gobj);
+void EventMenu_ExitMenu(GOBJ *gobj);
+void EventMenu_PrevMenu(GOBJ *gobj);
+void EventMenu_NextMenu(GOBJ *gobj, EventMenu *menu);
+void EventMenu_ChangeOptionVal(GOBJ *gobj, EventOption *option, int value);
 void EventMenu_UpdateText(GOBJ *gobj);
 void EventMenu_CreateText(GOBJ *gobj);
 void EventMenu_CreateModel(GOBJ *gobj);
@@ -109,6 +166,7 @@ enum option_kind {
     OPTKIND_FUNC,
     OPTKIND_INFO,
     OPTKIND_TOGGLE,
+    OPTKIND_RESUME,
 };
 
 // GX Link args

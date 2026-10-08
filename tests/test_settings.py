@@ -345,6 +345,19 @@ class RelocatedDATSettingsTests(unittest.TestCase):
         self.assertEqual(fresh.record(), saved)
         self.assertEqual(fresh.call("TestDirty"), 0)
 
+    def test_sweetspot_guides_through_real_dat_relocation_and_reload(self):
+        m = self.m; m.init()
+        self.assertEqual(m.call("DAT_Get", 25, 0), 1)
+        before = m.record()
+        m.call("DAT_Set", 25, 0, 0)
+        expected = bytearray(before); expected[40] |= 0x80
+        self.assertEqual(m.record(), bytes(expected))
+        fresh = Machine(); fresh.put(m.record())
+        self.assertEqual(fresh.call("Settings_Get", 25, 0), 0)
+        self.assertEqual(fresh.call("TestDirty"), 0)
+        m.call("DAT_Set", 25, 0, 1)
+        self.assertEqual(m.record(), before)
+
     def test_layout_and_runtime_page_use_relocated_accessors_without_touching_preferences(self):
         m = self.m; m.init()
         m.call("DAT_Set",19,4,1); m.call("DAT_Set",18,4,0)
@@ -465,6 +478,37 @@ class NativeCardSaveTests(unittest.TestCase):
         self.ready();m.call('Settings_CommitPending');self.assertEqual(m.call('TestDirty'),1)
 
 
+class EventSelectionTests(unittest.TestCase):
+    def test_page_and_selection_round_trip_without_changing_neighbors(self):
+        m = Machine(); m.init()
+        original = m.record()
+        for page in range(3):
+            for event in range(64):
+                m.write(2, 0, page); m.write(26, 0, event)
+                self.assertEqual((m.read(2), m.read(26)), (page, event))
+                self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
+                self.assertEqual(m.record()[:5] + m.record()[6:], original[:5] + original[6:])
+        self.assertEqual(m.write(26, 0, 64), 0)
+
+    def test_native_init_restores_selection_and_preserves_context(self):
+        for selected, expected in [(0, 0), (12, 12), (63, 0)]:
+            m = Machine(); m.init(); m.write(26, 0, selected)
+            # Native hook invokes page count through the existing function table.
+            m.cpu.mem_write(0x102000, bytes.fromhex("386000144e800020"))
+            m.cpu.mem_write(0x80300000 - 200 + 5 * 4, struct.pack(">I", 0x102000))
+            m.cpu.mem_write(0x80300000 - 0x77C0, struct.pack(">I", RECORD - 0x1F24))
+            m.install_hook(0x8024e858)
+            for n in range(3, 32): m.cpu.reg_write(gpr(n), 100 + n)
+            m.cpu.reg_write(reg.UC_PPC_REG_CR, 0x24812481)
+            m.cpu.reg_write(reg.UC_PPC_REG_LR, STOP)
+            m.cpu.emu_start(0x8024e858, 0x8024e85C, count=300000)
+            self.assertEqual(m.cpu.reg_read(reg.UC_PPC_REG_PC), 0x8024e85C)
+            for n in range(3, 32):
+                self.assertEqual(m.cpu.reg_read(gpr(n)), expected if n == 30 else 100 + n)
+            self.assertEqual(m.cpu.reg_read(reg.UC_PPC_REG_CR), 0x24812481)
+            self.assertEqual(m.read(26), expected)
+
+
 class SettingsTests(unittest.TestCase):
     def setUp(self):
         self.m = Machine()
@@ -484,6 +528,48 @@ class SettingsTests(unittest.TestCase):
             self.assertEqual(m.read(12, group), group % 11)
             self.assertEqual(m.read(13, group), (group + 3) % 11)
         self.assertEqual(m.record()[40:44], b"\0" * 4)
+
+    def test_sweetspot_guides_default_on_and_only_change_their_own_bit(self):
+        m = self.m; m.init()
+        self.assertEqual(m.read(25), 1)
+        # Existing format-3 event preferences and global flags stay intact.
+        m.write(18, 0, 4); m.write(19, 0, 199); m.write(21, 0, 2)
+        m.write(24, 0, 20); m.write(11, 8, 1)
+        before = m.record()
+        self.assertEqual(m.write(25, 0, 0), 1)
+        expected = bytearray(before); expected[40] |= 0x80
+        self.assertEqual(m.record(), bytes(expected))
+        self.assertEqual(m.read(25), 0)
+        self.assertEqual(m.write(25, 0, 0), 0)
+        m.write(20, 0, 1); m.write(20, 1, 1)
+        self.assertEqual(m.read(25), 0)  # Sibling event resets cannot enable it.
+        self.assertEqual(m.write(25, 0, 1), 1)
+        self.assertEqual(m.read(25), 1)
+
+    def test_sweetspot_guides_reject_bad_values_and_default_old_saves_on(self):
+        m = self.m; m.init(); before = m.record()
+        for index, value in [(1, 0), (0, 2), (0, 0xFFFFFFFF)]:
+            self.assertEqual(m.write(25, index, value), 0)
+            self.assertEqual(m.record(), before)
+        self.assertEqual(m.read(25, 1), 0)
+        for version in (1, 2):
+            old = bytearray(before); old[10] = version << 6; old[40] = 0xFF
+            m.put(old)
+            self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 1)
+            self.assertEqual(m.read(25), 1)
+
+    def test_sweetspot_guides_survive_fresh_service_without_dirtying_on_read(self):
+        m = self.m; m.init()
+        self.assertEqual(m.call("Settings_Get", 25, 0), 1)
+        self.assertEqual(m.call("TestDirty"), 0)
+        m.call("Settings_Set", 25, 0, 0)
+        saved = m.record()
+        fresh = Machine(); fresh.put(saved)
+        self.assertEqual(fresh.call("Settings_Get", 25, 0), 0)
+        self.assertEqual(fresh.call("TestDirty"), 0)
+        self.assertEqual(fresh.record(), saved)
+        fresh.call("Settings_Set", 25, 0, 1)
+        self.assertEqual(fresh.call("Settings_Get", 25, 0), 1)
 
     def test_global_trail_rows_do_not_use_enable_mask_bits(self):
         m = self.m
@@ -2266,11 +2352,11 @@ class ActionCueTests(unittest.TestCase):
         m.put(old)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 1)
         self.assertEqual(m.record()[10], 0xFF)
-        self.assertEqual(m.record()[40:44], b"\xF0AB\x03")
+        self.assertEqual(m.record()[40:44], b"\x70AB\x03")
         self.assertEqual(m.read(11, 6), 0)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
         m.write(16, 17, 1)
-        self.assertEqual(m.record()[40:44], b"\xF1AB\x03")
+        self.assertEqual(m.record()[40:44], b"\x71AB\x03")
         self.assertEqual(m.record()[10], 0xFF)  # Version bits do not change.
         for row, flag in [(7, 3), (11, 4), (17, 6), (23, 5)]:
             self.assertEqual(m.read(16, row), m.read(11, flag))
@@ -2376,6 +2462,58 @@ class ActionCueTests(unittest.TestCase):
         m.call("TestCueDraw", 0)
         self.assertEqual(m.call("TestCueDrawColor", 0), 0)
 
+    def test_marth_roy_counter_windows_follow_native_flags_and_overlay_toggle(self):
+        m=self.m;m.init();m.call('TestCueInit');m.write(11,7,1)
+        m.call('TestCuePlayer',0,1,0)
+        obj=m.call('TestCueObject',0);data=m.call('TestCueData',0)
+        for kind in (18,26):
+            m.call('TestCueKind',0,kind)
+            for state in (369,371):
+                m.call('TestCueState',0,state,10,60,100)
+                m.call('TestCueTick',1)
+                for flags,protected in ((0,0),(0x40,0),(0x80,0),(0xC0,1)):
+                    m.cpu.mem_write(data+0x221B,bytes([flags]))
+                    self.assertEqual(m.call('ActionCues_IsProtected',obj),protected)
+                    m.call('TestCueDraw',0)
+                    self.assertEqual(m.call('TestCueDrawColor',0),0x4691FF70 if protected else 0)
+                m.write(11,7,0);m.call('TestCueDraw',0)
+                self.assertEqual(m.call('TestCueDrawColor',0),0)
+                m.write(11,7,1)
+            # Retaliation/recovery or ordinary shield do not count as a counter.
+            for state in (370,372,179,341):
+                m.call('TestCueState',0,state,10,60,100)
+                self.assertEqual(m.call('ActionCues_IsProtected',obj),0)
+        m.call('TestCueKind',0,1);m.call('TestCueState',0,369,10,60,100)
+        self.assertEqual(m.call('ActionCues_IsProtected',obj),0)
+
+    def test_counter_native_animation_callbacks_open_and_close_overlay_window(self):
+        m=self.m;m.init();m.call('TestCueInit');m.write(11,7,1)
+        obj=m.call('TestCueObject',0);data=m.call('TestCueData',0)
+        dol=(ROOT/'build/Start.dol').read_bytes()
+        for address,end in ((0x80138AA8,0x80138C20),(0x8007B1B8,0x8007B23C)):
+            for section in range(18):
+                offset,base,length=[struct.unpack_from('>I',dol,at+section*4)[0] for at in (0,0x48,0x90)]
+                if base<=address and end<=base+length:
+                    m.cpu.mem_write(address,dol[offset+address-base:offset+end-base]);break
+        # Run the actual shield initializer and counter callbacks. Bound only
+        # the unrelated animation-end query so it stays in the stance.
+        m.cpu.mem_write(0x8006F238,bytes.fromhex('386000014e800020'))
+        attrs=0x80406000;m.cpu.mem_write(attrs,bytes(0x100))
+        m.cpu.mem_write(data+0x2D4,struct.pack('>I',attrs))
+        m.cpu.mem_write(data+0x5E8,struct.pack('>I',0x80406400))
+        m.cpu.mem_write(0x80406400,struct.pack('>I',0x80406800))
+        m.symbols['NativeGroundCounter']=0x80138AA8;m.symbols['NativeAirCounter']=0x80138B64
+        for kind in (18,26):
+            m.call('TestCueKind',0,kind)
+            for state,callback in ((369,'NativeGroundCounter'),(371,'NativeAirCounter')):
+                m.call('TestCueState',0,state,1,60,100)
+                m.cpu.mem_write(data+0x221B,b'\0')
+                for command,expected in ((0,0),(1,1),(2,1),(0,0)):
+                    m.cpu.mem_write(data+0x2204,struct.pack('>I',command))
+                    m.call(callback,obj)
+                    self.assertEqual(m.call('ActionCues_IsProtected',obj),expected)
+                self.assertEqual(bytes(m.cpu.mem_read(data+0x221B,1)),b'\x40')
+
     def test_yoshi_double_jump_armor_and_move_protection(self):
         m = self.m
         m.call("Settings_Set", 11, 7, 1)
@@ -2400,7 +2538,7 @@ class ActionCueTests(unittest.TestCase):
         m.put(old)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 1)
         self.assertEqual(m.record()[10], 0xFF)
-        self.assertEqual(m.record()[40:44], b"\xF1AB\x03")
+        self.assertEqual(m.record()[40:44], b"\x71AB\x03")
         self.assertEqual(m.read(11, 6), 1)
         self.assertEqual(m.read(11, 7), 0)
         self.assertEqual(m.call("TMSettings_Prepare", RECORD, 1), 0)
@@ -2408,7 +2546,7 @@ class ActionCueTests(unittest.TestCase):
         m.call("TestEditorInput", 0x200, 28)  # Protection at final grouped row.
         m.call("TestEditorAnimate", 28)
         m.write(16, 25, m.call("TestEditorCache", 28))
-        self.assertEqual(m.record()[40:44], b"\xF3AB\x03")
+        self.assertEqual(m.record()[40:44], b"\x73AB\x03")
         fresh = Machine()
         fresh.put(m.record())
         self.assertEqual(fresh.call("Settings_Get", 11, 7), 1)

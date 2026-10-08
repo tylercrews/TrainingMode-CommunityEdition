@@ -2039,7 +2039,7 @@ struct Memcard
     int unk1992;           // 0x1F20
     u32 TM_OSDEnabled;     // 0x1F24
     u8 TM_OSDPosition;     // 0x1F28
-    u8 TM_EventPage;       // 0x1F29
+    u8 TM_EventPage;       // 0x1F29: low two bits page; high six bits selected event
     u8 TM_OSDRecommended;  // 0x1F2A: bit 0 recommended; bits 1-5 human code; bits 6-7 character marker
     u8 TM_LabFrameAdvanceButton;    // 0x1F2B - advance idx in low half, decrement idx in high half
     u8 TM_LabDPadUD;       // 0x1F2C - Up in low half, Down in high half
@@ -2051,7 +2051,7 @@ struct Memcard
     u8 TM_PackedOverlays[18];     // 0x1F30: HMN low nibble, CPU high nibble per condition
     u8 TM_PackedOSDColors[8];     // 0x1F42: stable sparse-ID slots, three bits each
     u8 TM_SettingsSignature[2];  // 0x1F4A
-    u8 TM_SettingsExtraFlags;    // 0x1F4C: bit 0 TurnRun, bit 1 protection overlay; six bits reserved
+    u8 TM_SettingsExtraFlags;    // 0x1F4C: global flags, event initialization/delay/tips, bit 7 Sweetspot guides Off
     u8 TM_SettingsReserved[3];   // 0x1F4D: preserved for future preferences
     int unk2004;           // 0x1F50
     int unk2005;           // 0x1F54
