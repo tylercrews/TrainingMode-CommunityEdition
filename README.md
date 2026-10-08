@@ -20,8 +20,10 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 ### T3 (V1.4.1T3)
 
 - Increment the centralized release version to V1.4.1T3 for the Training Lab menu rework.
-- Add the [Training Lab menu investigation](TRAINING-LAB-MENU-INVESTIGATION.md), including the current inventory, proposed organization, styling research, submenu previews, and an alternative UI sketch. Menu implementation remains pending.
-- Rebuild the menu sketch around joystick directions and A/B, with a category/page selector, preserved parent focus, and cancellable value pickers. Native game menu implementation remains pending.
+- Add the [Training Lab menu investigation](TRAINING-LAB-MENU-INVESTIGATION.md), including the baseline inventory, organization, styling research and interactive sketch.
+- Implement Training Lab's controller menu: eight visible category tabs, selections/values on the left, descriptions and one-row-per-option submenu previews with `>` markers on the right, plus alternating semantic row colors.
+- Use short menus and peer editor pages, retain parent selection, and add A-to-apply/B-to-cancel value pickers; preserve hold-Y shortcuts, L/R OSD paging, recording value IDs and the existing save format. Other events retain their existing renderer.
+- Move Boost Grab into Combat & Defense OSDs. The native build and PowerPC regression checks pass; live Dolphin layout/input validation remains pending.
 
 ### T2 (V1.4.1T2)
 

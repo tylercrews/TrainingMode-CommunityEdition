@@ -205,6 +205,14 @@ The powershield event is the simplest and easiest to learn from.
     - Drawing from ASM is currently difficult. Check out `ASM/.../Custom ESS Button Actions.asm` for a possible method.
 
 ## Debugging Tips
+
+### Training Lab controller menu (T3)
+
+Lab's root opts into the tabbed renderer through `EventMenu.tabs`. `src/lab_menu.h` defines referenced views of the original `EventOption` arrays; never copy mutable options or reorder serialized value choices to change presentation. `EventMenu_GetOption` resolves view/page rows to their canonical option. Palette/global callbacks identify that option directly rather than using a presentation row index.
+
+`src/menu_controller_ui.h`, included by `menu.c`, implements the native tabs, two panels, previews and A/B value pickers. `src/menu_controller.h` contains portable cursor/value/viewport rules. Menus without tabs retain the legacy renderer. The menu headers participate in the shared ABI build fingerprint, forcing a full rebuild after layout changes. No save-format change or new shared function export is required.
+
+Run `python tests/test_menu.py` after a full optimized build; it uses the existing Unicorn dependency under `build/test-deps`. The probe checks bounded menus, canonical identity, all OSD destinations, signed values and large frame pickers. It also loads `build/lab.dat` with native MEX relocation rules and executes the initial view/page setup before any fighter dependency. Run the existing `tests/run_settings_tests.sh` suite too. Use devkitPro's MSYS2 Bash on Windows; Git Bash's MINGW identifier does not select this build script's Windows tools. Live font fit, controller input and custom editor/card flows still require Dolphin.
 - Development builds enable logging! Call `TMLOG(...)` to print to the dolphin console and the onscreen console. L/R+Z toggles console visibility.
 - **Use the dolphin debugger!** Make sure you have the latest version of dolphin for debugging.
     - To set a breakpoint, use the `bp()` fn call in C or the `SetBreakpoint` macro in ASM (which will clobber r3). Then when you boot up dolphin, put a breakpoint on the `bp` symbol.

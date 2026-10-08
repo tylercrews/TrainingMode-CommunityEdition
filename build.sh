@@ -86,7 +86,7 @@ mex_build() {
 # make build directory if necessary
 mkdir -p build
 tyro_write_build_metadata
-settings_abi_stamp="$(cksum src/settings.h src/trails.h src/osd_style.h src/osd_layout.h src/osd_context.h src/action_cues.h src/ledgedash_logic.h src/events.h MexTK/tmFunction.txt MexTK/include/memcard.h MexTK/include/fighter.h MexTK/include/item.h MexTK/melee.link ASM/Globals.s)"
+settings_abi_stamp="$(cksum src/menu.h src/menu_controller.h src/settings.h src/trails.h src/osd_style.h src/osd_layout.h src/osd_context.h src/action_cues.h src/ledgedash_logic.h src/events.h MexTK/tmFunction.txt MexTK/include/memcard.h MexTK/include/fighter.h MexTK/include/item.h MexTK/include/text.h MexTK/melee.link ASM/Globals.s)"
 
 # A partial build must not pair a new version/identity with old eventMenu or ASM code.
 if [[ -n "${mode}" ]] && { [[ "$(cat build/version-stamp 2>/dev/null || true)" != "${tyro_metadata_stamp}" ]] || \

@@ -2,7 +2,7 @@
 
 **Version: V1.4.1T3. Initial source audit: October 7, 2026. Branch: `t3-menu-rework`.**
 
-This is the working research and decision log for the Training Lab menu rework. Like [the OSD investigation](OSD-GLOBAL-SETTINGS-INVESTIGATION.md), it separates observed behavior, proposed changes, implementation, and validation. The version bump and this research are implemented; the game menu changes below are proposals.
+This is the working research and decision log for the Training Lab menu rework. Like [the OSD investigation](OSD-GLOBAL-SETTINGS-INVESTIGATION.md), it separates observed behavior, proposed changes, implementation, and validation. **The first native implementation is now built; section 12 records its code, checks and remaining Dolphin validation.** Section 2 preserves the baseline inventory before the rework, and later design decisions supersede earlier proposals where stated.
 
 ## Running to-do list
 
@@ -13,10 +13,10 @@ This is the working research and decision log for the Training Lab menu rework. 
 - [x] Establish how submenu descriptions can show purpose and contents before entry.
 - [x] Sketch an alternative interface, then rebuild it around controller navigation after user feedback.
 - [x] Choose a single-cursor category selector/list direction in place of the mouse-oriented rail.
-- [ ] Finalize the hierarchy, labels, and native controller layout.
-- [ ] Choose zebra rows, color blocks, or the combined treatment.
-- [ ] Implement a presentation layer that preserves setting identities and callback behavior.
-- [ ] Implement purpose/contents previews, unavailable reasons, and override explanations.
+- [x] Implement the first hierarchy and native controller layout; refine after a Dolphin trial.
+- [x] Implement combined alternating rows and semantic color blocks.
+- [x] Implement a presentation layer that preserves setting identities and callback behavior.
+- [x] Implement purpose/contents previews, generic unavailable reasons, and existing shield/trail override explanations.
 - [ ] Validate all conditional menus and recording transitions in Dolphin.
 - [ ] Validate native 4:3/CRT readability, menu fit, input conflicts, and rendering cost.
 
@@ -524,16 +524,16 @@ This is the tradeoff for keeping Visual Feedback at nine rows: actor-specific ed
 
 1. OVERRIDE ALL OSDS OFF
 2. OVERRIDE CPU OSDS OFF
-3. Movement & Landing OSDs → 7 rows
-4. Combat & Defense OSDs → 7 rows
+3. Movement & Landing OSDs → 6 rows
+4. Combat & Defense OSDs → 8 rows
 5. Action Timing OSDs → 5 rows
 6. OSD Display → existing 3 rows
 7. Global Visuals & Shields → 7 rows
 
 | Child screen, depth 2 | Exact members in proposed order |
 | --- | --- |
-| Movement & Landing OSDs | Wavedash; L-Cancel; Dashback; Boost Grab; Jump Cancel Timing; Fastfall Timing; Ledgedash Info |
-| Combat & Defense OSDs | Act OoS Frame; Powershield Frame; SDI Inputs; Frame Advantage; Combo Counter; Grab Breakout; Act OoHitstun |
+| Movement & Landing OSDs | Wavedash; L-Cancel; Dashback; Jump Cancel Timing; Fastfall Timing; Ledgedash Info |
+| Combat & Defense OSDs | Act OoS Frame; Powershield Frame; SDI Inputs; Boost Grab; Frame Advantage; Combo Counter; Grab Breakout; Act OoHitstun |
 | Action Timing OSDs | Act OoLag; Act OoAirborne; Lockout Timers; Item Throw Interrupts; Fighter-specific Tech |
 | Global Visuals & Shields | Hitbox Trails Very Fast; Hitbox Trails Instant; Missed L Cancel; Run Turnaround; Actionable Yellow>Green; Invincibility Overlay; Infinite Shields (global) |
 
@@ -778,3 +778,30 @@ Record future decisions using this format:
 | 2026-10-07 | Mark nested submenu entries in Included options with a right-aligned `>` symbol. | Distinguish another menu from a setting or action before entry. | Preview rows retain their menu target; only entries with a target receive the marker and accessible submenu label. |
 
 **Open design choices:** approve the final nine-row Recording hub; decide whether the extra Fighter Displays hub is worth its compact Visual Feedback root; choose the Action Timing group name; choose whether Human replaces HMN in display labels; select styling treatment; measure the controller selector/list layout natively. The mouse-oriented rail is no longer the active direction.
+
+## 12. First native implementation — October 7, 2026
+
+The user authorized implementing the accepted prototype in Training Lab and requested moving Boost Grab into combat OSDs. The native implementation is in [src/lab_menu.h](src/lab_menu.h), with the shared renderer opt-in in [src/menu.h](src/menu.h), [src/menu.c](src/menu.c), [src/menu_controller_ui.h](src/menu_controller_ui.h), and [src/menu_controller.h](src/menu_controller.h). The README now records implemented behavior rather than only the sketch.
+
+Implemented:
+
+- Eight persistent category tabs: Session, CPU, Recording, Visuals, Global, Stage/RNG, Controls, Exit. Native tab labels use compact aliases; the panel titles retain the full category names.
+- Two equal-width panels beneath the tabs: canonical options/current values on the left; description and one-row-per-option Included options on the right. Nested menus carry a `>` marker. Paged editors preview their members under page headings.
+- Nine-row viewports, bounded semantic submenus, and peer pages for actor Info Display, actor Overlays, and Alter Inputs. Boost Grab now belongs only to **Combat & Defense OSDs**; Movement has six rows, Combat eight, Action Timing five.
+- Separate active-tab and option-selection cues, alternating row luminance, and muted semantic color blocks. Disabled options are visible for inspection but block activation/editing; their generic unavailable context appears in the footer.
+- One movement per native pad press/deflection. Up/Down traverses rows; at tab roots the selector is part of that sequence. Left/Right changes a tab/page when its selector is focused or changes an editable value by one. A enters menus or a value picker. B returns to the parent row/page, focuses the tabs at a category root, or resumes when already on the tabs. Start also resumes.
+- Value pickers support the actual native integer ranges, including signed analog inputs and all 3,600 recording frames; A commits through the original callback, B cancels without a write. The viewport follows the draft choice.
+- Canonical references keep dynamic labels, mode-dependent availability, actor banks, probability rebalancing, and original save/export identities intact. Global palette/suppression/cue callbacks now identify the selected canonical option rather than assuming the old long-list row position.
+- Hold-Y shortcuts find their destination within the new tree and establish its real parent/active tab. Existing L/R OSD paging, frame-step bindings, bespoke Custom TDI and memory-card export/import flows retain their existing input paths.
+- Other events retain the legacy renderer. Menu layout headers now participate in the shared ABI build fingerprint, so a partial build cannot pair old shared code with new menu structures. No settings/save-format change or appended shared function export was needed.
+
+Native descriptions use bounded word wrapping into up to eight lines (the existing options still store four source strings). Preview position follows the wrapped description. The preview bank has 24 lines, enough for all current pages/rows, including the 17-condition overlay editor and its page headings. Future menu additions must recheck that bound and native fit.
+
+Validation completed:
+
+- Optimized PowerPC compilation of Lab and the shared menu renderer completed without new compiler diagnostics.
+- `python tests/test_menu.py`: **5 tests passed**. Tests execute the actual PowerPC controller rules and menu views, check canonical identity/coverage, all 19 unique OSD destinations, nine-row/three-entry bounds, signed/large picker limits, and emitted optimized Lab DAT pointers. The DAT test applies native MEX relocation and executes the initial view/page setup before the first fighter dependency; names, purposes and description pointers remain inside the loaded payload.
+- Existing `tests/run_settings_tests.sh`: **135 tests passed**, including optimized shared-DAT relocation, settings/recording identity, pending saves, overlays, layouts, cues and trails. The later refinement only increased wrapped-description capacity and supplied page help; the final menu suite and full release rebuild were repeated for that revision.
+- Full optimized release build succeeded: `TM-Tyro-V1.4.1T3.iso` and `TM-Tyro-V1.4.1T3.zip`, using the stable TYRE01 identity.
+
+**Still to validate in Dolphin:** native font/overscan fit and actual controller feel; retained parent selection across every editor/action; unsupported stage/fighter reasons; recording save/delete/mirroring/takeover/copy/chance transitions; custom TDI and card export return/unpause; and other-event menu regression checks. Compiled/relocated tests do not prove visual fit or gameplay input handling. The browser sketch remains a design aid, not a native screenshot.

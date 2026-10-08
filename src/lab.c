@@ -1,5 +1,6 @@
 #include "lab.h"
 #include "recovery.c"
+#include "lab_menu.h"
 
 #include <stddef.h>
 
@@ -210,7 +211,7 @@ void Lab_AddCustomOSD(GOBJ *menu_gobj) {
 }
 
 void Lab_RemoveCustomOSD(GOBJ *menu_gobj) {
-    int remove_idx = LabMenu_CustomOSDs.cursor;
+    int remove_idx = LabMenu_CustomOSDs.scroll + LabMenu_CustomOSDs.cursor;
     int osd_idx = remove_idx - OPTCUSTOMOSD_FIRST_CUSTOM;
     HSD_Free(LabOptions_CustomOSDs[remove_idx].name);
     int move_count = OPTCUSTOMOSD_MAX_COUNT - remove_idx - 1;
@@ -317,8 +318,11 @@ void Lab_ChangeGlobalInstant(GOBJ *menu_gobj, int value) {
 
 void Lab_ChangeOSDs(GOBJ *menu_gobj, int value) {
     MenuData *menu = menu_gobj->userdata;
-    unsigned row = menu->curr_menu->scroll + menu->curr_menu->cursor;
-    if (menu->curr_menu != &LabMenu_OSDs || row >= countof(LabOSD_ID)) return;
+    EventOption *selected = EventMenu_SelectedOption(menu);
+    unsigned row;
+    for (row = 0; row < countof(LabOSD_ID); ++row)
+        if (selected == &LabOptions_OSDs[row]) break;
+    if (row == countof(LabOSD_ID)) return;
     // Only the selected category changes; other editors' choices remain authoritative.
     TM_SetSetting(TM_SETTING_OSD_COLOR, LabOSD_ID[row], value);
     for (unsigned i = 0; i < countof(LabOSD_ID); ++i)
@@ -328,9 +332,9 @@ void Lab_ChangeOSDs(GOBJ *menu_gobj, int value) {
 
 void Lab_ChangeOSDsOff(GOBJ *menu_gobj, int value) {
     MenuData *menu = menu_gobj->userdata;
-    unsigned row = menu->curr_menu->scroll + menu->curr_menu->cursor;
-    if (menu->curr_menu != &LabMenu_OSDs || row < TM_SETTINGS_OSDS || row > TM_SETTINGS_OSDS + 1) return;
-    unsigned flag = row == TM_SETTINGS_OSDS ? TM_FLAG_CPU_OSDS_OFF : TM_FLAG_OSDS_OFF;
+    EventOption *selected = EventMenu_SelectedOption(menu);
+    if (selected != &LabOptions_OSDs[TM_SETTINGS_OSDS] && selected != &LabOptions_OSDs[TM_SETTINGS_OSDS + 1]) return;
+    unsigned flag = selected == &LabOptions_OSDs[TM_SETTINGS_OSDS] ? TM_FLAG_CPU_OSDS_OFF : TM_FLAG_OSDS_OFF;
     TM_SetSetting(TM_SETTING_FLAG, flag, value);
     LabOptions_OSDs[TM_SETTINGS_OSDS].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_CPU_OSDS_OFF);
     LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF);
@@ -354,10 +358,12 @@ static void Lab_RefreshShieldOverride(void) {
 }
 void Lab_ChangeGlobalCue(GOBJ *menu_gobj, int value) {
     MenuData *menu = menu_gobj->userdata;
-    unsigned row = menu->curr_menu->scroll + menu->curr_menu->cursor;
-    if (menu->curr_menu != &LabMenu_OSDs || row < TM_SETTINGS_OSDS + 5 ||
-        row >= TM_SETTINGS_OSDS + 5 + countof(global_cue_flags)) return;
-    TM_SetSetting(TM_SETTING_FLAG, global_cue_flags[row - TM_SETTINGS_OSDS - 5], value);
+    EventOption *selected = EventMenu_SelectedOption(menu);
+    unsigned cue;
+    for (cue = 0; cue < countof(global_cue_flags); ++cue)
+        if (selected == &LabOptions_OSDs[TM_SETTINGS_OSDS + 5 + cue]) break;
+    if (cue == countof(global_cue_flags)) return;
+    TM_SetSetting(TM_SETTING_FLAG, global_cue_flags[cue], value);
     for (unsigned i = 0; i < countof(global_cue_flags); ++i)
         LabOptions_OSDs[TM_SETTINGS_OSDS + 5 + i].val = TM_GetSetting(TM_SETTING_FLAG, global_cue_flags[i]);
     Lab_RefreshShieldOverride();
@@ -6053,6 +6059,7 @@ void Event_PostThink(GOBJ *gobj)
 // Init Function
 void Event_Init(GOBJ *gobj)
 {
+    Lab_InitMenuUI();
     GOBJ *hmn = Fighter_GetGObj(0);
     FighterData *hmn_data = hmn->userdata;
     GOBJ *cpu = Fighter_GetGObj(1);

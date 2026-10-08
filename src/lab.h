@@ -6,6 +6,7 @@
 // todo: move structs from lab_common.h to here
 
 static ShortcutList Lab_ShortcutList;
+static EventMenuTab LabMenuTabs[8];
 static EventMenu LabMenu_General;
 static EventMenu LabMenu_Controls;
 static EventMenu LabMenu_OverlaysHMN;
@@ -959,6 +960,8 @@ static EventMenu LabMenu_Main = {
     .option_num = sizeof(LabOptions_Main) / sizeof(EventOption),
     .options = LabOptions_Main,
     .shortcuts = &Lab_ShortcutList,
+    .tabs = LabMenuTabs,
+    .tab_num = countof(LabMenuTabs),
 };
 
 // CONTROLS MENU --------------------------------------------------------------
