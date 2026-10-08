@@ -4,11 +4,17 @@
 #include "../src/recovery.c"
 #include "../src/lab_menu.h"
 #include "../src/menu_controller.h"
+#include "../src/menu_controller_layout.h"
 
 int TestMenuInit(void) { Lab_InitMenuUI(); return 1; }
 int TestMenuMove(int i, int n, int selector, int direction) { return MenuController_Move(i, n, selector, direction); }
 int TestMenuStep(int value, int minimum, int count, int direction) { return MenuController_Step(value, minimum, count, direction); }
 int TestMenuScroll(int first, int index, int count, int visible) { return MenuController_Scroll(first, index, count, visible); }
+int TestMenuPreviewStart(int lines) { return MenuController_PreviewStart(lines); }
+int TestMenuPreviewCapacity(int first) { return MenuController_PreviewCapacity(first); }
+int TestMenuPreviewBottom(void) { return MC_PREVIEW_BOTTOM; }
+int TestMenuPreviewStep(void) { return MC_PREVIEW_STEP; }
+int TestMenuDescriptionStep(void) { return MC_DESC_STEP; }
 int TestMenuTabCount(void) { return LabMenu_Main.tab_num; }
 unsigned TestMenuTab(int tab) { return (unsigned)LabMenuTabs[tab].menu; }
 int TestMenuCount(EventMenu *menu) { return EventMenu_OptionCount(menu); }

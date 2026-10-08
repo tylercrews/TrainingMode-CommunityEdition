@@ -114,6 +114,21 @@ class MenuTests(unittest.TestCase):
                                ((0, 3599, 3600, 9), 3591), ((50, 0, 2, 9), 0)]:
             self.assertEqual(self.m.call("TestMenuScroll", *args), expected)
 
+    def test_readable_preview_spacing_and_panel_bounds(self):
+        step = self.m.call("TestMenuPreviewStep")
+        bottom = self.m.call("TestMenuPreviewBottom")
+        # 32-unit glyph at scale .84 has height 26.88; allow at least 4 units gap.
+        self.assertGreaterEqual(step, 31)
+        self.assertGreaterEqual(self.m.call("TestMenuDescriptionStep"), 29)
+        for description_lines in range(9):
+            first = self.m.call("TestMenuPreviewStart", description_lines)
+            capacity = self.m.call("TestMenuPreviewCapacity", first)
+            self.assertGreaterEqual(capacity, 3)
+            self.assertLessEqual(first + (capacity - 1) * step + 32, bottom)
+            slots = capacity - 2
+            pages = (20 + slots - 1) // slots
+            self.assertEqual(sum(min(slots, 20 - page * slots) for page in range(pages)), 20)
+
     def test_complete_bounded_views_and_boost_grab(self):
         origins, names, pages = self.m.graph()
         self.assertEqual(self.m.call("TestMenuTabCount"), 8)
@@ -191,7 +206,7 @@ class MenuTests(unittest.TestCase):
         root = word(base + public[3])
         self.assertEqual(byte(root + 36), 8)
         tabs = word(root + 32)
-        observed, visited = {}, set()
+        observed, visited, option_pointers = {}, set(), {}
         def walk(menu, depth):
             self.assertLessEqual(depth, 3)
             if menu in visited:
@@ -213,7 +228,9 @@ class MenuTests(unittest.TestCase):
                     option = word(view + i * 8) if view else options + i * 44
                     label = word(option + 12)
                     if label:
-                        observed.setdefault(text(label), []).append(name)
+                        option_label = text(label)
+                        observed.setdefault(option_label, []).append(name)
+                        option_pointers[option_label] = option
                     for desc in range(4):
                         description = word(option + 16 + desc * 4)
                         if description:
@@ -228,6 +245,17 @@ class MenuTests(unittest.TestCase):
         self.assertEqual(observed["Boost Grab"], ["Combat & Defense OSDs"])
         self.assertEqual(observed["Frame Advance"], ["Session"])
         self.assertIn("Recording", observed["Save Positions"])
+        # The opt-in root callback lives in the relocated Lab, not shared-code
+        # exports. Simulate a disabled recording mode before the state exists.
+        reason_callback = word(root + 44)
+        self.assertTrue(base <= reason_callback < base + payload_size)
+        mode = option_pointers["HMN Mode"]
+        self.m.cpu.mem_write(mode + 1, b"\1")
+        self.m.cpu.reg_write(reg.UC_PPC_REG_1, 0x80400000)
+        self.m.cpu.reg_write(reg.UC_PPC_REG_3, mode)
+        self.m.cpu.reg_write(reg.UC_PPC_REG_LR, 0x100000)
+        self.m.cpu.emu_start(reason_callback, 0x100000, count=100000)
+        self.assertEqual(text(self.m.cpu.reg_read(reg.UC_PPC_REG_3)), "Save Positions first to unlock recording controls.")
 
 
 if __name__ == "__main__":

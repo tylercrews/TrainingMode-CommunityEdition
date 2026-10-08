@@ -24,6 +24,7 @@ This section records Tyro-specific changes. Add a bullet under the matching Tyro
 - Implement Training Lab's controller menu: eight visible category tabs, selections/values on the left, descriptions and one-row-per-option submenu previews with `>` markers on the right, plus alternating semantic row colors.
 - Use short menus and peer editor pages, retain parent selection, and add A-to-apply/B-to-cancel value pickers; preserve hold-Y shortcuts, L/R OSD paging, recording value IDs and the existing save format. Other events retain their existing renderer.
 - Move Boost Grab into Combat & Defense OSDs. The native build and PowerPC regression checks pass; live Dolphin layout/input validation remains pending.
+- Widen the Lab panels, enlarge text and space description/preview rows using the native glyph height; long previews use Left/Right pages instead of overlapping. Expand recording help and add specific unavailable reasons plus a [recording guide](TRAINING-LAB-RECORDING-GUIDE.md).
 
 ### T2 (V1.4.1T2)
 

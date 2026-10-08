@@ -805,3 +805,51 @@ Validation completed:
 - Full optimized release build succeeded: `TM-Tyro-V1.4.1T3.iso` and `TM-Tyro-V1.4.1T3.zip`, using the stable TYRE01 identity.
 
 **Still to validate in Dolphin:** native font/overscan fit and actual controller feel; retained parent selection across every editor/action; unsupported stage/fighter reasons; recording save/delete/mirroring/takeover/copy/chance transitions; custom TDI and card export return/unpause; and other-event menu regression checks. Compiled/relocated tests do not prove visual fit or gameplay input handling. The browser sketch remains a design aid, not a native screenshot.
+
+## 13. Fonts, recording help and the first screenshot correction — October 8, 2026
+
+The user's Dolphin screenshots establish that the first recording preview has vertically overlapping lines, and that the native menu leaves substantial horizontal space unused within its outer frame. This supersedes the initial assumption that 17-unit preview spacing would fit the stock glyphs. The font family has not been changed in this pass.
+
+### 13.1 Available font/text options
+
+There is no project font-family catalog comparable to CSS `font-family`, and no bundled `.ttf`, `.otf` or `.woff` assets. The practical options exposed by this project are:
+
+| Option | Availability and consequences |
+| --- | --- |
+| **Stock Melee menu text via HSD/SIS** | Already used by Lab, most HUD messages and the watermark. `Text_CreateText`, `Text_SetScale`, kerning and aspect fitting support larger/smaller text and width adjustments. This is the current menu face and the smallest compatible implementation choice. The project does not provide a verified commercial typeface name for it. |
+| **Native developer/debug fixed-width text** | Already used by the TM console through `DevelopText_*` and its row/column data table. It is a separate pixel/grid text renderer, not another `Text_CreateText` font-family argument. It would require replacing the rendering path for menu labels and descriptions. |
+| **Scene-specific SIS bitmap glyph/message archives** | `Text_LoadSdFile` / native `HSD_SisLib_803A62A0` can load an archive table containing glyph images, widths and encoded strings. Existing disc assets are listed below. Their bank IDs and localized message sets are not a verified set of interchangeable Latin UI typefaces. Changing the ID alone is not a reliable font switch. |
+| **A new custom bitmap face** | Technically possible through a new glyph atlas, width/kerning data, encoding and managed SIS-bank lifetime, or a dedicated textured-glyph renderer. No such alternative face is bundled and ready to select in this checkout. TrueType/OpenType fonts would have to be converted into compatible assets, not loaded directly by the current menu API. |
+| **Pre-rendered letters/artwork in DAT models/textures** | Possible for fixed decorative text, but not a drop-in font for arbitrary state names, values and descriptions. It needs dedicated glyph/text layout work. |
+
+Local sources: [MexTK/include/text.h](MexTK/include/text.h), [src/menu_controller_ui.h](src/menu_controller_ui.h), [src/lab_css.c](src/lab_css.c), [src/events.c](src/events.c), and the native ASCII lookup/width/draw tests in [tests/test_settings.py](tests/test_settings.py). The [native SIS structure](https://github.com/doldecomp/melee/blob/master/src/sysdolphin/baselib/sislib.h) describes per-bank images and widths; the [native SIS initialization](https://github.com/doldecomp/melee/blob/master/src/sysdolphin/baselib/sislib.c) allocates five vanilla archive slots. The current C code uses identifier 0 for CSS import, 2 for match/menu text and 10 for the watermark; that usage must not be presented as three named faces or ten freely interchangeable font banks. Built-in menu glyph encodings and archive-specific glyph encodings are different paths.
+
+The local vanilla ISO contains these SIS/message archives, which are **asset choices to investigate**, not a catalog of distinct typefaces: `SdClr.dat/.usd`, `SdDec.dat/.usd`, `SdIntro.dat`, `SdMenu.dat/.usd`, `SdMsgBox.dat/.usd`, `SdPrize.dat/.usd`, `SdProge.dat/.usd`, `SdRst.dat/.usd`, `SdSlChr.dat/.usd`, `SdStRoll.dat`, `SdTou.dat/.usd`, `SdToy.dat/.usd`, `SdToyExp.dat/.usd`, `SdTrain.dat/.usd`, and `SdVsCam.dat/.usd`. `SdMenu.dat` and `SdMenu.usd` were extracted into ignored investigation scratch and both expose `SIS_MenuData`; the localized archive sizes are 317,509 and 87,557 bytes. Different strings/character coverage do not prove a different Latin font.
+
+**Conclusion for the current pass:** keep the compatible stock face, provide enough width to avoid excessive aspect compression, and correct baseline spacing. A font-family replacement should be a separate asset prototype with measured glyph coverage and bank ownership.
+
+### 13.2 Recording behavior research and improved descriptions
+
+The full explanation is in [TRAINING-LAB-RECORDING-GUIDE.md](TRAINING-LAB-RECORDING-GUIDE.md). Native descriptions now cover all 18 recording rows, the six Slot Management rows, and chance/extra-percent controls. They distinguish:
+
+- The saved situation from the separate human/CPU input clips, and the separate D-pad quicksave.
+- CPU Control from CPU Record, including which fighter your controller drives.
+- Playback Takeover, which leaves normal clips intact, from Re-Record, which commits replacement inputs when leaving that mode/changing slots.
+- **Loop**, which repeats the input timeline without restoring positions/damage, from **Auto Restore**, which reloads the saved situation after a 20-update delay.
+- **Re-Save**, which keeps full clips, from **Prune**, which removes their played beginning; both apply across all actor slots.
+- Weighted Random slot selection from **Random Percent**, which adds 0..N damage on restores and is capped at 999%.
+- Deleting one clip from deleting the complete recording setup, and exporting a card file from importing on character select.
+
+The root menu supplies a Lab-owned unavailable-reason callback, so a disabled recording row explains Save Positions, mirror mode locks, recording-mode conflicts or empty probability slots. It adds no shared function export and does not alter save/export value IDs.
+
+Research found an existing mirroring gate: `Record_ChangeMode_Common` tests CPU Playback twice in its `can_mirror` expression. Human-only playback therefore does not currently enable mirroring. This is documented accurately in help; that behavioral gate was not changed while rewriting descriptions. CPU Counter's end/hit settings were also described as a handoff to Lab AI rather than promising an immediate attack in every mode.
+
+### 13.3 Width, font size and line spacing changes
+
+Both panels widen from **21.6 to 25.4 world units** (about 18% more width), consuming most of the unused margin inside the existing outer frame. Row backgrounds and all eight tabs widen with them. Native name fitting width grows from 250 to 330 text units; the right description/preview fitting width grows from 390 to 476. The right title now has its own bounded text object, preventing its fitting width from inheriting the entire menu's width.
+
+Text scales increase: names `.78 → .86`, values/tabs `.72 → .80`, descriptions `.78 → .84`, previews `.65 → .84` (about 29% larger), and panel headings also increase. Description spacing becomes **30**, preview spacing **32** rather than 22/17. A 32-unit glyph at `.84` is at most 26.88 units tall, leaving a positive gap between rows. The preview begins after the actual wrapped description, removing the earlier forced four-line blank allowance.
+
+Preview capacity is bounded by the right panel's lower edge. Longer previews retain every entry across pages; with an unopened submenu focused, **Left/Right changes the preview page**, A enters the submenu as before, and B keeps its existing back behavior. Tab selectors and editor page selectors retain their original Left/Right behavior. Disabled included entries are dim rather than appending a long `(unavailable)` suffix to every row.
+
+The new portable layout rules are in [src/menu_controller_layout.h](src/menu_controller_layout.h), which also participates in the build fingerprint. Native text/model code remains opt-in for Lab; other events keep the old layout. The tests check the larger glyph spacing and bounded final preview row for 0–8 wrapped description lines, plus native DAT relocation and the Lab recording-help callback. A new screenshot is still needed to verify the actual visual result and overscan fit in Dolphin.

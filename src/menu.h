@@ -83,6 +83,7 @@ struct EventMenu
     EventMenuTab *tabs;            // root-only: opt in to the controller renderer
     u8 tab_num;
     char *purpose;
+    const char *(*unavailable_reason)(EventOption *option); /* optional root context */
 };
 typedef enum MenuMode {
     MenuMode_Normal,
@@ -118,6 +119,10 @@ typedef struct MenuData
     EventOption *picker;
     s16 picker_value;              // draft; original option is untouched until A
     u16 picker_scroll;
+    Text *text_panel_title;
+    EventMenu *preview_menu;
+    u8 preview_page;
+    u8 preview_pages;
 } MenuData;
 
 static inline int EventMenu_OptionCount(EventMenu *menu) {

@@ -23,9 +23,9 @@ LLINK(LabLink_TechFeedback, "Tech Feedback & Traps", LabUI_TechFeedback, "Choose
 LLINK(LabLink_Counter, "Counter Actions", LabUI_Counter, "Choose the CPU response after hits or shielding.");
 LLINK(LabLink_Shield, "Shield & Protection", LabUI_Shield, "Choose local shield policy and CPU protection.");
 LLINK(LabLink_Position, "Position & Control", LabUI_Position, "Move, freeze or manually control the CPU.");
-LLINK(LabLink_Playback, "Playback Rules", LabUI_Playback, "Choose looping, restore and takeover rules.");
-LLINK(LabLink_Files, "Positions & Files", LabUI_Files, "Manage the initial state and export recordings.");
-LLINK(LabLink_Chances, "Playback Chances", LabUI_Chances, "Choose the actor's playback probabilities.");
+LLINK(LabLink_Playback, "Playback Rules", LabUI_Playback, "Loop repeats inputs; Auto Restore reloads the saved situation. Also choose CPU handoff, takeover and mirroring.");
+LLINK(LabLink_Files, "Positions & Files", LabUI_Files, "Re-Save keeps complete clips. Prune removes the played beginning. Delete clears all clips; Export writes a card file.");
+LLINK(LabLink_Chances, "Playback Chances", LabUI_Chances, "Weight the clips selected by Random playback and add random extra percent on each restore.");
 LLINK(LabLink_Collision, "Collision & Bounds", LabUI_Collision, "Inspect fighter, item and stage collision.");
 LLINK(LabLink_Fighters, "Fighter Displays", LabUI_Fighters, "Choose human or CPU diagnostics and overlays.");
 LLINK(LabLink_Tools, "OSD Tools", LabUI_Tools, "Create feedback from the human action states.");
@@ -93,22 +93,22 @@ static EventMenuRow LabUI_Record_rows[] = {
     LR(LabOptions_Record, OPTREC_CPUMODE, 3), LR(LabOptions_Record, OPTREC_CPUSLOT, 3),
     LREF(LabLink_Playback, 0), LREF(LabLink_Files, 0), LR(LabOptions_Record, OPTREC_SLOTMANAGEMENT, 0), LREF(LabLink_Chances, 0),
 };
-LMENU(LabUI_Record, "Recording", "Save positions first, then record and replay inputs.");
+LMENU(LabUI_Record, "Recording", "1. Save Positions. 2. Choose human/CPU slot and Record. 3. Unpause and perform inputs. 4. Select Playback to replay.");
 static EventMenuRow LabUI_Playback_rows[] = {
     LR(LabOptions_Record, OPTREC_MIRRORED_PLAYBACK, 0), LR(LabOptions_Record, OPTREC_PLAYBACK_COUNTER, 3),
     LR(LabOptions_Record, OPTREC_LOOP, 0), LR(LabOptions_Record, OPTREC_AUTORESTORE, 2),
     LR(LabOptions_Record, OPTREC_STARTPAUSED, 2), LR(LabOptions_Record, OPTREC_TAKEOVER, 0),
 };
-LMENU(LabUI_Playback, "Playback Rules", "Choose looping, restore and takeover rules.");
+LMENU(LabUI_Playback, "Playback Rules", "Loop repeats inputs without resetting fighters. Auto Restore reloads the saved match state. Choose takeover and CPU handoff here too.");
 static EventMenuRow LabUI_Files_rows[] = {
     LR(LabOptions_Record, OPTREC_RESAVE, 2), LR(LabOptions_Record, OPTREC_PRUNE, 2),
     LR(LabOptions_Record, OPTREC_DELETE, 4), LR(LabOptions_Record, OPTREC_EXPORT, 0),
 };
-LMENU(LabUI_Files, "Positions & Files", "Manage the initial state and export recordings.");
+LMENU(LabUI_Files, "Positions & Files", "Change the shared starting situation, trim or delete clips, or save the whole recording setup to a memory card.");
 static EventMenuRow LabUI_Chances_rows[] = {
     LR(LabOptions_Record, OPTREC_HMNCHANCE, 1), LR(LabOptions_Record, OPTREC_CPUCHANCE, 3),
 };
-LMENU(LabUI_Chances, "Playback Chances", "Weight the human and CPU recording slots.");
+LMENU(LabUI_Chances, "Playback Chances", "Choose probabilities for Random playback. Only recorded slots participate; Random Percent adds extra damage when restoring.");
 
 static EventMenuRow LabUI_Visual_rows[] = {
     LR(LabOptions_General, OPTGEN_MODEL, 3), LREF(LabLink_Collision, 0), LR(LabOptions_General, OPTGEN_CAM, 3),
@@ -217,6 +217,14 @@ static void Lab_InitMenuUI(void)
     LabMenu_OverlaysHMN.purpose = "Saved human overlays grouped by movement, timing and combat.";
     LabMenu_OverlaysCPU.purpose = "Saved CPU overlays grouped by movement, timing and combat.";
     LabMenu_AlterInputs.purpose = "Edit analog inputs or buttons on the same recorded frame.";
+    for (int i = 0; i < REC_SLOTS; ++i) {
+        LabOptions_SlotChancesHMN[i].desc[1] = LabOptions_SlotChancesCPU[i].desc[1] = "Used when this actor's Record Slot is Random.";
+        LabOptions_SlotChancesHMN[i].desc[2] = LabOptions_SlotChancesCPU[i].desc[2] = "Only recorded slots participate; chances total 100%.";
+        LabOptions_SlotChancesHMN[i].desc[3] = LabOptions_SlotChancesCPU[i].desc[3] = "Changing one chance rebalances the other slots.";
+    }
+    LabOptions_SlotChancesHMN[OPTSLOTCHANCE_PERCENT].desc[0] = LabOptions_SlotChancesCPU[OPTSLOTCHANCE_PERCENT].desc[0] = "Add 0 through this much extra damage on each restore.";
+    LabOptions_SlotChancesHMN[OPTSLOTCHANCE_PERCENT].desc[1] = LabOptions_SlotChancesCPU[OPTSLOTCHANCE_PERCENT].desc[1] = "Added to the saved percent, capped at 999%.";
+    LabOptions_SlotChancesHMN[OPTSLOTCHANCE_PERCENT].desc[2] = LabOptions_SlotChancesCPU[OPTSLOTCHANCE_PERCENT].desc[2] = "Independent of choosing a Random playback slot.";
 }
 
 #undef LR

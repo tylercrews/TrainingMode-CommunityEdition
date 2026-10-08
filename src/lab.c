@@ -15,6 +15,22 @@ static GOBJ *infodisp_gobj_hmn;
 static GOBJ *infodisp_gobj_cpu;
 static RecData rec_data;
 static Savestate_v1 *rec_state;
+static const char *Lab_MenuUnavailable(EventOption *option)
+{
+    if (!option || !option->disable) return 0;
+    for (unsigned i = 0; i < countof(LabOptions_Record); ++i) {
+        if (option != &LabOptions_Record[i]) continue;
+        if (!rec_state || !rec_state->is_exist) return "Save Positions first to unlock recording controls.";
+        if (i == OPTREC_HMNMODE || i == OPTREC_CPUMODE) return "Set Mirrored Playback to Off before changing modes.";
+        if (i == OPTREC_LOOP || i == OPTREC_AUTORESTORE) return "Disabled while either actor is in Record or Re-Record.";
+        if (i == OPTREC_MIRRORED_PLAYBACK) return "Needs CPU Playback; neither actor may be recording.";
+        return "Unavailable in the current recording mode.";
+    }
+    for (int i = 0; i < REC_SLOTS; ++i)
+        if (option == &LabOptions_SlotChancesHMN[i] || option == &LabOptions_SlotChancesCPU[i])
+            return "Record inputs into this slot before assigning a chance.";
+    return 0;
+}
 static _HSD_ImageDesc snap_image = {0};
 static _HSD_ImageDesc resized_image = {
     .format = 4,

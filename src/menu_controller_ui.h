@@ -1,7 +1,6 @@
 /* Native Training Lab renderer/navigation. Included only by menu.c. */
 #include "menu_controller.h"
-#define MC_PREVIEW_LINES 24
-#define MC_DESC_LINES 8
+#include "menu_controller_layout.h"
 #define MC_ROW_Y 9.9f
 #define MC_ROW_STEP 2.4f
 
@@ -47,13 +46,13 @@ static void MC_CreateModel(GOBJ *gobj)
     GObj_AddObject(gobj, 3, root);
     GObj_DestroyGXLink(gobj);
     GObj_AddGXLink(gobj, EventMenu_MenuGX, GXLINK_MENUMODEL, GXPRI_MENUMODEL);
-    MC_Box(gobj, -11.2f, -.6f, 21.6f, 28.2f, (GXColor){19, 24, 36, 255}, .95f);
-    MC_Box(gobj, 11.f, -.6f, 21.6f, 28.2f, (GXColor){27, 33, 47, 255}, .95f);
+    MC_Box(gobj, -13.f, -.6f, 25.4f, 28.2f, (GXColor){19, 24, 36, 255}, .95f);
+    MC_Box(gobj, 13.f, -.6f, 25.4f, 28.2f, (GXColor){27, 33, 47, 255}, .95f);
     for (int i = 0; i < MENU_MAXOPTION; ++i)
-        data->rowboxes[i] = MC_Box(gobj, -11.2f, MC_ROW_Y - i * MC_ROW_STEP, 20.8f, 2.25f, (GXColor){30, 38, 53, 255}, .85f);
-    data->highlight_menu = MC_Box(gobj, -11.2f, MC_ROW_Y, 20.8f, 2.25f, (GXColor)MENUHIGHLIGHT_COLOR, .55f);
+        data->rowboxes[i] = MC_Box(gobj, -13.f, MC_ROW_Y - i * MC_ROW_STEP, 24.8f, 2.25f, (GXColor){30, 38, 53, 255}, .85f);
+    data->highlight_menu = MC_Box(gobj, -13.f, MC_ROW_Y, 24.8f, 2.25f, (GXColor)MENUHIGHLIGHT_COLOR, .55f);
     for (int i = 0; i < data->root_menu->tab_num; ++i)
-        data->tabboxes[i] = MC_Box(gobj, -19.1f + i * 5.45f, 16.1f, 5.2f, 2.7f, (GXColor){30, 38, 53, 255}, .95f);
+        data->tabboxes[i] = MC_Box(gobj, -22.3f + i * 6.37f, 16.1f, 6.11f, 2.7f, (GXColor){30, 38, 53, 255}, .95f);
 }
 static Text *MC_Text(MenuData *data, float width)
 {
@@ -73,27 +72,28 @@ static void MC_Subtext(Text *text, float x, float y, float scale)
 static void MC_CreateText(GOBJ *gobj)
 {
     MenuData *data = gobj->userdata;
-    data->text_title = MC_Text(data, 870);
-    MC_Subtext(data->text_title, -425, -390, 1.35f);
-    MC_Subtext(data->text_title, -416, -270, .9f);
-    MC_Subtext(data->text_title, 25, -270, .85f);
-    data->text_tabs = MC_Text(data, 102);
+    data->text_title = MC_Text(data, 990);
+    MC_Subtext(data->text_title, -494, -390, 1.35f);
+    MC_Subtext(data->text_title, -494, -270, .98f);
+    data->text_panel_title = MC_Text(data, 476);
+    MC_Subtext(data->text_panel_title, 20, -270, .92f);
+    data->text_tabs = MC_Text(data, 121);
     data->text_tabs->align = 1;
-    for (int i = 0; i < data->root_menu->tab_num; ++i) MC_Subtext(data->text_tabs, -382 + i * 109, -337, .72f);
-    data->text_name = MC_Text(data, 250);
-    data->text_value = MC_Text(data, 136);
+    for (int i = 0; i < data->root_menu->tab_num; ++i) MC_Subtext(data->text_tabs, -446 + i * 127.4f, -337, .8f);
+    data->text_name = MC_Text(data, 330);
+    data->text_value = MC_Text(data, 140);
     data->text_value->align = 1;
     for (int i = 0; i < MENU_MAXOPTION; ++i) {
-        MC_Subtext(data->text_name, -416, -211 + i * 48, .78f);
-        MC_Subtext(data->text_value, -76, -211 + i * 48, .72f);
+        MC_Subtext(data->text_name, -494, -211 + i * 48, .86f);
+        MC_Subtext(data->text_value, -82, -211 + i * 48, .8f);
     }
-    data->text_desc = MC_Text(data, 390);
-    for (int i = 0; i < MC_DESC_LINES; ++i) MC_Subtext(data->text_desc, 25, -218 + i * 22, .78f);
-    data->text_preview = MC_Text(data, 390);
-    for (int i = 0; i < MC_PREVIEW_LINES; ++i) MC_Subtext(data->text_preview, 25, -112 + i * 17, .65f);
-    data->text_hints = MC_Text(data, 870);
-    MC_Subtext(data->text_hints, -416, 321, .7f);
-    MC_Subtext(data->text_hints, -416, 347, .65f);
+    data->text_desc = MC_Text(data, 476);
+    for (int i = 0; i < MC_DESC_LINES; ++i) MC_Subtext(data->text_desc, 20, MC_BODY_Y + i * MC_DESC_STEP, MC_DETAIL_SCALE);
+    data->text_preview = MC_Text(data, 476);
+    for (int i = 0; i < MC_PREVIEW_LINES; ++i) MC_Subtext(data->text_preview, 20, -112 + i * MC_PREVIEW_STEP, MC_DETAIL_SCALE);
+    data->text_hints = MC_Text(data, 990);
+    MC_Subtext(data->text_hints, -494, 321, .76f);
+    MC_Subtext(data->text_hints, -494, 347, .7f);
 }
 static int MC_Description(Text *text, const char *const source[MENU_DESCLINEMAX])
 {
@@ -109,11 +109,11 @@ static int MC_Description(Text *text, const char *const source[MENU_DESCLINEMAX]
     int at = 0;
     int lines = 0;
     for (int i = 0; i < MC_DESC_LINES; ++i) {
-        char line[43];
+        char line[MC_WRAP_CHARS + 1];
         while (paragraph[at] == ' ') ++at;
         int length = 0;
-        while (paragraph[at + length] && length < 42) ++length;
-        if (length == 42 && paragraph[at + length]) {
+        while (paragraph[at + length] && length < MC_WRAP_CHARS) ++length;
+        if (length == MC_WRAP_CHARS && paragraph[at + length]) {
             int word = length;
             while (word && paragraph[at + word] != ' ') --word;
             if (word) length = word;
@@ -126,27 +126,46 @@ static int MC_Description(Text *text, const char *const source[MENU_DESCLINEMAX]
     }
     return lines;
 }
-static void MC_PreviewRow(MenuData *data, EventOption *option, int *line)
+static void MC_Preview(MenuData *data, EventMenu *menu, int page_only, int first_y)
 {
-    if (!option || !option->name || !option->name[0] || *line >= MC_PREVIEW_LINES) return;
-    Text_SetText(data->text_preview, (*line)++, "%s%s%s", option->name,
-                 option->kind == OPTKIND_MENU ? " >" : "", option->disable ? " (unavailable)" : "");
-}
-static void MC_Preview(MenuData *data, EventMenu *menu, int page_only)
-{
-    int line = 0;
+    EventOption *entries[64];
+    char *headings[64];
+    int count = 0;
+    GXColor white = {255, 255, 255, 255}, gray = {145, 151, 162, 255};
     for (int i = 0; i < MC_PREVIEW_LINES; ++i) Text_SetText(data->text_preview, i, "");
+    if (data->preview_menu != menu) { data->preview_menu = menu; data->preview_page = 0; }
+    data->preview_pages = 0;
     if (!menu) return;
-    Text_SetText(data->text_preview, line++, "Included options:");
-    if (menu->page_num) {
-        for (int page = 0; page < menu->page_num; ++page) {
-            if (page_only && page != menu->page) continue;
-            if (line < MC_PREVIEW_LINES) Text_SetText(data->text_preview, line++, "[%s]", menu->pages[page].name);
-            for (int i = 0; i < menu->pages[page].option_num; ++i) MC_PreviewRow(data, menu->pages[page].rows[i].option, &line);
+    for (int page = 0; page < (menu->page_num ? menu->page_num : 1); ++page) {
+        if (menu->page_num && page_only && page != menu->page) continue;
+        if (menu->page_num && count < 64) { entries[count] = 0; headings[count++] = menu->pages[page].name; }
+        int rows = menu->page_num ? menu->pages[page].option_num : EventMenu_OptionCount(menu);
+        for (int i = 0; i < rows && count < 64; ++i) {
+            EventOption *entry = menu->page_num ? menu->pages[page].rows[i].option : EventMenu_GetOption(menu, i);
+            if (!entry || !entry->name || !entry->name[0]) continue;
+            entries[count] = entry; headings[count++] = 0;
         }
-    } else {
-        for (int i = 0; i < EventMenu_OptionCount(menu); ++i) MC_PreviewRow(data, EventMenu_GetOption(menu, i), &line);
     }
+    int capacity = MenuController_PreviewCapacity(first_y);
+    int slots = capacity - 2; /* Includes title and page/status footer. */
+    data->preview_pages = count ? (count + slots - 1) / slots : 1;
+    if (data->preview_page >= data->preview_pages) data->preview_page = 0;
+    Text_SetText(data->text_preview, 0, "Included options:");
+    Text_SetColor(data->text_preview, 0, &white);
+    int first = data->preview_page * slots, line = 1;
+    if (first && !headings[first]) {
+        for (int i = first - 1; i >= 0; --i) {
+            if (headings[i]) { Text_SetText(data->text_preview, 0, "Included: %s (cont.)", headings[i]); break; }
+        }
+    }
+    for (int i = first; i < count && i < first + slots; ++i, ++line) {
+        if (headings[i]) Text_SetText(data->text_preview, line, "[%s]", headings[i]);
+        else Text_SetText(data->text_preview, line, "%s%s", entries[i]->name, entries[i]->kind == OPTKIND_MENU ? " >" : "");
+        Text_SetColor(data->text_preview, line, entries[i] && entries[i]->disable ? &gray : &white);
+    }
+    if (data->preview_pages > 1) Text_SetText(data->text_preview, line, "Preview %d/%d - Left/Right", data->preview_page + 1, data->preview_pages);
+    else Text_SetText(data->text_preview, line, "Dim entries are currently unavailable.");
+    Text_SetColor(data->text_preview, line, &gray);
 }
 static GXColor MC_RowColor(int group, int index)
 {
@@ -169,7 +188,7 @@ static void MC_UpdateText(GOBJ *gobj)
     GXColor white = {255, 255, 255, 255}, gray = {145, 151, 162, 255}, black = {28, 25, 18, 255};
     Text_SetText(data->text_title, 0, "Training Lab");
     Text_SetText(data->text_title, 1, "%s%s%s", menu->name, menu->page_num ? " / " : "", menu->page_num ? menu->pages[menu->page].name : "");
-    Text_SetText(data->text_title, 2, "%s", data->selector ? menu->name : option && option->name ? option->name : "");
+    Text_SetText(data->text_panel_title, 0, "%s", data->selector ? menu->name : option && option->name ? option->name : "");
     for (int i = 0; i < data->root_menu->tab_num; ++i) {
         int active = data->tab == i;
         Text_SetText(data->text_tabs, i, "%s%s", active && data->selector && !menu->prev ? "> " : "", data->root_menu->tabs[i].name);
@@ -217,9 +236,9 @@ static void MC_UpdateText(GOBJ *gobj)
     if (data->selector) description[0] = menu->purpose ? menu->purpose : "Choose a page, then press A or Down to enter its options.";
     else if (option) for (int i = 0; i < MENU_DESCLINEMAX; ++i) description[i] = option->desc[i];
     int description_lines = MC_Description(data->text_desc, description);
-    float preview_y = -218 + max(4, description_lines) * 22 + 18;
-    for (int i = 0; i < MC_PREVIEW_LINES; ++i) Text_SetPosition(data->text_preview, i, 25, preview_y + i * 17);
-    MC_Preview(data, data->picker ? 0 : data->selector ? menu : option && option->kind == OPTKIND_MENU ? option->menu : 0, data->selector);
+    int preview_y = MenuController_PreviewStart(description_lines);
+    for (int i = 0; i < MC_PREVIEW_LINES; ++i) Text_SetPosition(data->text_preview, i, 20, preview_y + i * MC_PREVIEW_STEP);
+    MC_Preview(data, data->picker ? 0 : data->selector ? menu : option && option->kind == OPTKIND_MENU ? option->menu : 0, data->selector, preview_y);
     if (data->picker) {
         Text_SetText(data->text_hints, 0, "Up/Down: Choose   A: Apply   B: Cancel");
         Text_SetText(data->text_hints, 1, "Choice %d/%d (current value is unchanged until A)", data->picker_value - MC_ValueMinimum(data->picker) + 1, MC_ValueCount(data->picker));
@@ -227,8 +246,9 @@ static void MC_UpdateText(GOBJ *gobj)
         Text_SetText(data->text_hints, 0, "Left/Right: %s   A/Down: Options   B: %s", menu->page_num ? "Page" : "Tab", menu->prev ? "Back" : "Resume");
         Text_SetText(data->text_hints, 1, "Start: Resume   Hold Y: Existing shortcuts   L/R: OSD page");
     } else {
-        Text_SetText(data->text_hints, 0, "Up/Down: Move   Left/Right: Value   A: Open/Choose   B: %s", menu->prev ? "Back" : "Tabs");
-        Text_SetText(data->text_hints, 1, "%s", option && option->disable ? "Unavailable in this fighter, recording or mode context." : data->tab == 4 ? "Global settings are saved and apply across events." : "Start: Resume   Hold Y: Existing shortcuts   L/R: OSD page");
+        Text_SetText(data->text_hints, 0, "Up/Down: Move   Left/Right: %s   A: Open/Choose   B: %s", data->preview_pages > 1 ? "Preview" : "Value", menu->prev ? "Back" : "Tabs");
+        const char *reason = data->root_menu->unavailable_reason ? data->root_menu->unavailable_reason(option) : 0;
+        Text_SetText(data->text_hints, 1, "%s", reason ? reason : option && option->disable ? "Unavailable in this fighter, recording or mode context." : data->tab == 4 ? "Global settings are saved and apply across events." : "Start: Resume   Hold Y: Existing shortcuts   L/R: OSD page");
     }
     JOBJ_SetMtxDirtySub(gobj->hsd_object);
 }
@@ -270,6 +290,8 @@ static void MC_Think(GOBJ *gobj)
                 menu->page = (menu->page + menu->page_num + horizontal) % menu->page_num;
                 menu->cursor = menu->scroll = 0;
             } else MC_Tab(data, (data->tab + data->root_menu->tab_num + horizontal) % data->root_menu->tab_num);
+        } else if (option && option->kind == OPTKIND_MENU && data->preview_pages > 1) {
+            data->preview_page = (data->preview_page + data->preview_pages + horizontal) % data->preview_pages;
         } else if (option && !option->disable && (option->kind == OPTKIND_STRING || option->kind == OPTKIND_INT || option->kind == OPTKIND_TOGGLE)) {
             int count = option->kind == OPTKIND_TOGGLE ? 2 : option->value_num;
             int minimum = option->kind == OPTKIND_TOGGLE ? 0 : option->value_min;
