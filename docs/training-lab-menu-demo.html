@@ -6,11 +6,13 @@
     </header>
     <nav class="tm-tabs" role="tablist" aria-label="Main menu categories"></nav>
     <div id="training-lab-category-panel" class="tm-category-panel" role="tabpanel">
-    <div class="tm-location"></div>
-    <div class="tm-heading"></div>
-    <div class="tm-list" aria-label="Menu rows"></div>
-    <div class="tm-position"></div>
-    <section class="tm-detail" aria-live="polite" aria-atomic="true"></section>
+      <div class="tm-options" aria-label="Selections and current values">
+        <div class="tm-location"></div>
+        <div class="tm-heading"></div>
+        <div class="tm-list" aria-label="Menu rows"></div>
+        <div class="tm-position"></div>
+      </div>
+      <section class="tm-detail" aria-label="Description and submenu contents" aria-live="polite" aria-atomic="true"></section>
     </div>
     <div class="tm-hints"></div>
     <footer class="tm-controls">
@@ -56,6 +58,8 @@
   #training-lab-t3-preview .tm-tab { min-width: 0; padding: 8px 4px; font-size: 12px; text-align: center; border-radius: 5px 5px 0 0; background: var(--tm-panel); border-bottom: 3px solid var(--tm-line); min-height: 46px; }
   #training-lab-t3-preview .tm-tab[aria-selected="true"] { font-weight: 500; background: var(--tm-selected); color: var(--tm-selected-text); border-bottom-color: var(--tm-selected-text); }
   #training-lab-t3-preview .tm-tab[data-focused="true"] { border-color: var(--tm-selected-text); box-shadow: inset 0 0 0 1px var(--tm-selected-text); }
+  #training-lab-t3-preview .tm-category-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; border-top: 1px solid var(--tm-line); }
+  #training-lab-t3-preview .tm-options { min-width: 0; padding-bottom: 4px; }
   #training-lab-t3-preview .tm-location { padding: 10px 20px 4px; color: var(--tm-muted); font-size: 12px; }
   #training-lab-t3-preview .tm-heading { padding: 5px 16px 10px; }
   #training-lab-t3-preview .tm-heading:empty { display: none; }
@@ -64,7 +68,8 @@
   #training-lab-t3-preview .tm-screen-title { padding: 9px 12px; box-sizing: border-box; font-weight: 500; }
   #training-lab-t3-preview .tm-heading-label { display: block; font-size: 11px; color: var(--tm-muted); }
   #training-lab-t3-preview .tm-list { display: grid; gap: 3px; padding: 0 16px; }
-  #training-lab-t3-preview .tm-row { --tm-group: var(--tm-neutral); background: var(--tm-group); display: grid; grid-template-columns: 12px minmax(0, 1fr) minmax(70px, auto); align-items: center; gap: 9px; width: 100%; min-height: 43px; }
+  #training-lab-t3-preview .tm-row { --tm-group: var(--tm-neutral); background: var(--tm-group); display: grid; grid-template-columns: 10px minmax(0, 1fr) minmax(55px, 32%); align-items: center; gap: 6px; width: 100%; min-height: 43px; padding: 9px 8px; }
+  #training-lab-t3-preview .tm-row > span { min-width: 0; }
   #training-lab-t3-preview .tm-row[data-group="blue"] { --tm-group: var(--tm-blue); }
   #training-lab-t3-preview .tm-row[data-group="purple"] { --tm-group: var(--tm-purple); }
   #training-lab-t3-preview .tm-row[data-group="amber"] { --tm-group: var(--tm-amber); }
@@ -77,9 +82,14 @@
   #training-lab-t3-preview .tm-group-label { display: block; font-size: 11px; color: var(--tm-muted); }
   #training-lab-t3-preview .tm-value { font-variant-numeric: tabular-nums; text-align: right; max-width: 205px; }
   #training-lab-t3-preview .tm-position { padding: 8px 20px; color: var(--tm-muted); font-size: 12px; text-align: right; }
-  #training-lab-t3-preview .tm-detail { padding: 12px 20px; background: var(--tm-panel); border-top: 1px solid var(--tm-line); min-height: 106px; }
+  #training-lab-t3-preview .tm-detail { padding: 16px; background: var(--tm-panel); border-left: 1px solid var(--tm-line); min-width: 0; }
   #training-lab-t3-preview .tm-detail-title { font-weight: 500; margin-bottom: 5px; }
   #training-lab-t3-preview .tm-detail-purpose { margin-bottom: 5px; }
+  #training-lab-t3-preview .tm-preview-heading { margin-top: 16px; margin-bottom: 6px; font-size: 12px; color: var(--tm-muted); }
+  #training-lab-t3-preview .tm-preview-group { margin-top: 10px; }
+  #training-lab-t3-preview .tm-preview-group-title { font-size: 12px; font-weight: 500; margin-bottom: 3px; }
+  #training-lab-t3-preview .tm-preview-list { list-style: none; margin: 0; padding: 0; }
+  #training-lab-t3-preview .tm-preview-item { padding: 7px 0; border-bottom: 1px solid var(--tm-line); font-size: 13px; }
   #training-lab-t3-preview .tm-context { color: var(--tm-muted); font-size: 12px; margin-top: 6px; }
   #training-lab-t3-preview .tm-hints { padding: 10px 20px; border-top: 1px solid var(--tm-line); display: flex; flex-wrap: wrap; gap: 7px 18px; font-size: 12px; }
   #training-lab-t3-preview .tm-hints strong { font-weight: 500; }
@@ -102,6 +112,10 @@
     #training-lab-t3-preview .tm-controls, #training-lab-t3-preview .tm-detail, #training-lab-t3-preview .tm-hints { padding-left: 12px; padding-right: 12px; }
   }
   @media (max-width: 620px) { #training-lab-t3-preview .tm-tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  @media (max-width: 540px) {
+    #training-lab-t3-preview .tm-category-panel { grid-template-columns: minmax(0, 1fr); }
+    #training-lab-t3-preview .tm-detail { border-left: 0; border-top: 1px solid var(--tm-line); }
+  }
   @media (pointer: coarse) { #training-lab-t3-preview button { min-height: 44px; } #training-lab-t3-preview .tm-dpad { grid-template-rows: repeat(2, 44px); grid-template-columns: repeat(3, 44px); } }
 </style>
 <script>
@@ -341,7 +355,7 @@
     });
   });
   function contents(menu) {
-    return menu.pages ? menu.pages.map(p => p.title + ': ' + p.rows.map(r => r.label).join(', ')).join(' / ') : menu.rows.map(r => r.label).join(' · ');
+    return menu.pages ? menu.pages.map(p => ({ title: p.title, items: p.rows.map(r => r.label) })) : [{ title: '', items: menu.rows.map(r => r.label) }];
   }
   function save() {
     if (!window.openai?.setWidgetState) return;
@@ -376,7 +390,7 @@
   }
   function describe() {
     ui.detail.replaceChildren(); ui.hints.replaceChildren();
-    let title, purpose, included = '', scope = current().scope;
+    let title, purpose, included = [], scope = current().scope;
     if (state.closed) {
       title = state.message || 'Practice resumed'; purpose = 'Press A to open Training Lab again.'; scope = 'Demo only — the game is not running here';
       hint('A', 'Open menu');
@@ -386,11 +400,11 @@
       hint('↑ ↓', 'Choose'); hint('A', 'Apply'); hint('B', 'Cancel');
     } else if (frame().cursor === -1) {
       title = current().pages ? 'Page: ' + current().pages[frame().page].title : categories[state.category][1];
-      purpose = current().purpose; included = current().pages ? current().pages[frame().page].rows.map(r => r.label).join(' · ') : contents(current());
+      purpose = current().purpose; included = current().pages ? [{ title: current().pages[frame().page].title, items: rows().map(r => r.label) }] : contents(current());
       hint('← →', current().pages ? 'Switch page' : 'Switch tab'); hint('A / ↓', 'Enter list'); hint('B', state.frames.length > 1 ? 'Back' : 'Resume');
     } else {
       const row = selected(); const target = row.target && menus[row.target]; title = row.label;
-      purpose = target ? target.purpose : row.purpose; included = target ? contents(target) : '';
+      purpose = target ? target.purpose : row.purpose; included = target ? contents(target) : [];
       scope = target ? target.scope : row.scope;
       hint('↑ ↓', 'Move');
       if (row.choices) { hint('← →', 'Change value'); hint('A', 'Choose value'); }
@@ -400,7 +414,15 @@
     }
     put(ui.detail, 'div', 'tm-detail-title', title);
     put(ui.detail, 'div', 'tm-detail-purpose', purpose);
-    if (included) put(ui.detail, 'div', '', 'Includes: ' + included);
+    if (included.length) {
+      put(ui.detail, 'div', 'tm-preview-heading', 'Included options');
+      included.forEach(group => {
+        const section = put(ui.detail, 'div', 'tm-preview-group', '');
+        if (group.title) put(section, 'div', 'tm-preview-group-title', group.title);
+        const list = put(section, 'ul', 'tm-preview-list', '');
+        group.items.forEach(label => put(list, 'li', 'tm-preview-item', label));
+      });
+    }
     put(ui.detail, 'div', 'tm-context', state.closed ? scope : state.message || scope);
   }
   function updateSelection() {
