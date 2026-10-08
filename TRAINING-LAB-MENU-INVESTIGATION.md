@@ -679,7 +679,7 @@ For the modest tree here, authored four-line previews are the smallest first imp
 
 A layout redesign should reserve a fixed detail area: purpose, **Includes:** list, context/availability. Selection changes update the preview; opening the child should preserve the same names/order. Entering and returning should retain the selected row and page, so exploration does not reset the player to the top.
 
-## 8. Controller-first UI: category selector + single list + detail footer
+## 8. Controller-first UI: visible category tabs + single list + detail footer
 
 **October 7 follow-up:** the user requested a fresh direction optimized for a joystick that moves one direction at a time, with A to enter and B to go back. The earlier mouse-oriented rail/tree comparison is superseded. The new demo has one explicit controller cursor, a category selector above a single list, and a purpose/contents detail footer. There are no independently navigated columns or clickable tab requirements.
 
@@ -697,7 +697,7 @@ The demo retains section 4's semantic destinations and the sample Peach/Fox matc
 | Paged editor's selector | Enter first/last row | Previous/next page | Enter list | Return to parent |
 | Value picker | Move one choice; wrap at ends | No action | Apply highlighted choice | Cancel without changing value |
 
-The selector is part of the same vertical focus sequence as the list. B at a category root reaches it in one press; the user does not have to climb through all rows to switch categories. A remembers the last focused row in a category, while Down explicitly enters its first row. Returning from a child preserves the parent's cursor, page, and viewport. Nested screens expose their breadcrumb without turning it into another focus region.
+The top tab bar is part of the same controller focus sequence as the list. **All eight main categories are visible:** Session, CPU, Recording, Visual Feedback, Global Settings, Stage & RNG, Controls, Exit. The active tab stays highlighted even inside a submenu or value picker. An additional marker/outline indicates when controller focus is on that tab rather than a menu row. Left/Right moves one tab when the bar has focus; A/Down enters the list. B at a category root reaches the tabs in one press; the user does not have to climb through all rows to switch categories. A remembers the last focused row in a category, while Down explicitly enters its first row. Returning from a child preserves the parent's cursor, page, and viewport. Nested screens expose their breadcrumb without turning it into another focus region. At narrow browser widths the tabs form two rows, keeping every label visible without horizontal scrolling; Left/Right still follows their displayed order.
 
 Left/Right editing is deliberately restricted to the focused setting. Value pickers support a longer list with a maximum of nine visible choices and a position counter; the viewport follows the controller cursor. Pages such as Analog/Buttons and overlay groups use a focused page selector with the same directions and A/B, requiring no shoulder buttons or mouse tabs. Long values are displayed in the right column and explained in the footer.
 
@@ -773,5 +773,6 @@ Record future decisions using this format:
 | --- | --- | --- | --- |
 | 2026-10-07 | Start T3 menu investigation and version bump. | Establish a complete inventory before reorganizing. | Source audit; metadata/diff checks. Native layout/gameplay validation remains pending. |
 | 2026-10-07 | Replace rail/tree sketch with a single-cursor controller menu. | User prioritizes joystick directions plus A/B, with easy access to elements. | Browser prototype navigation implemented; native integration and actual hardware/visual checks remain pending. |
+| 2026-10-07 | Show all main categories as persistent top tabs. | User wants the selected category and adjacent choices visible while navigating Left/Right. | Active-category and controller-focus indicators are separate; all tabs remain visible in descendants and pickers. |
 
 **Open design choices:** approve the final nine-row Recording hub; decide whether the extra Fighter Displays hub is worth its compact Visual Feedback root; choose the Action Timing group name; choose whether Human replaces HMN in display labels; select styling treatment; measure the controller selector/list layout natively. The mouse-oriented rail is no longer the active direction.

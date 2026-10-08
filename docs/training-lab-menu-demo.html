@@ -4,11 +4,14 @@
       <div class="tm-title">TRAINING LAB</div>
       <div class="tm-subtitle">V1.4.1T3 · Peach / Fox · Fountain of Dreams</div>
     </header>
+    <nav class="tm-tabs" role="tablist" aria-label="Main menu categories"></nav>
+    <div id="training-lab-category-panel" class="tm-category-panel" role="tabpanel">
     <div class="tm-location"></div>
     <div class="tm-heading"></div>
     <div class="tm-list" aria-label="Menu rows"></div>
     <div class="tm-position"></div>
     <section class="tm-detail" aria-live="polite" aria-atomic="true"></section>
+    </div>
     <div class="tm-hints"></div>
     <footer class="tm-controls">
       <div class="tm-controller" aria-label="Controller simulator">
@@ -49,8 +52,13 @@
   #training-lab-t3-preview .tm-title { font-size: 22px; font-weight: 500; letter-spacing: .03em; }
   #training-lab-t3-preview .tm-subtitle { color: var(--tm-muted); font-size: 12px; margin-top: 4px; }
   #training-lab-t3-preview button { font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 9px 12px; text-align: left; }
+  #training-lab-t3-preview .tm-tabs { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 3px; padding: 12px 12px 0; }
+  #training-lab-t3-preview .tm-tab { min-width: 0; padding: 8px 4px; font-size: 12px; text-align: center; border-radius: 5px 5px 0 0; background: var(--tm-panel); border-bottom: 3px solid var(--tm-line); min-height: 46px; }
+  #training-lab-t3-preview .tm-tab[aria-selected="true"] { font-weight: 500; background: var(--tm-selected); color: var(--tm-selected-text); border-bottom-color: var(--tm-selected-text); }
+  #training-lab-t3-preview .tm-tab[data-focused="true"] { border-color: var(--tm-selected-text); box-shadow: inset 0 0 0 1px var(--tm-selected-text); }
   #training-lab-t3-preview .tm-location { padding: 10px 20px 4px; color: var(--tm-muted); font-size: 12px; }
   #training-lab-t3-preview .tm-heading { padding: 5px 16px 10px; }
+  #training-lab-t3-preview .tm-heading:empty { display: none; }
   #training-lab-t3-preview .tm-heading-control, #training-lab-t3-preview .tm-screen-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; background: var(--tm-panel); min-height: 49px; }
   #training-lab-t3-preview .tm-heading-control { border-color: var(--tm-line); }
   #training-lab-t3-preview .tm-screen-title { padding: 9px 12px; box-sizing: border-box; font-weight: 500; }
@@ -93,6 +101,7 @@
     #training-lab-t3-preview .tm-heading { padding-left: 10px; padding-right: 10px; }
     #training-lab-t3-preview .tm-controls, #training-lab-t3-preview .tm-detail, #training-lab-t3-preview .tm-hints { padding-left: 12px; padding-right: 12px; }
   }
+  @media (max-width: 620px) { #training-lab-t3-preview .tm-tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
   @media (pointer: coarse) { #training-lab-t3-preview button { min-height: 44px; } #training-lab-t3-preview .tm-dpad { grid-template-rows: repeat(2, 44px); grid-template-columns: repeat(3, 44px); } }
 </style>
 <script>
@@ -303,7 +312,7 @@
     action('Resume Practice', 'Tools', 'Close the pause menu and resume practice.')
   ]);
   const host = root.querySelector('.tm-mock');
-  const ui = Object.fromEntries(['location', 'heading', 'list', 'position', 'detail', 'hints', 'gamepad-status'].map(k => [k, host.querySelector('.tm-' + k)]));
+  const ui = Object.fromEntries(['tabs', 'category-panel', 'location', 'heading', 'list', 'position', 'detail', 'hints', 'gamepad-status'].map(k => [k, host.querySelector('.tm-' + k)]));
   const freshFrame = menu => ({ menu, cursor: -1, page: 0, offset: 0, remembered: 0 });
   const state = { category: 0, frames: [freshFrame('session')], memory: {}, values: {}, picker: null, closed: false, message: '', shading: 'Combined' };
   const clamp = (n, low, high) => Math.max(low, Math.min(high, Number.isInteger(n) ? n : low));
@@ -315,6 +324,22 @@
   const selected = () => frame().cursor >= 0 ? rows()[frame().cursor] : null;
   const put = (parent, tag, className, content) => { const el = document.createElement(tag); el.className = className; el.textContent = content; parent.append(el); return el; };
   const button = (parent, className, content, run) => { const b = put(parent, 'button', className + ' cursor-interaction', content); b.type = 'button'; b.addEventListener('click', run); return b; };
+  function selectCategory(index) {
+    if (state.closed) return;
+    state.memory[state.frames[0].menu] = { ...state.frames[0] };
+    state.category = index;
+    const id = categories[index][0];
+    state.frames = [{ ...(state.memory[id] || freshFrame(id)), cursor: -1 }];
+    state.picker = null; state.message = ''; render(); save();
+  }
+  categories.forEach(([id, label], index) => {
+    const tab = button(ui.tabs, 'tm-tab', label, () => selectCategory(index));
+    tab.id = 'training-lab-tab-' + id; tab.dataset.category = String(index);
+    tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', 'training-lab-category-panel');
+    tab.addEventListener('focus', () => {
+      if (!state.closed && !state.picker && state.frames.length === 1 && index === state.category && frame().cursor !== -1) focusRow(-1);
+    });
+  });
   function contents(menu) {
     return menu.pages ? menu.pages.map(p => p.title + ': ' + p.rows.map(r => r.label).join(', ')).join(' / ') : menu.rows.map(r => r.label).join(' · ');
   }
@@ -362,7 +387,7 @@
     } else if (frame().cursor === -1) {
       title = current().pages ? 'Page: ' + current().pages[frame().page].title : categories[state.category][1];
       purpose = current().purpose; included = current().pages ? current().pages[frame().page].rows.map(r => r.label).join(' · ') : contents(current());
-      hint('← →', current().pages ? 'Switch page' : 'Switch category'); hint('A / ↓', 'Enter list'); hint('B', state.frames.length > 1 ? 'Back' : 'Resume');
+      hint('← →', current().pages ? 'Switch page' : 'Switch tab'); hint('A / ↓', 'Enter list'); hint('B', state.frames.length > 1 ? 'Back' : 'Resume');
     } else {
       const row = selected(); const target = row.target && menus[row.target]; title = row.label;
       purpose = target ? target.purpose : row.purpose; included = target ? contents(target) : '';
@@ -371,7 +396,7 @@
       if (row.choices) { hint('← →', 'Change value'); hint('A', 'Choose value'); }
       else if (row.target) hint('A', 'Open');
       else if (row.action) hint('A', 'Activate');
-      hint('B', state.frames.length > 1 ? 'Back' : 'Categories');
+      hint('B', state.frames.length > 1 ? 'Back' : 'Tabs');
     }
     put(ui.detail, 'div', 'tm-detail-title', title);
     put(ui.detail, 'div', 'tm-detail-purpose', purpose);
@@ -379,6 +404,13 @@
     put(ui.detail, 'div', 'tm-context', state.closed ? scope : state.message || scope);
   }
   function updateSelection() {
+    ui.tabs.querySelectorAll('button').forEach((tab, index) => {
+      tab.setAttribute('aria-selected', String(index === state.category));
+      tab.dataset.focused = String(index === state.category && state.frames.length === 1 && frame().cursor === -1 && !state.picker && !state.closed);
+      tab.textContent = (tab.dataset.focused === 'true' ? '› ' : '') + categories[index][1];
+      tab.disabled = state.closed;
+    });
+    ui['category-panel'].setAttribute('aria-labelledby', 'training-lab-tab-' + categories[state.category][0]);
     const cursor = state.picker ? state.picker.cursor : frame().cursor;
     ui.list.querySelectorAll('.tm-row').forEach(el => {
       const active = Number(el.dataset.row) === cursor;
@@ -404,14 +436,14 @@
     ui.heading.replaceChildren(); ui.list.replaceChildren();
     if (state.closed) { put(ui.heading, 'div', 'tm-screen-title', state.message || 'Practice resumed'); updateSelection(); return; }
     if (state.picker) put(ui.heading, 'div', 'tm-screen-title', 'Choose ' + rows()[state.picker.row].label);
-    else if (hasSelector()) {
+    else if (current().pages) {
       const selector = button(ui.heading, 'tm-heading-control', '', () => focusRow(-1));
       selector.addEventListener('focus', () => { if (frame().cursor !== -1) focusRow(-1); });
       const text = put(selector, 'span', '', '');
       put(text, 'span', 'tm-heading-label', current().pages ? 'PAGE · LEFT / RIGHT' : 'CATEGORY · LEFT / RIGHT');
       put(text, 'span', '', current().pages ? current().pages[frame().page].title : categories[state.category][1]);
       put(selector, 'span', '', '‹ ' + (current().pages ? (frame().page + 1) + '/' + current().pages.length : (state.category + 1) + '/' + categories.length) + ' ›');
-    } else put(ui.heading, 'div', 'tm-screen-title', current().title);
+    } else if (state.frames.length > 1) put(ui.heading, 'div', 'tm-screen-title', current().title);
     const source = state.picker ? rows()[state.picker.row].choices.map(label => ({ label, group: 'Choices' })) : rows();
     const cursor = state.picker ? state.picker.cursor : frame().cursor;
     const viewport = state.picker || frame();
@@ -448,9 +480,7 @@
       if (f.cursor === -1 && current().pages) {
         f.page = (f.page + delta + current().pages.length) % current().pages.length; f.offset = 0; f.remembered = 0;
       } else if (f.cursor === -1 && state.frames.length === 1) {
-        state.memory[f.menu] = { ...f };
-        state.category = (state.category + delta + categories.length) % categories.length;
-        const id = categories[state.category][0]; state.frames = [{ ...(state.memory[id] || freshFrame(id)), cursor: -1 }];
+        selectCategory((state.category + delta + categories.length) % categories.length); return;
       } else if (selected()?.choices) {
         const row = selected(); state.values[row.id] = clamp(indexOf(row) + delta, 0, row.choices.length - 1);
       }
@@ -475,7 +505,7 @@
     if (event.altKey || event.ctrlKey || event.metaKey || event.target?.isContentEditable) return;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target?.tagName)) return;
     if (event.target && !root.contains(event.target) && !['BODY', 'HTML'].includes(event.target.tagName)) return;
-    if (event.key === 'Enter' && event.target?.dataset?.input) return; // Keep simulator buttons' native activation.
+    if (event.key === 'Enter' && (event.target?.dataset?.input || event.target?.dataset?.category !== undefined)) return; // Keep buttons' native activation.
     const command = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', a: 'a', A: 'a', Enter: 'a', b: 'b', B: 'b', Escape: 'b' }[event.key];
     if (!command) return;
     event.preventDefault(); if (!event.repeat) input(command);
