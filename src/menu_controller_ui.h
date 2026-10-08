@@ -43,6 +43,9 @@ static void MC_CreateModel(GOBJ *gobj)
 {
     MenuData *data = gobj->userdata;
     JOBJ *root = JOBJ_LoadJoint(event_vars->menu_assets->menu);
+    /* Expand the complete frame and its child boxes, with no vertical scale.
+     * Text anchors/bounds follow below; glyph scales stay unchanged. */
+    root->scale.X *= MC_HORIZONTAL_EXPANSION;
     GObj_AddObject(gobj, 3, root);
     GObj_DestroyGXLink(gobj);
     GObj_AddGXLink(gobj, EventMenu_MenuGX, GXLINK_MENUMODEL, GXPRI_MENUMODEL);
@@ -60,13 +63,13 @@ static Text *MC_Text(MenuData *data, float width)
     text->gobj->gx_cb = EventMenu_TextGX;
     text->kerning = 1;
     text->use_aspect = 1;
-    text->aspect.X = width;
+    text->aspect.X = width * MC_HORIZONTAL_EXPANSION;
     text->viewport_scale.X = text->viewport_scale.Y = MENU_CANVASSCALE;
     return text;
 }
 static void MC_Subtext(Text *text, float x, float y, float scale)
 {
-    int line = Text_AddSubtext(text, x, y, "");
+    int line = Text_AddSubtext(text, x * MC_HORIZONTAL_EXPANSION, y, "");
     Text_SetScale(text, line, scale, scale);
 }
 static void MC_CreateText(GOBJ *gobj)
@@ -237,7 +240,7 @@ static void MC_UpdateText(GOBJ *gobj)
     else if (option) for (int i = 0; i < MENU_DESCLINEMAX; ++i) description[i] = option->desc[i];
     int description_lines = MC_Description(data->text_desc, description);
     int preview_y = MenuController_PreviewStart(description_lines);
-    for (int i = 0; i < MC_PREVIEW_LINES; ++i) Text_SetPosition(data->text_preview, i, 20, preview_y + i * MC_PREVIEW_STEP);
+    for (int i = 0; i < MC_PREVIEW_LINES; ++i) Text_SetPosition(data->text_preview, i, 20 * MC_HORIZONTAL_EXPANSION, preview_y + i * MC_PREVIEW_STEP);
     MC_Preview(data, data->picker ? 0 : data->selector ? menu : option && option->kind == OPTKIND_MENU ? option->menu : 0, data->selector, preview_y);
     if (data->picker) {
         Text_SetText(data->text_hints, 0, "Up/Down: Choose   A: Apply   B: Cancel");

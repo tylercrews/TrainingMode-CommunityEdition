@@ -11,6 +11,7 @@
 #define MC_PREVIEW_BOTTOM 282
 #define MC_WRAP_CHARS 46
 #define MC_DETAIL_SCALE .84f
+#define MC_HORIZONTAL_EXPANSION 1.08f
 
 static inline int MenuController_PreviewStart(int description_lines)
 {
