@@ -87,7 +87,8 @@ void Exit(GOBJ *menu);
 void Reset(int side_idx);
 
 enum menu_options {
-    OPT_LINES,
+    OPT_VERTICAL_LINES,
+    OPT_HORIZONTAL_LINES,
 };
 
 enum ledge_direction {
@@ -99,9 +100,15 @@ enum ledge_direction {
 static EventOption Options_Main[] = {
     {
         .kind = OPTKIND_TOGGLE,
-        .name = "Enable Line Guides",
+        .name = "Vertical Line Guides",
         .desc = {"Side-B just above the line guide",
                  "to sweetspot the ledge."},
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = "Horizontal Line Guides",
+        .desc = {"B timing: 1/2 shortest, 3/4 longer.",
+                 "0 = full range (no shorten)."},
     },
     {
         .kind = OPTKIND_INFO,
@@ -132,21 +139,117 @@ enum event_state {
 static struct sideb {
     bool attempted;
     Vec3 pos;
+    Vec3 range_origin;
+    bool range_locked;
     int dir;
 } sideb = { 0 };
 static int reset_timer = 0;
 static int state = STATE_ENDLAG;
+
+// NTSC 1.02 PlFxAJ/PlFcAJ SpecialAirS TransN-Z tracks are linear:
+// Fox 0 -> 78, Falco 0 -> 60 over animation frames 0..4. The animation
+// callback enters endlag at frame 4, before dash physics, so only three
+// moving physics frames run. Normal model scales are Fox .96, Falco 1.10:
+// dash step = 18.72 / 16.50 units; full dash = 56.16 / 49.50 units.
+// B is checked before physics: shorten-window frames 1 and 2 both skip all
+// dash movement, frame 3 permits one step, frame 4 permits two steps.
+// Aerial endlag starts at speed 2 and subtracts .07 before each movement;
+// its 28 positive-speed frames add 27.58 units to EVERY endpoint.
+// From rest, unobstructed aerial total ranges (world units):
+//                 1/2      3       4       0 (no second B)
+// Fox             27.58    46.30   65.02   83.74
+// Falco           27.58    44.08   60.58   77.08
+// Startup drift, knockback, walls, landing and ledge catches can alter actual
+// travel. Guides describe aerial recovery from the dash origin, not hitboxes.
+// Physics/order reference:
+// https://github.com/doldecomp/melee/blob/master/src/melee/ft/kinds/ftFox/ftfoxspecials.c
+static void GetHorizontalRanges(FighterData *fighter, float ranges[4]) {
+    float step = (fighter->kind == FTKIND_FOX ? 78.0f : 60.0f) / 4.0f;
+    step *= fighter->attr.model_scaling * fighter->scale.Y;
+
+    // Read the selected fighter's live aerial end speed and friction (0x3C,
+    // 0x40 in the shared Fox/Falco special attributes), rather than assuming
+    // both characters always use vanilla values.
+    float *attributes = fighter->special_attributes;
+    float speed = attributes[0x3C / sizeof(float)];
+    float friction = attributes[0x40 / sizeof(float)];
+    float drift = 0;
+    // Aerial endlag lasts 40 frames; after that, freefall is steerable.
+    for (int i = 0; i < 40; i++) {
+        speed -= friction;
+        if (speed <= 0)
+            break;
+        drift += speed;
+    }
+    for (int i = 0; i < 4; i++)
+        ranges[i] = drift + step * i;
+}
+
+// Small world-space numerals keep the labels attached to the points as the
+// match camera pans/zooms. Seven-segment strokes need no extra text camera.
+static void DrawRangeNumber(int number, float x, float y, GXColor color) {
+    static const u8 masks[5] = { 0x3F, 0x06, 0x5B, 0x4F, 0x66 };
+    static const float segments[7][4] = {
+        { 0, 3, 1.5, 3 }, { 1.5, 3, 1.5, 1.5 },
+        { 1.5, 1.5, 1.5, 0 }, { 1.5, 0, 0, 0 },
+        { 0, 0, 0, 1.5 }, { 0, 1.5, 0, 3 },
+        { 0, 1.5, 1.5, 1.5 },
+    };
+    int count = 0;
+    for (int i = 0; i < 7; i++)
+        if (masks[number] & (1 << i))
+            count += 2;
+    event_vars->GFX_Start(count, (GFX_Params) { .shape = GX_LINES, .size = 12 });
+    for (int i = 0; i < 7; i++) {
+        if (!(masks[number] & (1 << i)))
+            continue;
+        GFX_AddVtx(x - 0.75f + segments[i][0], y + segments[i][1], 0, color);
+        GFX_AddVtx(x - 0.75f + segments[i][2], y + segments[i][3], 0, color);
+    }
+}
+
+static void DrawHorizontalLines(FighterData *fighter) {
+    float ranges[4];
+    GetHorizontalRanges(fighter, ranges);
+    Vec3 origin = sideb.attempted ? sideb.range_origin : fighter->phys.pos;
+    float direction = sideb.attempted ? sideb.dir : fighter->facing_direction;
+    GXColor yellow = { 0xff, 0xe0, 0x00, 0xff };
+    GXColor white = { 0xff, 0xff, 0xff, 0xff };
+
+    event_vars->GFX_Start(2, (GFX_Params) { .shape = GX_LINES, .size = 12 });
+    GFX_AddVtx(origin.X, origin.Y, 0, yellow);
+    GFX_AddVtx(origin.X + direction * ranges[3], origin.Y, 0, yellow);
+    event_vars->GFX_Start(4, (GFX_Params) { .shape = GX_POINTS, .size = 42 });
+    for (int i = 0; i < 4; i++)
+        GFX_AddVtx(origin.X + direction * ranges[i], origin.Y, 0,
+                   i == 3 ? white : yellow);
+
+    float shortest_x = origin.X + direction * ranges[0];
+    // Same endpoint, two input timings: label above/below the shared dot.
+    DrawRangeNumber(1, shortest_x, origin.Y + 2, yellow);
+    DrawRangeNumber(2, shortest_x, origin.Y - 5, yellow);
+    DrawRangeNumber(3, origin.X + direction * ranges[1], origin.Y + 2, yellow);
+    DrawRangeNumber(4, origin.X + direction * ranges[2], origin.Y + 2, yellow);
+    DrawRangeNumber(0, origin.X + direction * ranges[3], origin.Y + 2, white);
+}
 
 void Draw_Lines(void) {
     GOBJ *hmn = Fighter_GetGObj(0);
     FighterData *hmn_data = hmn->userdata;
     CollData *coll_data = &hmn_data->coll_data;
 
-    if (!Options_Main[OPT_LINES].val)
+    if (!Options_Main[OPT_VERTICAL_LINES].val && !Options_Main[OPT_HORIZONTAL_LINES].val)
         return;
 
     COBJ *cur_cam = COBJ_GetCurrent();
     CObj_SetCurrent(*stc_matchcam_cobj);
+
+    if (Options_Main[OPT_HORIZONTAL_LINES].val)
+        DrawHorizontalLines(hmn_data);
+    if (!Options_Main[OPT_VERTICAL_LINES].val) {
+        CObj_SetCurrent(cur_cam);
+        return;
+    }
 
     // Melee calculation for the top of the ledgegrab box
     float ledgegrab_offset = coll_data->cliffgrab_y_offset + 0.5 * coll_data->cliffgrab_height;
@@ -238,7 +341,16 @@ void Event_Think(GOBJ *menu) {
     if (hmn_data->state_id == 350) { // Aerial sideb startup for fox/falco
         sideb.attempted = true;
         sideb.pos = hmn_data->phys.pos;
+        sideb.range_origin = hmn_data->phys.pos;
+        sideb.range_locked = false;
         sideb.dir = hmn_data->facing_direction;
+    }
+    if (sideb.attempted && !sideb.range_locked
+        && (hmn_data->state_id == 351 || hmn_data->state_id == 352)) {
+        // Capture before the first dash/endlag movement, including a B press
+        // on the transition frame that skips the dash state entirely.
+        sideb.range_origin = hmn_data->phys.pos_prev;
+        sideb.range_locked = true;
     }
 
     // Begin CPU AI logic
@@ -304,6 +416,7 @@ void Reset(int side_idx) {
 
     event_vars->Savestate_Load_v1(event_vars->savestate, Savestate_Silent);
     sideb.attempted = false;
+    sideb.range_locked = false;
 
     GOBJ *hmn = Fighter_GetGObj(0);
     FighterData *hmn_data = hmn->userdata;
