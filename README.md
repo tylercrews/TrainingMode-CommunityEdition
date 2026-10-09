@@ -2,7 +2,7 @@
 
 # Training Mode - Tyro Edition
 
-Training Mode - Tyro Edition is an expanded and updated version of UnclePunch's training modpack, further expanding on Aitch's Community Edition for Super Smash Bros. Melee in ways that I have felt would be useful from my past experiences using the program.
+Training Mode - Tyro Edition is an expanded and updated version of UnclePunch's training modpack, further expanding on Aitch's Community Edition for Super Smash Bros. Melee in ways that I have felt would be useful from my past experiences using the program. I have developed these features with the use of AI and for that reason they will not be eligible for merging into the Community Edition and should remain exclusive to this version of the program.
 
 To download the ISO, click [here](https://github.com/AlexanderHarrison/TrainingMode-CommunityEdition/releases/latest).
 
