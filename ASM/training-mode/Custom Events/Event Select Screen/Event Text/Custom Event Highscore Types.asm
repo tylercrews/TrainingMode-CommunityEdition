@@ -5,7 +5,7 @@
 
     mr r4, r3
     lwz r3, MemcardData(r13)
-    lbz r3, CurrentEventPage(r3)
+    SettingsRead SettingsField_Page, 3
     rtocbl r12, TM_GetScoreType
 
     restore

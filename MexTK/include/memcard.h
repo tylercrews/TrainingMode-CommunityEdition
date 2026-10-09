@@ -2039,17 +2039,20 @@ struct Memcard
     int unk1992;           // 0x1F20
     u32 TM_OSDEnabled;     // 0x1F24
     u8 TM_OSDPosition;     // 0x1F28
-    u8 TM_EventPage;       // 0x1F29
-    u8 TM_OSDRecommended;  // 0x1F2A
+    u8 TM_EventPage;       // 0x1F29: low two bits page; high six bits selected event
+    u8 TM_OSDRecommended;  // 0x1F2A: bit 0 recommended; bits 1-5 human code; bits 6-7 character marker
     u8 TM_LabFrameAdvanceButton;    // 0x1F2B - advance idx in low half, decrement idx in high half
     u8 TM_LabDPadUD;       // 0x1F2C - Up in low half, Down in high half
     u8 TM_LabDPadLR;       // 0x1F2D - Left in low half, Right in high half
-    u8 unused1F2E;         // 0x1F2E
+    u8 TM_SettingsFlagsVersion; // 0x1F2E: six flags, two version bits
     u8 TM_LabCPUInputDisplay;       // 0x1F2F
 
-    // We only save a max of 8 overlays.
-    OverlaySave TM_LabSavedOverlays_HMN[8]; // 0x1F30
-    OverlaySave TM_LabSavedOverlays_CPU[8]; // 0x1F40
+    // Explicit byte format managed by src/settings.c; do not store C enums/bitfields here.
+    u8 TM_PackedOverlays[18];     // 0x1F30: HMN low nibble, CPU high nibble per condition
+    u8 TM_PackedOSDColors[8];     // 0x1F42: stable sparse-ID slots, three bits each
+    u8 TM_SettingsSignature[2];  // 0x1F4A
+    u8 TM_SettingsExtraFlags;    // 0x1F4C: global flags, event initialization/delay/tips, bit 7 Sweetspot guides Off
+    u8 TM_SettingsReserved[3];   // 0x1F4D: preserved for future preferences
     int unk2004;           // 0x1F50
     int unk2005;           // 0x1F54
     int unk2006;           // 0x1F58
@@ -2732,10 +2735,10 @@ struct MemcardState
     /* +0  */ int x0;
     /* +4  */ int x4;
     /* +8  */ int x8;
-    /* +C  */ bool memcard_changed;
+    /* +C  */ int memcard_changed; /* Native word boolean, not SDK's byte-sized bool. */
     /* +10 */ int x10;
     /* +14 */ int x14;
-    /* +18 */ bool enable;
+    /* +18 */ int enable; /* Native archive lifecycle reads/writes a full word. */
     /* +1C */ char _1C[0x40];
     /* +5C */ int *x5C;
     /* +60 */ int x60;

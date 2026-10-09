@@ -1,5 +1,6 @@
 #include "../MexTK/mex.h"
 #include "events.h"
+#include "ledgedash_logic.h"
 
 typedef struct LedgedashData LedgedashData;
 typedef struct LedgedashAssets LedgedashAssets;
@@ -17,6 +18,12 @@ struct LedgedashData
     int ledge;
     bool was_successful;
     s16 reset_timer;
+    LdshAttempt attempt;
+    Vec3 ledge_pos;
+    float ledge_dir;
+    int ledge_line, resolved_start;
+    unsigned native_frame, restore_serial;
+    int seen_frame;
     GOBJ *hitlog_gobj;
     CmSubject *cam;
     struct
@@ -41,6 +48,7 @@ struct LedgedashData
         u8 refresh_displayed : 1;
         u8 is_input_release : 1;
     } tip;
+    LdshEggPlacement egg_placement; // Append: preserve existing event offsets; copied with savestates.
 };
 
 struct LedgedashAssets
@@ -71,7 +79,7 @@ enum ldsh_action
     LDACT_FASTFALL,
     LDACT_JUMP,
     LDACT_AIRDODGE,
-    LDACT_ATTACK,
+    LDACT_ATTACK_DASH,
     LDACT_LANDING,
     LDACT_GALINT,
 };

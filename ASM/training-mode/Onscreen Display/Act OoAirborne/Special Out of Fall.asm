@@ -18,7 +18,7 @@
 
 Text:
     blrl
-    .string "Special OoFall\nFrame %d"
+    .string "Special OoFall\n%df"
     .align 2
 
 Exit:

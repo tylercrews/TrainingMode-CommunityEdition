@@ -8,13 +8,17 @@
     .set player, 30
 
     backupall
+    SettingsBackup
+    mr r3, player
+    rtocbl r12, TM_ShineBeforeIASA
+    SettingsRestore
     
 OSD_ActOoWait:
     # CHECK IF ENABLED
     li r0, OSD.ActOoWait                        # PowerShield ID
     # lwz r4, -0xdbc(rtoc) #get frame data toggle bits
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -32,6 +36,13 @@ ActOoWait_SearchForWait:
     beq ActOoWait_FoundWait
     cmpwi r3, ASID_Landing
     beq ActOoWait_FoundWait
+    cmpwi r3, ASID_LandingFallSpecial
+    beq ActOoWait_FoundWait
+    cmpwi r3, ASID_LandingAirN
+    blt ActOoWait_CheckIntermediate
+    cmpwi r3, ASID_LandingAirLw
+    ble ActOoWait_FoundWait
+ActOoWait_CheckIntermediate:
     
     # If the player walks/turns as an intermediate state,
     # skip this intermediate state and show the OSD for the next state.
@@ -81,7 +92,7 @@ ActOoWait_End:
 OSD_FighterSpecificTech:
     li r0, OSD.FighterSpecificTech    # OSD ID
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -121,11 +132,6 @@ FoxFalco:
     cmpwi r3, 0x16D                 # Ground Side B End
     beq FoxFalco_ShineAirStartup
 
-    cmpwi r3, 0x169
-    beq FoxFalco_ShineGroundLoop
-    cmpwi r3, 0x16E
-    beq FoxFalco_ShineAirLoop
-
     b FighterSpecificTech_End
 
 # --------
@@ -151,7 +157,7 @@ FoxFalco_SideBStart:
     load r5, MSGCOLOR_RED
     bl FoxFalco_ShortenEarlyPressText
     mflr r6
-    Message_Display
+    Message_DisplayOSD 8, 0, 1, 0
 
     b FighterSpecificTech_End
 
@@ -175,7 +181,7 @@ FoxFalco_SideB:
     load r5, MSGCOLOR_GREEN
     bl FoxFalco_ShortenTypeText
     mflr r6
-    Message_Display
+    Message_DisplayOSD 8, 0, 1, 0
 
     b FighterSpecificTech_End
 
@@ -192,69 +198,12 @@ FoxFalco_SideBEnd:
     load r5, MSGCOLOR_RED
     bl FoxFalco_ShortenLatePressText
     mflr r6
-    Message_Display
+    Message_DisplayOSD 8, 0, 1, 0
 
     b FighterSpecificTech_End
 
 # --------
 
-FoxFalco_ShineGroundLoop:
-    # Check For JC
-    bl CheckForJumpCancel
-    cmpwi r3, 0x0
-    beq FighterSpecificTech_End
-
-FoxFalco_ShineGroundLoop_SetColor:
-    load r5, MSGCOLOR_RED
-    lhz r3, 0x23F8(playerdata)
-    cmpwi r3, 0x1
-    bne FoxFalco_ShineGroundLoop_EndSetColor
-    load r5, MSGCOLOR_GREEN
-
-FoxFalco_ShineGroundLoop_EndSetColor:
-    li r3, OSD.FighterSpecificTech  # ID
-    lbz r4, 0xC(playerdata)         # queue
-    bl FoxFalco_ActOOShineText
-    mflr r6
-    lhz r7, 0x23F8(playerdata)
-    Message_Display
-
-    b FighterSpecificTech_End
-
-# --------
-
-FoxFalco_ShineAirLoop:
-    # Check For Remaining Jump
-    lbz r3, 0x1968(playerdata)      # Jumps Used
-    lwz r0, 0x0168(playerdata)      # Total Jumps
-    cmpw r3, r0
-    bge FighterSpecificTech_End
-
-    # Check For JC
-    bl CheckForJumpCancel
-    cmpwi r3, 0x0
-    beq FighterSpecificTech_End
-
-FoxFalco_ShineAirLoop_SetColor:
-    load r5, MSGCOLOR_RED
-    lhz r3, 0x23F8(playerdata)
-    cmpwi r3, 0x1
-    bne FoxFalco_ShineAirLoop_EndSetColor
-    load r5, MSGCOLOR_GREEN
-
-FoxFalco_ShineAirLoop_EndSetColor:
-
-    li r3, OSD.FighterSpecificTech  # ID
-    lbz r4, 0xC(playerdata)         # queue
-    bl FoxFalco_ActOOShineText
-    mflr r6
-    lhz r7, 0x23F8(playerdata)
-    Message_Display
-
-    b FighterSpecificTech_End
-    
-# --------
-    
 FoxFalco_ShineAirStartup:
     # ensure we just jumped from the ground
     lhz r3, 0x23fc(playerdata)
@@ -309,15 +258,16 @@ FoxFalco_ShineAirStartup_EndJumpInputsLoop:
     mflr r8
     li r19, 1 # save for later
 EndGetHopTypeText:
+    mr r25, r9 # Preserve printed hop duration, not JC Shine timing in r7.
     
     # display
-    li r3, OSD.FighterSpecificTechAlt  # ID - use alt so that ActOoShine doesn't overwrite
+    li r3, OSD.FighterSpecificTechAlt  # ID - use alt so that Jump Out Of Shine does not overwrite
     lbz r4, 0xC(playerdata)         # queue
     li r5, MSGCOLOR_WHITE
     bl FoxFalco_JCShineText
     mflr r6
     lhz r7, 0x2408(playerdata) # frames in JumpF / JumpB
-    Message_Display
+    Message_DisplayOSD 8, 1, 1, 0
     lwz r3, 0x2C(r3)
     lwz r20, MsgData_Text(r3)
     
@@ -334,13 +284,13 @@ ShineWasGood:
     branchl r12, Text_ChangeTextColor
        
     # set hop type colour
-    li r4, 2
-    mr r3, r19
-    bl GreenRedColors
-    mflr r5
-    mulli r3, r3, 4
-    add r5, r5, r3
+    xori r3, r19, 1 # Helper takes short_hop=1, full_hop=0.
+    mr r4, r25
+    rtocbl r12, TM_WavedashHopColor
+    stw r3, 0x84(sp)
     mr r3, r20
+    li r4, 2
+    addi r5, sp, 0x84
     branchl r12, Text_ChangeTextColor
     
     b FighterSpecificTech_End
@@ -368,7 +318,7 @@ Yoshi_PrintJumpOoParryText:
     bl Yoshi_JumpOoParryText
     mflr r6
     lhz r7, 0x23F8(playerdata)
-    Message_Display
+    Message_DisplayOSD 8, 1, 1, 0
     b FighterSpecificTech_End
 
 # /////////////////////////////////////////////////////////////////////////////
@@ -417,7 +367,7 @@ FoxFalco_ShortenEarlyPressText:
 
 FoxFalco_ShortenTypeText:
     blrl
-    .string "Shorten Press\nFrame %d/4"
+    .string "Shorten Press\n%df/4f"
     .align 2
 
 FoxFalco_ShortenLatePressText:
@@ -425,14 +375,9 @@ FoxFalco_ShortenLatePressText:
     .string "Shorten Press\nLate"
     .align 2
 
-FoxFalco_ActOOShineText:
-    blrl
-    .string "Act OoShine\nFrame %d"
-    .align 2
-    
 FoxFalco_JCShineText:
     blrl
-    .string "JC Shine\nFrame %d\n%s: %df"
+    .string "JC Shine\n%df\n%s: %df"
     .align 2
 
 ShortHopText:
@@ -455,7 +400,7 @@ GreenRedColors:
 
 Yoshi_JumpOoParryText:
     blrl
-    .string "Jump OoParry\nFrame %d"
+    .string "Jump OoParry\n%df"
     .align 2
 
 FighterSpecificTech_End:
@@ -466,7 +411,7 @@ OSD_Lockout:
     # Check enabled
     li r0, OSD.LockoutTimers
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -505,12 +450,12 @@ Lockout_InLockout:
 
     li r3, OSD.LockoutTimers        # ID
     lbz r4, 0xC(playerdata)         # queue
-    Message_Display
+    Message_DisplayOSD 12, 0, 1, 0
     b Lockout_End
 
 LockoutText:
     blrl
-    .string "DTilt Lockout\nFrame %d"
+    .string "DTilt Lockout\n%df"
     .align 2
 
 Lockout_End:
@@ -520,7 +465,7 @@ Lockout_End:
 OSD_DJL:
     li r0, OSD.FighterSpecificTech    # OSD ID
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -583,12 +528,12 @@ DJL_EndColor:
 
     bl DJL_Text
     mflr r6
-    Message_Display
+    Message_DisplayOSD 8, 1, 1, 0, 5 # Preserve the original best interval: five frames.
     b DJL_End
     
 DJL_Text:
     blrl
-    .string "Insta Double Jump\nFrame %d"
+    .string "Insta Double Jump\n%df"
     .align 2
     
 DJL_End:

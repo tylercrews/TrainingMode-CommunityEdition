@@ -1,6 +1,7 @@
     # To be inserted at 80236b40
     .include "../../../Globals.s"
     .include "../../../m-ex/Header.s"
+    .include "../../../../build/tyro-identity.s"
 
     .set Text, 30
     .set TextProp, 28
@@ -96,10 +97,10 @@ IncLoopLeft:
     bl OSDPositionText
     mflr r4
     lwz r5, MemcardData(r13)
-    lbz r5, 0x1F28(r5)
+    SettingsRead SettingsField_Display, 5
 
     # Fix value if invalid from removed max osd setting
-    cmpwi r5, 4
+    cmpwi r5, 6
     blt EndFixInvalidOSDPosition
     li r5, 0
 EndFixInvalidOSDPosition:
@@ -112,6 +113,10 @@ EndFixInvalidOSDPosition:
     beql OSDPositionTextTopLeft
     cmpwi r5, 3
     beql OSDPositionTextTopRight
+    cmpwi r5, 4
+    beql OSDPositionTextFixed
+    cmpwi r5, 5
+    beql OSDPositionTextPanel
     mflr r5
 
     lfs f1, 0x1C(TextProp)
@@ -189,6 +194,12 @@ IncLoopRight:
     cmpwi r29, 15
     blt LoopStartRight
 
+    # Existing row subtexts now show the shared palette/flag values. Preserve FPRs
+    # as well as GPRs across the C call inside this native animation callback.
+    SettingsBackup
+    mr r3, r31
+    rtocbl r12, TM_OSDEditorInit
+    SettingsRestore
     restore
     b exit
 
@@ -250,7 +261,7 @@ TextProperties:
     .long 0x3CB43958        # Text Scaling
     .long 0x42480000        # Text Y Difference
     .long 0x4423C000        # Right Text X Offset
-    .long 0x43960000        # Center Title X
+    .float 655.0           # Right-aligned title; same anchor as right-column text
     .long 0xC22C0000        # Center Title Y
     .float 0                # OSD Position text X
     .float -43.0            # OSD Position text Y
@@ -263,7 +274,7 @@ TextProperties:
 
 OSDPositionText:
     blrl
-    .string "OSD Position: %s"
+    .string "OSD Display: %s"
     .align 2
 
 OSDPositionTextHUD:
@@ -286,9 +297,18 @@ OSDPositionTextTopRight:
     .string "Top Right"
     .align 2
 
+OSDPositionTextFixed:
+    blrl
+    .string "Fixed Grid"
+    .align 2
+OSDPositionTextPanel:
+    blrl
+    .string "Practice Panel"
+    .align 2
+
 XYText:
     blrl
-    .string "(X/Y)"
+    .string "X/Y: Display  L/R: Page  B/Z: Color"
     .align 2
 
 FDDRecommended:
@@ -314,11 +334,11 @@ TextASCIILeft:
     .string ""
     .string "Wavedash Info"
     .string "L-Cancel"
-    .string "" # OSD ID 2
+    TyroTrailLabel_VERY_FAST # Global flag; native row ID 2
     .string "Act OoS Frame"
-    .string "" # OSD ID 4
+    TyroTrailLabel_INSTANT # Global flag; native row ID 4
     .string "Dashback"
-    .string "" # OSD ID 6
+    .string "TURN OSDS OFF" # Global flag; native row ID 6
     .string "" # OSD ID 7
     .string "Fighter-specific Tech"
     .string "Powershield Frame"
@@ -350,9 +370,8 @@ TextASCIIRight:
 
 FDDTitleText:
     blrl
-    .long 0x4f534420
-    .long 0x4d656e75
-    .long 0x00000000
+    .string "Global Settings"
+    .align 2
 
 original:
     branchl r4, 0x802359c8

@@ -17,7 +17,7 @@
     # CHECK IF ENABLED
     li r0, OSD.RollAirdodgeInterrupt
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -47,17 +47,17 @@ Throw:
     lhz r7, TM_FramesInPrevASStart(playerdata)
 
 Display:
-    Message_Display
+    Message_DisplayOSD 13, 1, 1, 0
     b Exit
 
 Text_ItemThrow:
     blrl
-    .string "Airdodge Item Throw\nFrame %d"
+    .string "Airdodge Item Throw\n%df"
     .align 2
 
 Text_ZDrop:
     blrl
-    .string "Airdodge Z-Drop\nFrame %d"
+    .string "Airdodge Z-Drop\n%df"
     .align 2
 
 Exit:

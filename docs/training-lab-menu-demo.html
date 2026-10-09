@@ -1,0 +1,584 @@
+<div id="training-lab-t3-preview" class="viz-dotted-background" aria-label="Training Lab controller navigation prototype">
+  <div class="tm-mock" aria-label="Training Lab controller menu">
+    <header class="tm-header">
+      <div class="tm-title">TRAINING LAB</div>
+      <div class="tm-subtitle">V1.4.1T3 · Peach / Fox · Fountain of Dreams</div>
+    </header>
+    <nav class="tm-tabs" role="tablist" aria-label="Main menu categories"></nav>
+    <div id="training-lab-category-panel" class="tm-category-panel" role="tabpanel">
+      <div class="tm-options" aria-label="Selections and current values">
+        <div class="tm-location"></div>
+        <div class="tm-heading"></div>
+        <div class="tm-list" aria-label="Menu rows"></div>
+        <div class="tm-position"></div>
+      </div>
+      <section class="tm-detail" aria-label="Description and submenu contents" aria-live="polite" aria-atomic="true"></section>
+    </div>
+    <div class="tm-hints"></div>
+    <footer class="tm-controls">
+      <div class="tm-controller" aria-label="Controller simulator">
+        <div class="tm-dpad">
+          <button type="button" data-input="up" class="cursor-interaction" aria-label="Joystick up">↑</button>
+          <button type="button" data-input="left" class="cursor-interaction" aria-label="Joystick left">←</button>
+          <button type="button" data-input="down" class="cursor-interaction" aria-label="Joystick down">↓</button>
+          <button type="button" data-input="right" class="cursor-interaction" aria-label="Joystick right">→</button>
+        </div>
+        <button type="button" data-input="b" class="tm-button-b cursor-interaction" aria-label="B: Back or cancel">B</button>
+        <button type="button" data-input="a" class="tm-button-a cursor-interaction" aria-label="A: Enter or confirm">A</button>
+      </div>
+      <div class="tm-input-help">Keyboard: arrows · A / Enter · B / Escape</div>
+      <div class="tm-gamepad-status" aria-live="polite">Standard gamepad: stick or D-pad + A/B</div>
+    </footer>
+  </div>
+</div>
+<style>
+  #training-lab-t3-preview { color-scheme: light dark; }
+  #training-lab-t3-preview .tm-mock {
+    --tm-bg: light-dark(#f4f5f8, #111622);
+    --tm-panel: light-dark(#ffffff, #191f2d);
+    --tm-text: light-dark(#20283a, #f0f3fa);
+    --tm-muted: light-dark(#545f74, #b2bed3);
+    --tm-line: light-dark(#cbd2df, #39465e);
+    --tm-selected: light-dark(#f4d978, #eed077);
+    --tm-selected-text: #242017;
+    --tm-neutral: light-dark(#e9edf4, #252d3d);
+    --tm-blue: light-dark(#e0edf4, #1d3542);
+    --tm-purple: light-dark(#eae5f4, #322b46);
+    --tm-amber: light-dark(#f2ebd6, #3c3524);
+    --tm-green: light-dark(#e3eee7, #263d34);
+    color: var(--tm-text); background: var(--tm-bg); border: 1px solid var(--tm-line);
+    border-radius: 8px; font-family: Arial, sans-serif; font-size: 15px; line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+  #training-lab-t3-preview .tm-header { padding: 16px 112px 14px 20px; border-bottom: 1px solid var(--tm-line); }
+  #training-lab-t3-preview .tm-title { font-size: 22px; font-weight: 500; letter-spacing: .03em; }
+  #training-lab-t3-preview .tm-subtitle { color: var(--tm-muted); font-size: 12px; margin-top: 4px; }
+  #training-lab-t3-preview button { font: inherit; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 9px 12px; text-align: left; }
+  #training-lab-t3-preview .tm-tabs { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 3px; padding: 12px 12px 0; }
+  #training-lab-t3-preview .tm-tab { min-width: 0; padding: 8px 4px; font-size: 12px; text-align: center; border-radius: 5px 5px 0 0; background: var(--tm-panel); border-bottom: 3px solid var(--tm-line); min-height: 46px; }
+  #training-lab-t3-preview .tm-tab[aria-selected="true"] { font-weight: 500; background: var(--tm-selected); color: var(--tm-selected-text); border-bottom-color: var(--tm-selected-text); }
+  #training-lab-t3-preview .tm-tab[data-focused="true"] { border-color: var(--tm-selected-text); box-shadow: inset 0 0 0 1px var(--tm-selected-text); }
+  #training-lab-t3-preview .tm-category-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 12px; border-top: 1px solid var(--tm-line); }
+  #training-lab-t3-preview .tm-options { min-width: 0; padding-bottom: 4px; }
+  #training-lab-t3-preview .tm-location { padding: 10px 20px 4px; color: var(--tm-muted); font-size: 12px; }
+  #training-lab-t3-preview .tm-heading { padding: 5px 16px 10px; }
+  #training-lab-t3-preview .tm-heading:empty { display: none; }
+  #training-lab-t3-preview .tm-heading-control, #training-lab-t3-preview .tm-screen-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; background: var(--tm-panel); min-height: 49px; }
+  #training-lab-t3-preview .tm-heading-control { border-color: var(--tm-line); }
+  #training-lab-t3-preview .tm-screen-title { padding: 9px 12px; box-sizing: border-box; font-weight: 500; }
+  #training-lab-t3-preview .tm-heading-label { display: block; font-size: 11px; color: var(--tm-muted); }
+  #training-lab-t3-preview .tm-list { display: grid; gap: 3px; padding: 0 16px; }
+  #training-lab-t3-preview .tm-row { --tm-group: var(--tm-neutral); background: var(--tm-group); display: grid; grid-template-columns: 10px minmax(0, 1fr) minmax(55px, 32%); align-items: center; gap: 6px; width: 100%; min-height: 43px; padding: 9px 8px; }
+  #training-lab-t3-preview .tm-row > span { min-width: 0; }
+  #training-lab-t3-preview .tm-row[data-group="blue"] { --tm-group: var(--tm-blue); }
+  #training-lab-t3-preview .tm-row[data-group="purple"] { --tm-group: var(--tm-purple); }
+  #training-lab-t3-preview .tm-row[data-group="amber"] { --tm-group: var(--tm-amber); }
+  #training-lab-t3-preview .tm-row[data-group="green"] { --tm-group: var(--tm-green); }
+  #training-lab-t3-preview .tm-mock[data-shading="Zebra"] .tm-row { --tm-group: var(--tm-neutral); }
+  #training-lab-t3-preview .tm-mock:not([data-shading="Blocks"]) .tm-row[data-even="true"] { background: color-mix(in srgb, var(--tm-group) 68%, var(--tm-panel)); }
+  #training-lab-t3-preview .tm-row[data-selected="true"], #training-lab-t3-preview .tm-heading-control[data-selected="true"] { background: var(--tm-selected); color: var(--tm-selected-text); border-color: var(--tm-selected-text); }
+  #training-lab-t3-preview [data-selected="true"] .tm-group-label, #training-lab-t3-preview [data-selected="true"] .tm-heading-label { color: var(--tm-selected-text); }
+  #training-lab-t3-preview .tm-pointer { font-weight: 500; }
+  #training-lab-t3-preview .tm-group-label { display: block; font-size: 11px; color: var(--tm-muted); }
+  #training-lab-t3-preview .tm-value { font-variant-numeric: tabular-nums; text-align: right; max-width: 205px; }
+  #training-lab-t3-preview .tm-position { padding: 8px 20px; color: var(--tm-muted); font-size: 12px; text-align: right; }
+  #training-lab-t3-preview .tm-detail { padding: 16px; background: var(--tm-panel); border-left: 1px solid var(--tm-line); min-width: 0; }
+  #training-lab-t3-preview .tm-detail-title { font-weight: 500; margin-bottom: 5px; }
+  #training-lab-t3-preview .tm-detail-purpose { margin-bottom: 5px; }
+  #training-lab-t3-preview .tm-preview-heading { margin-top: 16px; margin-bottom: 6px; font-size: 12px; color: var(--tm-muted); }
+  #training-lab-t3-preview .tm-preview-group { margin-top: 10px; }
+  #training-lab-t3-preview .tm-preview-group-title { font-size: 12px; font-weight: 500; margin-bottom: 3px; }
+  #training-lab-t3-preview .tm-preview-list { list-style: none; margin: 0; padding: 0; }
+  #training-lab-t3-preview .tm-preview-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--tm-line); font-size: 13px; }
+  #training-lab-t3-preview .tm-preview-submenu { flex-shrink: 0; font-weight: 500; }
+  #training-lab-t3-preview .tm-context { color: var(--tm-muted); font-size: 12px; margin-top: 6px; }
+  #training-lab-t3-preview .tm-hints { padding: 10px 20px; border-top: 1px solid var(--tm-line); display: flex; flex-wrap: wrap; gap: 7px 18px; font-size: 12px; }
+  #training-lab-t3-preview .tm-hints strong { font-weight: 500; }
+  #training-lab-t3-preview .tm-controls { padding: 12px 20px; border-top: 1px solid var(--tm-line); }
+  #training-lab-t3-preview .tm-controller { display: flex; align-items: center; gap: 12px; }
+  #training-lab-t3-preview .tm-dpad { display: grid; grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(2, 38px); gap: 3px; margin-right: auto; }
+  #training-lab-t3-preview .tm-dpad button { padding: 0; text-align: center; border-color: var(--tm-line); background: var(--tm-panel); }
+  #training-lab-t3-preview .tm-dpad [data-input="up"] { grid-area: 1 / 2; }
+  #training-lab-t3-preview .tm-dpad [data-input="left"] { grid-area: 2 / 1; }
+  #training-lab-t3-preview .tm-dpad [data-input="down"] { grid-area: 2 / 2; }
+  #training-lab-t3-preview .tm-dpad [data-input="right"] { grid-area: 2 / 3; }
+  #training-lab-t3-preview .tm-button-a, #training-lab-t3-preview .tm-button-b { border-color: var(--tm-line); border-radius: 50%; width: 45px; height: 45px; text-align: center; padding: 0; font-weight: 500; }
+  #training-lab-t3-preview .tm-button-a { background: var(--tm-green); }
+  #training-lab-t3-preview .tm-button-b { background: var(--tm-amber); }
+  #training-lab-t3-preview .tm-input-help, #training-lab-t3-preview .tm-gamepad-status { color: var(--tm-muted); font-size: 12px; margin-top: 7px; }
+  @media (max-width: 420px) {
+    #training-lab-t3-preview .tm-row { grid-template-columns: 10px minmax(0, 1fr) minmax(55px, 38%); padding: 8px; gap: 5px; }
+    #training-lab-t3-preview .tm-list { padding: 0 10px; }
+    #training-lab-t3-preview .tm-heading { padding-left: 10px; padding-right: 10px; }
+    #training-lab-t3-preview .tm-controls, #training-lab-t3-preview .tm-detail, #training-lab-t3-preview .tm-hints { padding-left: 12px; padding-right: 12px; }
+  }
+  @media (max-width: 620px) { #training-lab-t3-preview .tm-tabs { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  @media (max-width: 540px) {
+    #training-lab-t3-preview .tm-category-panel { grid-template-columns: minmax(0, 1fr); }
+    #training-lab-t3-preview .tm-detail { border-left: 0; border-top: 1px solid var(--tm-line); }
+  }
+  @media (pointer: coarse) { #training-lab-t3-preview button { min-height: 44px; } #training-lab-t3-preview .tm-dpad { grid-template-rows: repeat(2, 44px); grid-template-columns: repeat(3, 44px); } }
+</style>
+<script>
+(() => {
+  const root = document.getElementById('training-lab-t3-preview');
+  const menus = {};
+  const tones = { Simulation: 'blue', 'Fighter Setup': 'green', 'CPU Setup': 'green', DI: 'blue', Grab: 'amber', Feedback: 'purple', Traps: 'amber', Shield: 'amber', Protection: 'purple', 'Initial State': 'green', 'Human Capture': 'blue', 'CPU Capture': 'purple', Tools: 'neutral', Trails: 'blue', 'Fighter Cues': 'purple', 'Shield Rule': 'amber', Human: 'blue', CPU: 'purple', Context: 'neutral', Ground: 'green', Air: 'blue', Movement: 'blue', Timing: 'purple', Combat: 'amber', Analog: 'blue', Buttons: 'purple', 'Frame Stepping': 'blue', 'D-pad Shortcuts': 'green' };
+  const option = (label, group, purpose, choices = ['Off', 'On'], initial = 0, scope = 'Training Lab') => ({ id: scope + ':' + label, label, group, purpose, choices, initial, scope });
+  const action = (label, group, purpose) => ({ id: 'action:' + label, label, group, purpose, action: true, scope: 'Training Lab' });
+  const link = (label, target, group = 'Tools') => ({ label, target, group, purpose: '', scope: '' });
+  const add = (id, title, purpose, rows, scope = 'Training Lab') => { menus[id] = { title, purpose, rows, scope }; };
+  const page = (id, title, purpose, pages, scope = 'Training Lab') => { menus[id] = { title, purpose, pages, scope }; };
+  const named = (names, group, purpose, scope, choices) => names.map(n => option(n, group, purpose, choices, 0, scope));
+  const palette = ['Off', 'White', 'Red', 'Green', 'Blue', 'Yellow', 'Cyan', 'Magenta'];
+
+  add('session', 'Session', 'Set the pace of practice and the human fighter’s starting damage.', [
+    option('Frame Advance', 'Simulation', 'Pause simulation and advance using your chosen button.'),
+    option('Game Speed', 'Simulation', 'Choose how quickly the simulation runs.', ['1x', '1/2x', '1/4x']),
+    option('Player Percent', 'Fighter Setup', 'Set the human fighter’s percent.', ['0%', '20%', '50%', '100%']),
+    option('Lock Player Percent', 'Fighter Setup', 'Keep the human fighter at the selected percent.'),
+    option('Move Staling', 'Fighter Setup', 'Choose whether repeated moves stale.', ['On', 'Off'])
+  ]);
+  add('cpu', 'CPU', 'Configure the practice opponent.', [
+    option('CPU Percent', 'CPU Setup', 'Set the CPU’s percent.', ['0%', '20%', '50%', '100%']),
+    option('Lock CPU Percent', 'CPU Setup', 'Keep the CPU at the selected percent.'),
+    option('Behavior', 'CPU Setup', 'Choose the CPU’s idle behavior.', ['Stand', 'Shield', 'Crouch', 'Jump', 'Powershield']),
+    link('DI & Survival', 'di', 'DI'), link('Tech & Getup', 'tech', 'Feedback'),
+    link('Counter Actions', 'counter'), link('Shield & Protection', 'shield', 'Shield'),
+    link('Position & Control', 'position'), link('Recovery Options', 'recovery')
+  ]);
+  add('di', 'DI & Survival', 'Choose escape inputs during hits and grabs.', [
+    option('Trajectory DI', 'DI', 'Choose the CPU’s trajectory DI.', ['Random', 'Inwards', 'Outwards', 'Natural', 'Custom', 'Random Custom', 'None']),
+    link('Custom TDI', 'tdi', 'DI'), option('Smash DI Amount', 'DI', 'Choose the number of SDI inputs.', ['0', '1', '2', '3']),
+    option('Smash DI Direction', 'DI', 'Choose the direction of SDI inputs.', ['Auto', 'Random', 'Away', 'Towards', 'Left', 'Right', 'Up', 'Down']),
+    option('ASDI', 'DI', 'Choose automatic DI direction.', ['Auto', 'Away', 'Towards', 'Left', 'Right', 'Up', 'Down']),
+    option('Grab Escape', 'Grab', 'Choose the CPU’s grab escape effort.', ['None', 'Medium', 'High', 'Perfect']),
+    option('Grab Release', 'Grab', 'Choose the grab release type.', ['Grounded', 'Airborn'])
+  ]);
+  add('tdi', 'Custom TDI', 'Capture a sequence of main-stick and C-stick DI inputs.', [
+    action('Save Input', 'DI', 'Native editor: A saves live main-stick and C-stick input.'),
+    action('Delete Input', 'DI', 'Native editor: X removes the last input.'),
+    option('Reversible', 'DI', 'Native editor: Z changes whether the last input is reversible.')
+  ]);
+  add('tech', 'Tech & Getup', 'Choose landing recovery and configure random outcomes.', [
+    option('Tech Option', 'Context', 'Set tech behavior; probability controls apply to Random.', ['Random', 'In Place', 'Away', 'Towards', 'None']),
+    option('Get Up Option', 'Context', 'Set getup behavior; probability controls apply to Random.', ['Random', 'Stand', 'Away', 'Towards', 'Attack']),
+    link('Tech Chances', 'tech-chances'), link('Getup Chances', 'getup-chances'), link('Tech Feedback & Traps', 'tech-feedback')
+  ]);
+  add('tech-chances', 'Tech Chances', 'Distribute the CPU’s random tech outcomes.', named(['Tech in Place Chance', 'Tech Away Chance', 'Tech Toward Chance', 'Miss Tech Chance'], 'Feedback', 'Native probabilities rebalance together; this sketch uses illustrative values.', 'Training Lab', ['25%', '0%', '50%', '100%']));
+  add('getup-chances', 'Getup Chances', 'Configure waiting after a miss and random getup outcomes.', named(['Miss Tech Wait Chance', 'Stand Chance', 'Roll Away Chance', 'Roll Toward Chance', 'Getup Attack Chance'], 'Feedback', 'Native availability and probability balancing depend on the getup mode.', 'Training Lab', ['25%', '0%', '50%', '100%']));
+  add('tech-feedback', 'Tech Feedback & Traps', 'Choose tech cues and practice trap conditions.', [
+    option('Tech Invisibility', 'Feedback', 'Hide the tech animation for reaction practice.'),
+    option('Tech Invisibility Delay', 'Feedback', 'Choose the delay before hiding.', ['0f', '5f', '10f']),
+    option('Tech Sound', 'Feedback', 'Choose whether a tech sound plays.'),
+    option('Simulate Tech Trap', 'Traps', 'Simulate tech trap conditions.'),
+    option('Tech Lockout', 'Traps', 'Choose tech lockout behavior.', ['Random', 'Off', 'On'])
+  ]);
+  add('counter', 'Counter Actions', 'Choose the CPU’s response after taking a hit or shielding.', [
+    option('Counter Action (Ground)', 'Ground', 'Default grounded response.', ['None', 'Jab', 'Grab', 'Spotdodge']),
+    option('Counter Action (Air)', 'Air', 'Default airborne response.', ['None', 'Nair', 'Airdodge']),
+    option('Counter Action (Shield)', 'Shield', 'Default shield response.', ['None', 'Grab', 'Jump']),
+    option('Counter Delay', 'Context', 'Delay before the default response.', ['0f', '1f', '5f', '10f']),
+    link('Advanced Counter Options', 'advanced')
+  ]);
+  add('advanced', 'Advanced Counter Options', 'Configure a separate response for each of ten hit numbers.', [
+    option('Hit Number', 'Context', 'Select the hit record to edit.', ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']),
+    option('Counter Logic', 'Context', 'Native custom actions are available when Custom is selected.', ['Default', 'Custom', 'Disabled']),
+    option('Counter Action (Ground)', 'Ground', 'Per-hit grounded response.', ['None', 'Jab', 'Grab'], 0, 'Per-hit'),
+    option('Delay (Ground)', 'Ground', 'Per-hit grounded delay.', ['0f', '1f', '5f']),
+    option('Counter Action (Air)', 'Air', 'Per-hit airborne response.', ['None', 'Nair', 'Airdodge'], 0, 'Per-hit'),
+    option('Delay (Air)', 'Air', 'Per-hit airborne delay.', ['0f', '1f', '5f']),
+    option('Counter Action (Shield)', 'Shield', 'Per-hit shield response.', ['None', 'Grab', 'Jump'], 0, 'Per-hit'),
+    option('Delay (Shield)', 'Shield', 'Per-hit shield delay.', ['0f', '1f', '5f'])
+  ]);
+  add('shield', 'Shield & Protection', 'Choose local shield policy and CPU damage protection.', [
+    option('Infinite Shields', 'Shield', 'Local policy; global Infinite Shields takes precedence while On.', ['Off', 'On Until Hit', 'On'], 1, 'Local shield rule'),
+    option('Infinite Shields Health', 'Shield', 'Local health target; global On refills full health.', ['60', '30', '10'], 0, 'Local shield rule'),
+    option('Shield Angle', 'Shield', 'Choose the CPU’s shield direction.', ['Neutral', 'Up', 'Towards', 'Down', 'Away']),
+    option('Intangibility', 'Protection', 'Toggle whether the CPU can take damage.')
+  ]);
+  add('position', 'Position & Control', 'Reposition, freeze, or manually control the CPU.', [
+    action('Move CPU', 'CPU Setup', 'Native game: move the CPU, then choose Finish Moving CPU.'),
+    option('Controlled By', 'CPU Setup', 'Assign another controller port.', ['None', 'Port 1', 'Port 2', 'Port 3', 'Port 4']),
+    action('Freeze CPU', 'CPU Setup', 'Native action freezes the CPU and its hitboxes.')
+  ]);
+  add('recovery', 'Fox Recovery', 'Allow these recovery choices for the current Fox CPU.', named(['Firefox Low', 'Firefox Mid', 'Firefox High', 'Double Jump', 'Illusion', 'Fast Fall'], 'CPU', 'Permit this recovery option. Other characters have their own lists.', 'Training Lab', ['On', 'Off']));
+
+  add('recording', 'Recording', 'Capture and replay sequences. This sample already has positions saved.', [
+    action('Restore Positions', 'Initial State', 'Return to the saved initial state. Before saving, this row is Save Positions.'),
+    option('HMN Mode', 'Human Capture', 'Choose human recording mode.', ['Off', 'Record', 'Playback', 'Re-Record']),
+    option('HMN Record Slot', 'Human Capture', 'Select the human slot.', ['Random', 'Slot 1', 'Slot 2', 'Slot 3', 'Slot 4', 'Slot 5', 'Slot 6'], 1),
+    option('CPU Mode', 'CPU Capture', 'Choose CPU recording mode.', ['Off', 'Control', 'Record', 'Playback', 'Re-Record']),
+    option('CPU Record Slot', 'CPU Capture', 'Select the CPU slot.', ['Random', 'Slot 1', 'Slot 2', 'Slot 3', 'Slot 4', 'Slot 5', 'Slot 6'], 1),
+    link('Playback Rules', 'playback'), link('Positions & Files', 'files'), link('Slot Management', 'slots'), link('Playback Chances', 'chances')
+  ]);
+  add('playback', 'Playback Rules', 'Choose when sequences repeat, restore, and hand control back.', [
+    option('Mirrored Playback', 'Context', 'Mirror compatible saved situations.', ['Off', 'On', 'Random']),
+    option('CPU Counter', 'CPU', 'Choose when playback allows the CPU counter.', ['Off', 'After Playback Ends', 'On CPU Hit', 'On HMN Hit', 'On Any Hit']),
+    option('Loop Input Playback', 'Context', 'Loop compatible input playback.'),
+    option('Auto Restore', 'Initial State', 'Choose the automatic restore trigger.', ['Off', 'Playback Ends', 'CPU Counters']),
+    option('Start Paused', 'Initial State', 'Start the restored sequence paused.'),
+    option('Playback Takeover', 'Context', 'Choose takeover target.', ['HMN', 'CPU', 'None'])
+  ]);
+  add('files', 'Positions & Files', 'Manage the initial state and export a recording.', [
+    action('Re-Save Positions', 'Initial State', 'Replace the saved initial positions.'),
+    action('Prune Positions', 'Initial State', 'Prune the saved recording state using the existing native action.'),
+    action('Delete Positions', 'Initial State', 'Delete the saved initial state; dependent native recording rows become unavailable.'),
+    link('Export', 'export')
+  ]);
+  add('export', 'Export', 'The native export flow chooses a card, filename, and confirmation.', [
+    action('Slot A', 'Tools', 'Native export continues to Enter File Name, then Yes/No confirmation.'),
+    action('Slot B', 'Tools', 'Native export continues to Enter File Name, then Yes/No confirmation.')
+  ]);
+  add('slots', 'Slot Management', 'Choose an actor and slot, then edit, copy, or delete it.', [
+    option('Player', 'Context', 'Choose whose recording to edit.', ['HMN', 'CPU']),
+    option('Slot', 'Context', 'Choose the recording slot.', ['Slot 1', 'Slot 2', 'Slot 3', 'Slot 4', 'Slot 5', 'Slot 6']),
+    link('Modify Inputs', 'inputs'), action('Delete Slot', 'Tools', 'Delete the selected recording slot.'),
+    option('Copy Slot To', 'Tools', 'Choose the copy destination.', ['Slot 1', 'Slot 2', 'Slot 3', 'Slot 4', 'Slot 5', 'Slot 6']),
+    action('Copy Slot', 'Tools', 'Copy the selected recording to the destination slot.')
+  ]);
+  const recordedFrame = option('Frame', 'Context', 'Select the same frame on either editor page.', ['1', '2', '3', '4', '5']);
+  page('inputs', 'Alter Inputs', 'Edit one recorded frame without a tall scrolling list.', [
+    { title: 'Analog', rows: [recordedFrame, ...named(['Stick X', 'Stick Y', 'C-Stick X', 'C-Stick Y', 'Analog Trigger'], 'Analog', 'Change this recorded analog value.', 'Recorded input', ['0', '40', '80'])] },
+    { title: 'Buttons', rows: [recordedFrame, ...named(['A', 'B', 'X', 'Y', 'Z', 'L', 'R'], 'Buttons', 'Change the recorded button state.', 'Recorded input')] }
+  ]);
+  add('chances', 'Playback Chances', 'Choose which actor’s slot probabilities to edit.', [link('Set HMN Chances', 'human-chances', 'Human'), link('Set CPU Chances', 'cpu-chances', 'CPU')]);
+  ['Human', 'CPU'].forEach(actor => add(actor === 'Human' ? 'human-chances' : 'cpu-chances', actor === 'Human' ? 'HMN Playback Slot Chances' : 'CPU Playback Slot Chances', 'Weight recorded slots. Empty slots stay unavailable in the game.', [
+    ...named(['Slot 1', 'Slot 2', 'Slot 3', 'Slot 4', 'Slot 5', 'Slot 6'], actor, 'Native chance edits rebalance available recordings; the sketch only cycles sample values.', actor + ' playback chance', ['0%', '25%', '50%', '100%']),
+    option('Random Percent', actor, 'Randomize the actor’s percent during playback.', ['0%', '10%', '20%'], 0, actor + ' playback chance')
+  ]));
+
+  add('visual', 'Visual Feedback', 'Choose game displays, fighter diagnostics, and local trail controls.', [
+    option('Model Display', 'Feedback', 'Choose how fighter models are displayed.', ['On', 'Off']), link('Collision & Bounds', 'collision'),
+    option('Camera Mode', 'Feedback', 'Choose a camera mode.', ['Normal', 'Zoom', 'Fixed', 'Free']),
+    option('HUD', 'Feedback', 'Show or hide the game HUD.', ['On', 'Off']), option('DI Display', 'DI', 'Show DI trajectories.'),
+    option('Input Display', 'Feedback', 'Choose the input display.', ['Off', 'HMN', 'CPU', 'Both']),
+    link('Fighter Displays', 'fighters'), link('Hitbox Trails', 'trails', 'Trails'), link('OSD Tools', 'tools')
+  ]);
+  add('collision', 'Collision & Bounds', 'Inspect fighter, item, and stage collision regions.', named(['Fighter Collision', 'Item Grab Sizes', 'Environment Collision'], 'Feedback', 'Display this collision region.', 'Training Lab'));
+  add('fighters', 'Fighter Displays', 'Choose the actor and type of diagnostic display.', [link('HMN Info Display', 'human-info', 'Human'), link('CPU Info Display', 'cpu-info', 'CPU'), link('HMN Color Overlays', 'human-overlay', 'Human'), link('CPU Color Overlays', 'cpu-overlay', 'CPU')]);
+  ['Human', 'CPU'].forEach(actor => {
+    const id = actor === 'Human' ? 'human' : 'cpu';
+    page(id + '-info', actor === 'Human' ? 'HMN Info Display' : 'CPU Info Display', 'Choose a preset and size, or customize eight display fields.', [
+      { title: 'Setup', rows: [option('Display Preset', actor, 'Choose a configured field selection.', ['None', 'State', 'Ledge', 'Damage'], 1, actor + ' info'), option('Size', actor, 'Choose diagnostic window size.', ['Small', 'Medium', 'Large'], 1, actor + ' info')] },
+      { title: 'Rows', rows: named(Array.from({ length: 8 }, (_, i) => 'Row ' + (i + 1)), actor, 'Native game offers all 29 existing field choices.', actor + ' info', ['None', 'State Name', 'State Frame', 'Position', 'Hitlag', 'Hitstun']) }
+    ]);
+    page(id + '-overlay', actor === 'Human' ? 'HMN Overlays' : 'CPU Overlays', 'Choose color or effect by fighter condition. These preferences are saved.', [
+      { title: 'Movement', rows: named(['Crouch', 'Wait', 'Walk', 'Dash', 'Run', 'Jumps', 'Full Hop', 'Short Hop'], 'Movement', 'Apply an overlay during this condition.', actor + ' overlay', ['None', 'Red', 'Green', 'Blue', 'Yellow', 'White', 'Black', 'Remove Overlay', 'Show Collision', 'Invisible', 'Play Sound']) },
+      { title: 'Timing', rows: named(['Actionable', 'Ledge Actionable', 'Missed L-Cancel', 'Can Fastfall', 'Autocancel', 'IASA'], 'Timing', 'Apply an overlay during this condition.', actor + ' overlay', ['None', 'Red', 'Green', 'Blue', 'Yellow', 'White', 'Black', 'Remove Overlay', 'Show Collision', 'Invisible', 'Play Sound']) },
+      { title: 'Combat', rows: named(['Hitstun', 'Invincible', 'Shield Stun'], 'Combat', 'Apply an overlay during this condition.', actor + ' overlay', ['None', 'Red', 'Green', 'Blue', 'Yellow', 'White', 'Black', 'Remove Overlay', 'Show Collision', 'Invisible', 'Play Sound']) }
+    ], 'Saved actor preference');
+  });
+  add('trails', 'Hitbox Trails', 'Local trail choices apply when both global profiles are Off.', [
+    option('Enable (local)', 'Trails', 'Enable the local trail profile.'),
+    option('Decay', 'Trails', 'Off here means no fading, not disabled trails.', ['Normal', 'Fast', 'Very Fast', 'Instant', 'Slow', 'Off']),
+    { label: 'Global: Off', group: 'Context', purpose: 'Effective global profile. Change it under Global Settings.', info: true, scope: 'Read-only status' }
+  ]);
+  add('tools', 'OSD Tools', 'Build custom feedback from the human fighter’s action states.', [link('Custom OSDs', 'custom'), link('Action Log', 'log')]);
+  add('custom', 'Custom OSDs', 'Add up to eight custom states; existing states appear in insertion order.', [action('Add Custom OSD', 'Tools', 'Native action captures the current human action state.'), action('Remove OSD: Wait', 'Tools', 'Remove this sample custom state.')]);
+  add('log', 'Action Log', 'Edit one of ten state and input-condition records.', [
+    option('Action Number', 'Context', 'Select the action record.', ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']),
+    option('Action Behaviour', 'Feedback', 'Choose how the log is displayed.', ['Start Log', 'Red', 'Green', 'Blue', 'Yellow', 'Orange', 'Cyan', 'Purple', 'White', 'Grey']),
+    action('Set State', 'Context', 'Capture the current human state; native label then becomes Remove State.'),
+    option('State Frame', 'Context', 'Choose the minimum state frame.', ['1', '2', '5', '10']),
+    option('Min Stick X', 'DI', 'Choose the minimum horizontal stick condition.', ['0', '40', '-40']),
+    option('Min Stick Y', 'DI', 'Choose the minimum vertical stick condition.', ['0', '40', '-40']),
+    option('Fastfall', 'Timing', 'Require the fastfall condition.'), option('IASA', 'Timing', 'Require the IASA condition.')
+  ]);
+
+  add('global', 'Global Settings', 'Shared saved preferences apply across events.', [
+    option('OVERRIDE ALL OSDS OFF', 'Context', 'Suppress configurable text OSDs while preserving category choices and visual cues.', ['Off', 'On'], 0, 'Global'),
+    option('OVERRIDE CPU OSDS OFF', 'Context', 'Suppress CPU OSD text.', ['Off', 'On'], 0, 'Global'),
+    link('Movement & Landing OSDs', 'movement'), link('Combat & Defense OSDs', 'combat'), link('Action Timing OSDs', 'timing'), link('OSD Display', 'osd-display'), link('Global Visuals & Shields', 'global-visuals')
+  ], 'Global — saved across events');
+  add('movement', 'Movement & Landing OSDs', 'Choose a color or Off for each movement feedback category.', named(['Wavedash', 'L-Cancel', 'Dashback', 'Jump Cancel Timing', 'Fastfall Timing', 'Ledgedash Info'], 'Movement', 'Change this OSD palette without changing its timing measurement.', 'Global', palette), 'Global — saved across events');
+  add('combat', 'Combat & Defense OSDs', 'Choose a color or Off for each combat feedback category.', named(['Act OoS Frame', 'Powershield Frame', 'SDI Inputs', 'Boost Grab', 'Frame Advantage', 'Combo Counter', 'Grab Breakout', 'Act OoHitstun'], 'Combat', 'Change this OSD palette without changing its measurement.', 'Global', palette), 'Global — saved across events');
+  add('timing', 'Action Timing OSDs', 'Choose a color or Off for action and interrupt feedback.', named(['Act OoLag', 'Act OoAirborne', 'Lockout Timers', 'Item Throw Interrupts', 'Fighter-specific Tech'], 'Timing', 'Change this OSD palette without changing its measurement.', 'Global', palette), 'Global — saved across events');
+  add('osd-display', 'OSD Display', 'Choose the shared feedback layout and Recent anchor.', [
+    option('Display Style', 'Feedback', 'Choose a sliding queue or a stable layout.', ['Recent', 'Fixed Grid', 'Practice Panel'], 2, 'Global'),
+    option('Recent Position', 'Feedback', 'Applies to Recent; stable layouts use the top left.', ['HUD', 'Sides', 'Top Left', 'Top Right'], 0, 'Global'),
+    { label: 'L/R: OSD Page', group: 'Context', purpose: 'Native game: L/R while paused selects an OSD page. Menu page bindings need separate review.', info: true, scope: 'Input help' }
+  ], 'Global — saved across events');
+  add('global-visuals', 'Global Visuals & Shields', 'Choose shared trail profiles, fighter cues, and shield refill.', [
+    ...named(['Hitbox Trails Very Fast', 'Hitbox Trails Instant'], 'Trails', 'Global trail profiles override local choices; Both On uses the Very Fast union.', 'Global'),
+    ...named(['Missed L Cancel', 'Run Turnaround', 'Actionable Yellow>Green', 'Invincibility Overlay'], 'Fighter Cues', 'Shared fighter cue; independent of text OSD suppression.', 'Global'),
+    option('Infinite Shields', 'Shield Rule', 'Global full-health refill overrides local shield choices.', ['Off', 'On'], 0, 'Global')
+  ], 'Global — saved across events');
+  add('stage-rng', 'Stage & RNG', 'Show controls relevant to the current stage and fighters.', [link('Stage Options', 'stage'), link('Character RNG', 'rng')]);
+  add('stage', 'Stage Options', 'Set platform heights on Fountain of Dreams.', named(['Left Platform Height', 'Right Platform Height'], 'Context', 'Choose this platform’s height.', 'Training Lab', ['Random', 'Hidden', 'Lowest', 'Left Default', 'Average', 'Right Default', 'Highest']));
+  add('rng', 'Character RNG', 'Peach human / Fox CPU: only Peach’s RNG controls apply.', [
+    option('Peach Turnip', 'Human', 'Choose Peach’s turnip behavior.', ['Random', 'Normal', 'Stitch']),
+    option('Peach Forward Smash', 'Human', 'Choose Peach’s forward-smash weapon.', ['Random', 'Golf Club', 'Frying Pan', 'Tennis Racket'])
+  ]);
+  add('controls', 'Controls', 'Assign frame stepping and unpaused D-pad shortcuts.', [
+    option('Frame Advance Button', 'Frame Stepping', 'Choose the advance binding.', ['L', 'Z', 'X', 'Y', 'R'], 0, 'Saved controls'),
+    option('Frame Decrement Button', 'Frame Stepping', 'Choose the decrement binding.', ['None', 'Z', 'L', 'R', 'X', 'Y'], 0, 'Saved controls'),
+    option('DPad Up', 'D-pad Shortcuts', 'Choose the unpaused up action.', ['Taunt', 'None'], 0, 'Saved controls'),
+    option('DPad Down', 'D-pad Shortcuts', 'Choose the unpaused down action.', ['Place CPU', 'None', 'Frame Advance'], 0, 'Saved controls'),
+    option('DPad Left', 'D-pad Shortcuts', 'Choose the unpaused left action.', ['Load State', 'None'], 0, 'Saved controls'),
+    option('DPad Right', 'D-pad Shortcuts', 'Choose the unpaused right action.', ['Save State', 'None'], 0, 'Saved controls')
+  ]);
+  const categories = [['session', 'Session'], ['cpu', 'CPU'], ['recording', 'Recording'], ['visual', 'Visual Feedback'], ['global', 'Global Settings'], ['stage-rng', 'Stage & RNG'], ['controls', 'Controls']];
+  // The menu data above is retained; layout and navigation are rebuilt around
+  // a single controller cursor. Pointer, keyboard and gamepad share this state.
+  categories.push(['exit', 'Exit']);
+  add('exit', 'Exit', 'Leave practice or return to it.', [
+    action('Return to Event Select', 'Tools', 'Preview returning to Event Select.'),
+    action('Resume Practice', 'Tools', 'Close the pause menu and resume practice.')
+  ]);
+  const host = root.querySelector('.tm-mock');
+  const ui = Object.fromEntries(['tabs', 'category-panel', 'location', 'heading', 'list', 'position', 'detail', 'hints', 'gamepad-status'].map(k => [k, host.querySelector('.tm-' + k)]));
+  const freshFrame = menu => ({ menu, cursor: -1, page: 0, offset: 0, remembered: 0 });
+  const state = { category: 0, frames: [freshFrame('session')], memory: {}, values: {}, picker: null, closed: false, message: '', shading: 'Combined' };
+  const clamp = (n, low, high) => Math.max(low, Math.min(high, Number.isInteger(n) ? n : low));
+  const frame = () => state.frames[state.frames.length - 1];
+  const current = () => menus[frame().menu];
+  const rows = () => current().pages ? current().pages[frame().page].rows : current().rows;
+  const hasSelector = () => state.frames.length === 1 || Boolean(current().pages);
+  const indexOf = row => clamp(state.values[row.id] ?? row.initial, 0, row.choices.length - 1);
+  const selected = () => frame().cursor >= 0 ? rows()[frame().cursor] : null;
+  const put = (parent, tag, className, content) => { const el = document.createElement(tag); el.className = className; el.textContent = content; parent.append(el); return el; };
+  const button = (parent, className, content, run) => { const b = put(parent, 'button', className + ' cursor-interaction', content); b.type = 'button'; b.addEventListener('click', run); return b; };
+  function selectCategory(index) {
+    if (state.closed) return;
+    state.memory[state.frames[0].menu] = { ...state.frames[0] };
+    state.category = index;
+    const id = categories[index][0];
+    state.frames = [{ ...(state.memory[id] || freshFrame(id)), cursor: -1 }];
+    state.picker = null; state.message = ''; render(); save();
+  }
+  categories.forEach(([id, label], index) => {
+    const tab = button(ui.tabs, 'tm-tab', label, () => selectCategory(index));
+    tab.id = 'training-lab-tab-' + id; tab.dataset.category = String(index);
+    tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', 'training-lab-category-panel');
+    tab.addEventListener('focus', () => {
+      if (!state.closed && !state.picker && state.frames.length === 1 && index === state.category && frame().cursor !== -1) focusRow(-1);
+    });
+  });
+  function contents(menu) {
+    return menu.pages ? menu.pages.map(p => ({ title: p.title, items: p.rows })) : [{ title: '', items: menu.rows }];
+  }
+  function save() {
+    if (!window.openai?.setWidgetState) return;
+    window.openai.setWidgetState({
+      modelContent: { design: 'Controller menu', category: categories[state.category][1], menu: current().title, row: selected()?.label || 'Category / page selector' },
+      privateContent: { controller: { v: 2, category: state.category, frames: state.frames, memory: state.memory, values: state.values, shading: state.shading } }
+    }).catch(() => {});
+  }
+  function restore(saved) {
+    if (saved?.v !== 2) return;
+    state.category = clamp(saved.category, 0, categories.length - 1);
+    state.frames = [freshFrame(categories[state.category][0])];
+    for (const candidate of (Array.isArray(saved.frames) ? saved.frames.slice(0, 4) : [])) {
+      if (!menus[candidate?.menu]) break;
+      if (candidate.menu !== state.frames[0].menu && !rows().some(r => r.target === candidate.menu)) break;
+      const next = freshFrame(candidate.menu);
+      next.page = clamp(candidate.page, 0, (menus[next.menu].pages?.length || 1) - 1);
+      const count = menus[next.menu].pages ? menus[next.menu].pages[next.page].rows.length : menus[next.menu].rows.length;
+      next.cursor = clamp(candidate.cursor, candidate.menu === state.frames[0].menu || menus[next.menu].pages ? -1 : 0, count - 1);
+      next.remembered = clamp(candidate.remembered, 0, count - 1);
+      next.offset = clamp(candidate.offset, 0, Math.max(0, count - 9));
+      if (candidate.menu === state.frames[0].menu) state.frames[0] = next;
+      else state.frames.push(next);
+    }
+    state.values = saved.values && typeof saved.values === 'object' ? { ...saved.values } : {};
+    state.memory = {}; // Only validated current frames are restored from the host.
+    state.shading = ['Combined', 'Zebra', 'Blocks'].includes(saved.shading) ? saved.shading : 'Combined';
+    state.picker = null; state.closed = false; state.message = '';
+  }
+  function hint(keys, meaning) {
+    const item = put(ui.hints, 'span', '', ''); put(item, 'strong', '', keys + ' '); put(item, 'span', '', meaning);
+  }
+  function describe() {
+    ui.detail.replaceChildren(); ui.hints.replaceChildren();
+    let title, purpose, included = [], scope = current().scope;
+    if (state.closed) {
+      title = state.message || 'Practice resumed'; purpose = 'Press A to open Training Lab again.'; scope = 'Demo only — the game is not running here';
+      hint('A', 'Open menu');
+    } else if (state.picker) {
+      const row = rows()[state.picker.row]; title = row.label;
+      purpose = row.purpose; scope = 'Current: ' + row.choices[indexOf(row)] + ' · Pending: ' + row.choices[state.picker.cursor];
+      hint('↑ ↓', 'Choose'); hint('A', 'Apply'); hint('B', 'Cancel');
+    } else if (frame().cursor === -1) {
+      title = current().pages ? 'Page: ' + current().pages[frame().page].title : categories[state.category][1];
+      purpose = current().purpose; included = current().pages ? [{ title: current().pages[frame().page].title, items: rows() }] : contents(current());
+      hint('← →', current().pages ? 'Switch page' : 'Switch tab'); hint('A / ↓', 'Enter list'); hint('B', state.frames.length > 1 ? 'Back' : 'Resume');
+    } else {
+      const row = selected(); const target = row.target && menus[row.target]; title = row.label;
+      purpose = target ? target.purpose : row.purpose; included = target ? contents(target) : [];
+      scope = target ? target.scope : row.scope;
+      hint('↑ ↓', 'Move');
+      if (row.choices) { hint('← →', 'Change value'); hint('A', 'Choose value'); }
+      else if (row.target) hint('A', 'Open');
+      else if (row.action) hint('A', 'Activate');
+      hint('B', state.frames.length > 1 ? 'Back' : 'Tabs');
+    }
+    put(ui.detail, 'div', 'tm-detail-title', title);
+    put(ui.detail, 'div', 'tm-detail-purpose', purpose);
+    if (included.length) {
+      put(ui.detail, 'div', 'tm-preview-heading', 'Included options');
+      included.forEach(group => {
+        const section = put(ui.detail, 'div', 'tm-preview-group', '');
+        if (group.title) put(section, 'div', 'tm-preview-group-title', group.title);
+        const list = put(section, 'ul', 'tm-preview-list', '');
+        group.items.forEach(item => {
+          const row = put(list, 'li', 'tm-preview-item', '');
+          put(row, 'span', '', item.label);
+          if (item.target) {
+            row.setAttribute('aria-label', item.label + ', submenu');
+            put(row, 'span', 'tm-preview-submenu', '>').setAttribute('aria-hidden', 'true');
+          }
+        });
+      });
+    }
+    put(ui.detail, 'div', 'tm-context', state.closed ? scope : state.message || scope);
+  }
+  function updateSelection() {
+    ui.tabs.querySelectorAll('button').forEach((tab, index) => {
+      tab.setAttribute('aria-selected', String(index === state.category));
+      tab.dataset.focused = String(index === state.category && state.frames.length === 1 && frame().cursor === -1 && !state.picker && !state.closed);
+      tab.textContent = (tab.dataset.focused === 'true' ? '› ' : '') + categories[index][1];
+      tab.disabled = state.closed;
+    });
+    ui['category-panel'].setAttribute('aria-labelledby', 'training-lab-tab-' + categories[state.category][0]);
+    const cursor = state.picker ? state.picker.cursor : frame().cursor;
+    ui.list.querySelectorAll('.tm-row').forEach(el => {
+      const active = Number(el.dataset.row) === cursor;
+      el.dataset.selected = String(active);
+      el.setAttribute('aria-current', active ? 'true' : 'false');
+      el.querySelector('.tm-pointer').textContent = active ? '›' : '';
+    });
+    const selector = ui.heading.querySelector('button');
+    if (selector) selector.dataset.selected = String(!state.picker && cursor === -1);
+    ui.position.textContent = state.closed ? '' : state.picker ? (cursor + 1) + ' / ' + rows()[state.picker.row].choices.length + ' choices' : cursor < 0 ? 'Category or page selector' : (cursor + 1) + ' / ' + rows().length + ' options';
+    describe();
+  }
+  function focusRow(index) {
+    if (state.closed) return;
+    state.message = '';
+    if (state.picker) state.picker.cursor = index;
+    else { frame().cursor = index; if (index >= 0) frame().remembered = index; }
+    updateSelection(); save();
+  }
+  function render() {
+    host.dataset.shading = state.shading;
+    ui.location.textContent = state.frames.map(f => menus[f.menu].title).join(' / ');
+    ui.heading.replaceChildren(); ui.list.replaceChildren();
+    if (state.closed) { put(ui.heading, 'div', 'tm-screen-title', state.message || 'Practice resumed'); updateSelection(); return; }
+    if (state.picker) put(ui.heading, 'div', 'tm-screen-title', 'Choose ' + rows()[state.picker.row].label);
+    else if (current().pages) {
+      const selector = button(ui.heading, 'tm-heading-control', '', () => focusRow(-1));
+      selector.addEventListener('focus', () => { if (frame().cursor !== -1) focusRow(-1); });
+      const text = put(selector, 'span', '', '');
+      put(text, 'span', 'tm-heading-label', current().pages ? 'PAGE · LEFT / RIGHT' : 'CATEGORY · LEFT / RIGHT');
+      put(text, 'span', '', current().pages ? current().pages[frame().page].title : categories[state.category][1]);
+      put(selector, 'span', '', '‹ ' + (current().pages ? (frame().page + 1) + '/' + current().pages.length : (state.category + 1) + '/' + categories.length) + ' ›');
+    } else if (state.frames.length > 1) put(ui.heading, 'div', 'tm-screen-title', current().title);
+    const source = state.picker ? rows()[state.picker.row].choices.map(label => ({ label, group: 'Choices' })) : rows();
+    const cursor = state.picker ? state.picker.cursor : frame().cursor;
+    const viewport = state.picker || frame();
+    if (cursor >= 0) viewport.offset = clamp(viewport.offset, Math.max(0, cursor - 8), cursor);
+    viewport.offset = clamp(viewport.offset, 0, Math.max(0, source.length - 9));
+    source.slice(viewport.offset, viewport.offset + 9).forEach((row, visibleIndex) => {
+      const index = viewport.offset + visibleIndex;
+      const b = button(ui.list, 'tm-row', '', () => focusRow(index));
+      b.dataset.row = String(index); b.dataset.group = tones[row.group] || 'neutral'; b.dataset.even = String(index % 2 === 1);
+      b.addEventListener('focus', () => { if ((state.picker ? state.picker.cursor : frame().cursor) !== index) focusRow(index); });
+      put(b, 'span', 'tm-pointer', '');
+      const label = put(b, 'span', '', '');
+      if (index === 0 || source[index - 1].group !== row.group || visibleIndex === 0) put(label, 'span', 'tm-group-label', row.group);
+      put(label, 'span', '', row.label);
+      put(b, 'span', 'tm-value', state.picker ? (index === indexOf(rows()[state.picker.row]) ? 'Current' : '') : row.target ? 'A ›' : row.choices ? '‹ ' + row.choices[indexOf(row)] + ' ›' : row.info ? 'Info' : 'A');
+    });
+    updateSelection();
+  }
+  function input(command) {
+    if (state.closed) { if (command === 'a') { state.closed = false; state.message = ''; render(); } return; }
+    state.message = '';
+    const f = frame();
+    if (state.picker) {
+      const picker = state.picker, row = rows()[picker.row];
+      if (command === 'up' || command === 'down') picker.cursor = (picker.cursor + (command === 'up' ? -1 : 1) + row.choices.length) % row.choices.length;
+      if (command === 'a') { state.values[row.id] = picker.cursor; state.picker = null; }
+      if (command === 'b') state.picker = null;
+    } else if (command === 'up' || command === 'down') {
+      const low = hasSelector() ? -1 : 0, count = rows().length - low;
+      f.cursor = low + ((f.cursor - low + (command === 'up' ? -1 : 1) + count) % count);
+      if (f.cursor >= 0) f.remembered = f.cursor;
+    } else if (command === 'left' || command === 'right') {
+      const delta = command === 'left' ? -1 : 1;
+      if (f.cursor === -1 && current().pages) {
+        f.page = (f.page + delta + current().pages.length) % current().pages.length; f.offset = 0; f.remembered = 0;
+      } else if (f.cursor === -1 && state.frames.length === 1) {
+        selectCategory((state.category + delta + categories.length) % categories.length); return;
+      } else if (selected()?.choices) {
+        const row = selected(); state.values[row.id] = clamp(indexOf(row) + delta, 0, row.choices.length - 1);
+      }
+    } else if (command === 'b') {
+      if (state.frames.length > 1) state.frames.pop();
+      else if (f.cursor !== -1) { f.remembered = f.cursor; f.cursor = -1; }
+      else { state.closed = true; state.message = 'Practice resumed'; }
+    } else if (command === 'a') {
+      if (f.cursor === -1) f.cursor = clamp(f.remembered, 0, rows().length - 1);
+      else {
+        const row = selected();
+        if (row.target) { const child = freshFrame(row.target); if (!menus[row.target].pages) child.cursor = 0; state.frames.push(child); }
+        else if (row.choices) state.picker = { row: f.cursor, cursor: indexOf(row), offset: 0 };
+        else if (row.label === 'Resume Practice' || row.label === 'Return to Event Select') { state.closed = true; state.message = row.label === 'Resume Practice' ? 'Practice resumed' : 'Event Select preview'; }
+        else state.message = row.info ? row.purpose : row.label + ' — action preview only. No game or card state changes.';
+      }
+    }
+    render(); save();
+  }
+  root.querySelectorAll('[data-input]').forEach(b => b.addEventListener('click', () => input(b.dataset.input)));
+  document.addEventListener('keydown', event => {
+    if (event.altKey || event.ctrlKey || event.metaKey || event.target?.isContentEditable) return;
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target?.tagName)) return;
+    if (event.target && !root.contains(event.target) && !['BODY', 'HTML'].includes(event.target.tagName)) return;
+    if (event.key === 'Enter' && (event.target?.dataset?.input || event.target?.dataset?.category !== undefined)) return; // Keep buttons' native activation.
+    const command = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right', a: 'a', A: 'a', Enter: 'a', b: 'b', B: 'b', Escape: 'b' }[event.key];
+    if (!command) return;
+    event.preventDefault(); if (!event.repeat) input(command);
+  });
+
+  // Standard browser mapping: south button=A, east button=B. One movement per
+  // stick deflection / D-pad press; recenter/release before the next step.
+  const padState = { index: null, direction: false, a: false, b: false };
+  function readPad(pad) {
+    const pressed = n => Boolean(pad.buttons[n]?.pressed);
+    const a = pressed(0), b = pressed(1), x = pad.axes[0] || 0, y = pad.axes[1] || 0;
+    const dpad = pressed(12) ? 'up' : pressed(13) ? 'down' : pressed(14) ? 'left' : pressed(15) ? 'right' : null;
+    const neutral = !dpad && Math.abs(x) < .3 && Math.abs(y) < .3;
+    const direction = dpad || (Math.max(Math.abs(x), Math.abs(y)) >= .55 ? (Math.abs(y) >= Math.abs(x) ? (y < 0 ? 'up' : 'down') : (x < 0 ? 'left' : 'right')) : null);
+    if (padState.index !== pad.index) { Object.assign(padState, { index: pad.index, direction: !neutral, a, b }); return; }
+    const command = b && !padState.b ? 'b' : a && !padState.a ? 'a' : direction && !padState.direction ? direction : null;
+    padState.a = a; padState.b = b;
+    if (neutral) padState.direction = false;
+    else if (direction) padState.direction = true;
+    if (command) input(command);
+  }
+  function pollGamepad() {
+    try {
+      if (!document.hidden && (!document.hasFocus || document.hasFocus())) {
+        const pads = navigator.getGamepads ? Array.from(navigator.getGamepads()).filter(Boolean) : [];
+        const pad = pads.find(p => p.mapping === 'standard');
+        ui['gamepad-status'].textContent = pad ? 'Gamepad connected · one step per stick deflection / D-pad press' : pads.length ? 'Nonstandard gamepad · use keyboard mapping or the simulator' : 'Standard gamepad: stick or D-pad + A/B';
+        if (pad) readPad(pad); else padState.index = null;
+      }
+    } catch { ui['gamepad-status'].textContent = 'Gamepad unavailable here · keyboard and simulator work'; }
+    requestAnimationFrame(pollGamepad);
+  }
+  restore(window.openai?.widgetState?.privateContent?.controller);
+  render();
+  if (globalThis.Tweak) {
+    const design = { shading: state.shading };
+    const tweak = new Tweak({ container: root, onChange: () => { state.shading = design.shading; render(); save(); } });
+    tweak.addSelect(design, 'shading', { label: 'Row styling', options: ['Combined', 'Zebra', 'Blocks'] });
+  }
+  window.addEventListener('openai:set_globals', event => {
+    const saved = event.detail?.globals?.widgetState?.privateContent?.controller;
+    if (saved?.v === 2) { restore(saved); render(); }
+  });
+  if (typeof requestAnimationFrame === 'function' && typeof navigator !== 'undefined') requestAnimationFrame(pollGamepad);
+})();
+</script>

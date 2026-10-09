@@ -14,7 +14,7 @@
     # temp move eventID
     mr 6, REG_EventID
     # Get Page ID in r3 for function call
-    lbz r3, CurrentEventPage(REG_EventScorePointer)
+    SettingsRead SettingsField_Page, 3
     # Get event page offset
     rtocbl r12, TM_GetPageEventOffset
     mr REG_PageID, r3

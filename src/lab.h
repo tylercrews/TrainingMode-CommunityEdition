@@ -6,6 +6,8 @@
 // todo: move structs from lab_common.h to here
 
 static ShortcutList Lab_ShortcutList;
+static const char *Lab_MenuUnavailable(EventOption *option);
+static EventMenuTab LabMenuTabs[8];
 static EventMenu LabMenu_General;
 static EventMenu LabMenu_Controls;
 static EventMenu LabMenu_OverlaysHMN;
@@ -22,6 +24,8 @@ static EventMenu LabMenu_CustomOSDs;
 static EventMenu LabMenu_SlotManagement;
 static EventMenu LabMenu_AlterInputs;
 static EventMenu LabMenu_OSDs;
+static EventMenu LabMenu_OSDDisplay;
+static void Lab_ChangeOSDDisplay(GOBJ *menu, int value);
 static EventMenu LabMenu_ActionLog;
 static EventMenu LabMenu_HitboxTrails;
 
@@ -112,8 +116,9 @@ void Lab_ChangeActionNumber(GOBJ *menu_gobj, int value);
 void Lab_SetActionLogState(GOBJ *menu_gobj);
 void ActionLog_GX(GOBJ *gobj, int pass);
 void ActionLog_Think(void);
-void HitboxTrails_GX(GOBJ *gobj, int pass);
-void HitboxTrails_Think(void);
+void Lab_ChangeHitboxTrails(GOBJ *menu_gobj, int value);
+void Lab_ChangeGlobalVeryFast(GOBJ *menu_gobj, int value);
+void Lab_ChangeGlobalInstant(GOBJ *menu_gobj, int value);
 void DIDraw_Init(void);
 void DIDraw_Reset(int ply);
 void DIDraw_Update(void);
@@ -956,6 +961,9 @@ static EventMenu LabMenu_Main = {
     .option_num = sizeof(LabOptions_Main) / sizeof(EventOption),
     .options = LabOptions_Main,
     .shortcuts = &Lab_ShortcutList,
+    .tabs = LabMenuTabs,
+    .tab_num = countof(LabMenuTabs),
+    .unavailable_reason = Lab_MenuUnavailable,
 };
 
 // CONTROLS MENU --------------------------------------------------------------
@@ -1251,8 +1259,8 @@ static EventOption LabOptions_General[OPTGEN_COUNT] = {
     {
         .kind = OPTKIND_MENU,
         .menu = &LabMenu_OSDs,
-        .name = "OSD Menu",
-        .desc = {"Enable/disable OSDs"},
+        .name = "Global Settings",
+        .desc = {"Choose global OSD colors, overlays and other shared controls."},
     },
 };
 static EventMenu LabMenu_General = {
@@ -1698,109 +1706,224 @@ static u8 LabOSD_ID[] = {
 };
 
 // Must match LabOSD_ID order
+static const char *LabOSD_ColorNames[] = { TM_OSD_COLOR_NAMES };
 static EventOption LabOptions_OSDs[] = {
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Wavedash",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "L-Cancel",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Act OoS Frame",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Dashback",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Fighter-specific Tech",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Powershield Frame",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "SDI Inputs",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Lockout Timers",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Item Throw Interrupts",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Boost Grab",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Act OoLag",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Act OoAirborne",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Jump Cancel Timing",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Fastfall Timing",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Frame Advantage",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Combo Counter",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Grab Breakout",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Ledgedash Info",
         .OnChange = Lab_ChangeOSDs,
     },
     {
-        .kind = OPTKIND_TOGGLE,
+        .kind = OPTKIND_STRING,
+        .value_num = 8,
+        .values = LabOSD_ColorNames,
         .name = "Act OoHitstun",
         .OnChange = Lab_ChangeOSDs,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_CPU_OSDS_OFF_NAME,
+        .desc = {"Hide messages belonging to CPU players in every match.", "Preserves individual OSD choices and player messages."},
+        .OnChange = Lab_ChangeOSDsOff,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_OSDS_OFF_NAME,
+        .desc = {"Hide global OSD messages without clearing their colors.", "Trails and event feedback remain active."},
+        .OnChange = Lab_ChangeOSDsOff,
+    },
+    {
+        .kind = OPTKIND_INFO, .disable = 1, .name = "",
+        .desc = {""},
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_TRAIL_VERY_FAST_NAME,
+        .desc = {"Enable Very Fast trails in every gameplay match."},
+        .OnChange = Lab_ChangeGlobalVeryFast,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_TRAIL_INSTANT_NAME,
+        .desc = {"Show only current-frame hitboxes in every match.", "Very Fast takes precedence when both are On."},
+        .OnChange = Lab_ChangeGlobalInstant,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_MISSED_LCANCEL_NAME,
+        .desc = {"Pulse red throughout uncancelled aerial landing lag.", "Actionable Yellow/Green takes priority over this flash."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_RUN_TURN_NAME,
+        .desc = {"Pulse red throughout the Run Turnaround state.", "Standing and dash turns do not trigger this flash."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_ACTION_CUES_NAME,
+        .desc = {"Yellow: last two blocked frames. Green: recovery completes.", "Green lasts two frames, even if you start your next action.", "Covers landings, aerials and ordinary grounded attacks."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_INFINITE_SHIELDS_NAME,
+        .desc = {"Keep all players' and CPUs' shields at full health.", "Overrides event-local shield health while On."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
+    {
+        .kind = OPTKIND_TOGGLE,
+        .name = TM_GLOBAL_INVINCIBILITY_NAME,
+        .desc = {"Show protected fighters in their translucent trail color.", "Includes moves, dodges, respawn, ledge and Yoshi jump armor.", "Actionable Yellow/Green takes priority while active."},
+        .OnChange = Lab_ChangeGlobalCue,
+    },
+    {
+        .kind = OPTKIND_MENU, .name = "OSD Display", .menu = &LabMenu_OSDDisplay,
+        .desc = {"Choose Recent, Fixed Grid or Practice Panel.", "Stable styles retain results; paused L/R changes page."},
     },
 };
 
 static EventMenu LabMenu_OSDs = {
-    .name = "OSDs",
+    .name = "Global Settings",
     .option_num = sizeof(LabOptions_OSDs) / sizeof(EventOption),
     .options = LabOptions_OSDs,
 };
+static const char *LabOSD_LayoutNames[] = { TM_OSD_LAYOUT_NAMES };
+static const char *LabOSD_PositionNames[] = {"HUD", "Sides", "Top Left", "Top Right"};
+static EventOption LabOptions_OSDDisplay[] = {
+    {.kind = OPTKIND_STRING, .name = "Display Style", .value_num = TM_OSD_LAYOUT_COUNT,
+     .values = LabOSD_LayoutNames, .OnChange = Lab_ChangeOSDDisplay,
+     .desc = {"Recent slides; Fixed reserves grid cells.", "Practice Panel keeps compact rows and timing history."}},
+    {.kind = OPTKIND_STRING, .name = "Recent Position", .value_num = 4,
+     .values = LabOSD_PositionNames, .OnChange = Lab_ChangeOSDDisplay,
+     .desc = {"Anchor for the Recent queue; stable styles use the top left."}},
+    {.kind = OPTKIND_INFO, .name = "L/R: OSD Page",
+     .desc = {"Use L/R while paused to choose a page.", "The OSD footer shows the page after unpausing.", "Pages never rotate automatically."}},
+};
+static EventMenu LabMenu_OSDDisplay = {.name = "OSD Display", .option_num = countof(LabOptions_OSDDisplay),
+    .options = LabOptions_OSDDisplay};
 
 // ACTION LOG --------------------------------------------------------------
 
@@ -1920,34 +2043,23 @@ static EventMenu LabMenu_ActionLog = {
 
 // HITBOX TRAILS --------------------------------------------------------------
 
-typedef struct HitboxTrail {
-    Vec3 a;
-    Vec3 b;
-    float size;
-    GXColor color;
-    int frame_created;
-} HitboxTrail;
-
-static u32 hitbox_trail_i;
-static HitboxTrail hitbox_trails[64];
-
 enum hitbox_trails_option
 {
     OPTHITBOXTRAILS_ENABLED,
     OPTHITBOXTRAILS_DECAY,
+    OPTHITBOXTRAILS_INFO,
 
     OPTHITBOXTRAILS_COUNT
 };
 
-const u8 LabValues_HitboxTrailDecayConst[] = { 15, 10, 30, 0 };
-const u8 LabValues_HitboxTrailDecayFactor[] = { 4, 8, 2, 0 };
-const char *LabOptions_HitboxTrailDecay[] = { "Normal", "Fast", "Slow", "Off" };
+static const char *LabOptions_HitboxTrailDecay[] = { TM_TRAIL_DECAY_LABELS };
 
 static EventOption LabOptions_HitboxTrails[OPTHITBOXTRAILS_COUNT] = {
     {
         .kind = OPTKIND_TOGGLE,
-        .name = "Enable",
-        .desc = {"Enable hitbox trails."},
+        .name = "Enable (local)",
+        .desc = {"Enable trails when both global profiles are Off."},
+        .OnChange = Lab_ChangeHitboxTrails,
     },
     {
         .kind = OPTKIND_STRING,
@@ -1955,6 +2067,12 @@ static EventOption LabOptions_HitboxTrails[OPTHITBOXTRAILS_COUNT] = {
         .name = "Decay",
         .desc = {"How quickly the hitbox will fade away."},
         .values = LabOptions_HitboxTrailDecay,
+        .OnChange = Lab_ChangeHitboxTrails,
+    },
+    {
+        .kind = OPTKIND_INFO,
+        .name = "Global: Off",
+        .desc = {"Global Very Fast/Instant override local controls.", "Both On draws the Very Fast union once.", "Change global trails in the OSD menu."},
     },
 };
 
@@ -2208,7 +2326,7 @@ static EventOption LabOptions_CPU[OPTCPU_COUNT] = {
         .name = "Smash DI Amount",
         .desc = {"Adjust how often the CPU will alter their position",
                  "during hitstop."},
-        .format = "%d Frames",
+        .format = "%df",
     },
     {
         .kind = OPTKIND_STRING,
@@ -2265,7 +2383,7 @@ static EventOption LabOptions_CPU[OPTCPU_COUNT] = {
         .name = "Counter Delay",
         .desc = {"Adjust the amount of actionable frames before ",
                  "the CPU counters."},
-        .format = "%d Frames",
+        .format = "%df",
     },
     {
         .kind = OPTKIND_MENU,
@@ -2449,7 +2567,7 @@ static EventOption LabOptions_AdvCounter_Default[OPTCTR_COUNT] = {
         .name = "Delay (Ground)",
         .desc = {"Adjust the amount of actionable frames before ",
                  "the CPU counters on the ground."},
-        .format = "%d Frames",
+        .format = "%df",
         .disable = 1,
     },
     {
@@ -2458,7 +2576,7 @@ static EventOption LabOptions_AdvCounter_Default[OPTCTR_COUNT] = {
         .name = "Delay (Air)",
         .desc = {"Adjust the amount of actionable frames before ",
                  "the CPU counters in the air."},
-        .format = "%d Frames",
+        .format = "%df",
         .disable = 1,
     },
     {
@@ -2467,7 +2585,7 @@ static EventOption LabOptions_AdvCounter_Default[OPTCTR_COUNT] = {
         .name = "Delay (Shield)",
         .desc = {"Adjust the amount of actionable frames before ",
                  "the CPU counters in shield."},
-        .format = "%d Frames",
+        .format = "%df",
         .disable = 1,
     },
 };
@@ -2575,7 +2693,7 @@ static EventOption LabOptions_Tech[OPTTECH_COUNT] = {
         .kind = OPTKIND_INT,
         .value_num = 16,
         .name = "Tech Invisibility Delay",
-        .format = "%d Frames",
+        .format = "%df",
         .desc = {"Set the delay in frames on tech invisibility."},
     },
     {
@@ -2937,16 +3055,20 @@ static const char *LabOptions_ChangeMirroredPlayback[] = {"Off", "On", "Random"}
 static const EventOption Record_Save = {
     .kind = OPTKIND_FUNC,
     .name = "Save Positions",
-    .desc = {"Save the current fighter positions",
-             "as the initial positions."},
+    .desc = {"Capture the current match state as the start",
+             "of this recording: positions, damage and actions.",
+             "Unlocks the recording controls. This creates",
+             "a fresh recording setup and clears all input slots."},
     .OnSelect = Record_InitState,
 };
 
 static const EventOption Record_Load = {
     .kind = OPTKIND_FUNC,
     .name = "Restore Positions",
-    .desc = {"Load the saved fighter positions and ",
-             "start the sequence from the beginning."},
+    .desc = {"Reload the saved match state and restart the",
+             "input timeline. Existing clips are kept.",
+             "Random slots and extra percent are rerolled.",
+             "Use this to repeat the same practice situation."},
     .OnSelect = Record_RestoreState,
 };
 
@@ -2960,8 +3082,10 @@ static EventOption LabOptions_Record[OPTREC_COUNT] = {
         .kind = OPTKIND_STRING,
         .value_num = sizeof(LabValues_HMNRecordMode) / 4,
         .name = "HMN Mode",
-        .desc = {"Toggle between recording and playback of",
-                 "inputs."},
+        .desc = {"HMN means your human fighter. Off: play normally.",
+                 "Record: store your live inputs in the chosen slot.",
+                 "Playback: replay that slot. Re-Record: replay",
+                 "until you input, then replace the remaining inputs."},
         .values = LabValues_HMNRecordMode,
         .OnChange = Record_ChangeHMNMode,
     },
@@ -2970,9 +3094,10 @@ static EventOption LabOptions_Record[OPTREC_COUNT] = {
         .value_num = sizeof(LabValues_RecordSlot) / 4,
         .val = 1,
         .name = "HMN Record Slot",
-        .desc = {"Toggle which recording slot to save inputs ",
-                 "to. Maximum of 6 and can be set to random ",
-                 "during playback."},
+        .desc = {"Choose one of six human input clips to record",
+                 "or replay. Changing slot reloads the saved start.",
+                 "Random uses Set HMN Chances during playback.",
+                 "Recording/Re-Record needs a numbered slot."},
         .values = LabValues_RecordSlot,
         .OnChange = Record_ChangeHMNSlot,
     },
@@ -2980,8 +3105,10 @@ static EventOption LabOptions_Record[OPTREC_COUNT] = {
         .kind = OPTKIND_STRING,
         .value_num = sizeof(LabValues_CPURecordMode) / 4,
         .name = "CPU Mode",
-        .desc = {"Toggle between recording and playback of",
-                 "inputs."},
+        .desc = {"Off: CPU follows CPU Options. Control: your",
+                 "controller moves the CPU without recording.",
+                 "Record: control and capture CPU inputs. Playback",
+                 "replays them; Re-Record replaces them after takeover."},
         .values = LabValues_CPURecordMode,
         .OnChange = Record_ChangeCPUMode,
     },
@@ -2990,8 +3117,10 @@ static EventOption LabOptions_Record[OPTREC_COUNT] = {
         .value_num = sizeof(LabValues_RecordSlot) / 4,
         .val = 1,
         .name = "CPU Record Slot",
-        .desc = {"Toggle which recording slot to save inputs ",
-                 "to. Maximum of 6 and can be set to random ","during playback."},
+        .desc = {"Choose one of six CPU input clips to record",
+                 "or replay. Changing slot reloads the saved start.",
+                 "Random uses Set CPU Chances during playback.",
+                 "Recording/Re-Record needs a numbered slot."},
         .values = LabValues_RecordSlot,
         .OnChange = Record_ChangeCPUSlot,
     },
@@ -2999,10 +3128,10 @@ static EventOption LabOptions_Record[OPTREC_COUNT] = {
         .kind = OPTKIND_STRING,
         .value_num = sizeof(LabOptions_ChangeMirroredPlayback) / 4,
         .name = "Mirrored Playback",
-        .desc = {"Playback with mirrored the recorded inputs,",
-                 "positions and facing directions.",
-                 "(!) This works properly only on symmetrical ",
-                 "stages."},
+        .desc = {"Flip left/right positions, facing and stick inputs.",
+                 "On always mirrors; Random rerolls on each restore.",
+                 "Turn Off before changing human/CPU modes.",
+                 "Use symmetrical stages; current code needs CPU Playback."},
         .values = LabOptions_ChangeMirroredPlayback,
         .OnChange = Record_ChangeMirroredPlayback,
     },
@@ -3011,80 +3140,106 @@ static EventOption LabOptions_Record[OPTREC_COUNT] = {
         .value_num = sizeof(LabValues_PlaybackCounterActions) / 4,
         .name = "CPU Counter",
         .val = 1,
-        .desc = {"Choose when CPU will start performing",
-                 "counter actions during playback."},
+        .desc = {"Choose when the CPU leaves its recorded inputs.",
+                 "Off: no automatic handoff. Ends: return to Lab AI",
+                 "after the clip. CPU Hit: use hit/grab counter timing.",
+                 "HMN Hit/Any Hit: hand off when that fighter is hit."},
         .values = LabValues_PlaybackCounterActions,
     },
     {
         .kind = OPTKIND_TOGGLE,
         .name = "Loop Input Playback",
-        .desc = {"Loop the recorded inputs when they end."},
+        .desc = {"Repeat the input timeline after the longest active",
+                 "clip ends. Does NOT restore positions or damage.",
+                 "Random playback slots reroll each loop.",
+                 "No looping during Record/Re-Record or CPU Control."},
     },
     {
         .kind = OPTKIND_STRING,
         .value_num = sizeof(LabValues_AutoRestore) / 4,
         .name = "Auto Restore",
-        .desc = {"Automatically restore saved positions."},
+        .desc = {"Off: restart manually. Playback Ends: reload the",
+                 "saved situation after the longest clip finishes.",
+                 "CPU Counters: reload after a counter, death or ledge wait.",
+                 "Restore waits 20 frames; unlike Loop, it resets state."},
         .values = LabValues_AutoRestore,
     },
     {
         .kind = OPTKIND_TOGGLE,
         .name = "Start Paused",
-        .desc = {"Pause the replay until your first input."},
+        .desc = {"Hold the recording at its first frame until you",
+                 "press an action button, move a stick or a trigger.",
+                 "Useful for getting ready after a restore.",
+                 "Independent of opening the Training Lab pause menu."},
     },
     {
         .kind = OPTKIND_STRING,
         .value_num = sizeof(LabOptions_TakeoverTarget) / 4,
         .name = "Playback Takeover",
-        .desc = {"Which character to takeover when",
-                 "inputting during playback."},
+        .desc = {"When you input during playback, control HMN or CPU",
+                 "with your controller; None disables input takeover.",
+                 "Normal Playback keeps the saved clip unchanged.",
+                 "Re-Record instead overwrites, and chooses its actor."},
         .values = LabOptions_TakeoverTarget,
     },
     {
         .kind = OPTKIND_FUNC,
         .name = "Re-Save Positions",
-        .desc = {"Save the current position, keeping",
-                 "all recorded inputs."},
+        .desc = {"Make the current match state the new start for",
+                 "all human/CPU slots, keeping their full input clips.",
+                 "Use to change starting damage or placement.",
+                 "Use Prune instead to remove the played beginning."},
         .OnSelect = Record_ResaveState,
     },
     {
         .kind = OPTKIND_FUNC,
         .name = "Prune Positions",
-        .desc = {"Save the current position, keeping",
-                 "recorded inputs from this point onwards."},
+        .desc = {"After advancing into a replay, make this state",
+                 "the new start and remove inputs before this point.",
+                 "Affects all human/CPU slots; shorter clips can empty.",
+                 "Re-Save keeps the beginning; Prune removes it."},
         .OnSelect = Record_PruneState,
     },
     {
         .kind = OPTKIND_FUNC,
         .name = "Delete Positions",
-        .desc = {"Delete the current initial position",
-                 "and recordings."},
+        .desc = {"Remove the saved recording start and all clips",
+                 "in all six human and six CPU slots.",
+                 "Recording controls lock until Save Positions.",
+                 "To remove just one clip, use Delete Slot."},
         .OnSelect = Record_DeleteState,
     },
     {
         .kind = OPTKIND_MENU,
         .name = "Slot Management",
-        .desc = {"Miscellaneous settings for altering the",
-                 "positions and inputs."},
+        .desc = {"Choose human or CPU and a clip slot, then edit",
+                 "its frame inputs, copy it or delete only that clip.",
+                 "These tools keep the shared saved match state."},
         .menu = &LabMenu_SlotManagement,
     },
     {
         .kind = OPTKIND_MENU,
         .name = "Set HMN Chances",
-        .desc = {"Set various randomization settings for the HMN."},
+        .desc = {"Weight the human clips used by the Random slot.",
+                 "Only slots with recordings participate.",
+                 "Random Percent adds extra damage on each restore."},
         .menu = &LabMenu_SlotChancesHMN,
     },
     {
         .kind = OPTKIND_MENU,
         .name = "Set CPU Chances",
-        .desc = {"Set various randomization settings for the CPU."},
+        .desc = {"Weight the CPU clips used by the Random slot.",
+                 "Only slots with recordings participate.",
+                 "Random Percent adds extra damage on each restore."},
         .menu = &LabMenu_SlotChancesCPU,
     },
     {
         .kind = OPTKIND_FUNC,
         .name = "Export",
-        .desc = {"Export the recording to a memory card",
-                 "for later use or to share with others."},
+        .desc = {"Write the saved start, input slots and recording",
+                 "settings to a memory-card recording file.",
+                 "Choose card A/B, a name, then confirm the save.",
+                 "Load recordings through Import on character select."},
         .OnSelect = Export_Init,
     },
 };
@@ -3121,40 +3276,48 @@ static EventOption LabOptions_SlotManagement[OPTSLOT_COUNT] = {
         .kind = OPTKIND_STRING,
         .value_num = sizeof(LabOptions_HmnCpu) / 4,
         .name = "Player",
-        .desc = {"Select the player to manage."},
+        .desc = {"Choose the human or CPU input bank.", "Each actor has six separate clip slots."},
         .values = LabOptions_HmnCpu,
     },
     {
         .kind = OPTKIND_STRING,
         .value_num = sizeof(LabOptions_Slot) / 4,
         .name = "Slot",
-        .desc = {"Select the slot to manage."},
+        .desc = {"Choose the source clip for editing, deleting or copying.", "The shared saved starting state stays unchanged."},
         .values = LabOptions_Slot,
     },
     {
         .kind = OPTKIND_MENU,
         .name = "Modify Inputs",
-        .desc = {"Manually alter this slot's inputs."},
+        .desc = {"Edit the selected clip one frame at a time.",
+                 "Analog and Buttons pages share the same Frame.",
+                 "Choosing a later frame can extend the clip.",
+                 "Edits change this slot's recorded input data."},
         .menu = &LabMenu_AlterInputs,
     },
     {
         .kind = OPTKIND_FUNC,
         .name = "Delete Slot",
-        .desc = {"Remove the inputs from this slot."},
+        .desc = {"Clear only the selected actor's selected input clip.",
+                 "The saved starting state and other clips stay.",
+                 "This slot leaves the Random playback pool."},
         .OnSelect = Record_DeleteSlot,
     },
     {
         .kind = OPTKIND_STRING,
         .value_num = sizeof(LabOptions_Slot) / 4,
         .name = "Copy Slot To",
-        .desc = {"Select the slot to copy to."},
+        .desc = {"Choose a destination in the selected actor's bank.",
+                 "Selecting it does not copy yet; use Copy Slot."},
         .values = LabOptions_Slot,
     },
     {
         .kind = OPTKIND_FUNC,
         .name = "Copy Slot",
-        .desc = {"Copy the inputs from \"Slot\"",
-                 "to \"Copy Slot To\"."},
+        .desc = {"Replace Copy Slot To with the selected source clip.",
+                 "Copies input timing/data and Random availability.",
+                 "Source equals destination: no change.",
+                 "The saved starting match state stays unchanged."},
         .OnSelect = Record_CopySlot,
     },
 };

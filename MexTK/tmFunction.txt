@@ -25,3 +25,16 @@ GetPageEventOffset
 GetJumpTableOffset
 GetEventCharList
 StartOSDs
+Settings_Get
+Settings_Set
+Message_EndCombo
+OSD_EditorInit
+OSD_EditorInput
+ActionCues_LCancel
+OSDContext_Tick
+OSD_ActOutWait
+OSD_WavedashHopColor
+OSD_ShineBeforeIASA
+OSD_ShineAfterIASA
+Settings_CommitPending
+Settings_EventCharacters

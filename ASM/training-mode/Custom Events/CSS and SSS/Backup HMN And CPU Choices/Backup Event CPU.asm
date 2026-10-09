@@ -38,3 +38,9 @@
     addi r7, r9, 150        # Nametag Backup Location
     li r8, 0                # Unk Backup Location
     branchl r12, 0x801b07e8
+
+    # Persist only confirmed unrestricted choices, through the deferred service.
+    SettingsBackup
+    li r3, 1
+    rtocbl r12, TM_SettingsEventCharacters
+    SettingsRestore

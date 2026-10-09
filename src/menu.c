@@ -1,4 +1,5 @@
 #include "events.h"
+#include "menu_controller_ui.h"
 
 GOBJ *EventMenu_Init(EventMenu *start_menu)
 {
@@ -25,6 +26,8 @@ GOBJ *EventMenu_Init(EventMenu *start_menu)
     menu_data->canvas_menu = Text_CreateCanvas(2, cam_gobj, 9, 13, 0, GXLINK_MENUTEXT, GXPRI_MENUTEXT, MENUCAM_GXPRI);
     menu_data->canvas_popup = Text_CreateCanvas(2, cam_gobj, 9, 13, 0, GXLINK_MENUTEXT, GXPRI_POPUPTEXT, MENUCAM_GXPRI);
     menu_data->curr_menu = start_menu;
+    menu_data->root_menu = start_menu;
+    if (start_menu->tab_num) MC_Tab(menu_data, 0);
 
     EventMenu_CreateModel(gobj);
     EventMenu_CreateText(gobj);
@@ -55,6 +58,7 @@ void EventMenu_ExitMenu(GOBJ *gobj) {
 
     menu_data->mode = MenuMode_Normal;
     menu_data->hide_menu = 1;
+    menu_data->picker = 0;
 
     // Allow the custom submenu to clean itself up before we exit
     if (menu_data->custom_gobj_destroy) {
@@ -72,6 +76,9 @@ void EventMenu_ExitMenu(GOBJ *gobj) {
     Match_UnfreezeGame(1);
     Match_ShowHUD();
     Match_AdjustSoundOnPause(0);
+    /* Event preference callbacks mark dirty once per explicit edit. Flush at
+     * menu close, rather than issuing card writes during practice/reset loops. */
+    Memcard_SaveIfChanged();
 }
 
 void EventMenu_PrevMenu(GOBJ *gobj) {
@@ -82,11 +89,15 @@ void EventMenu_PrevMenu(GOBJ *gobj) {
         assert("No previous menu");
 
     // reset cursor so it starts at top on reentry
-    curr_menu->scroll = 0;
-    curr_menu->cursor = 0;
+    if (!MC_Enabled(menu_data)) {
+        curr_menu->scroll = 0;
+        curr_menu->cursor = 0;
+    }
 
     curr_menu = curr_menu->prev;
     menu_data->curr_menu = curr_menu;
+    menu_data->selector = 0;
+    menu_data->picker = 0;
 
     EventMenu_UpdateText(gobj);
 }
@@ -96,6 +107,19 @@ void EventMenu_NextMenu(GOBJ *gobj, EventMenu* next_menu) {
 
     if (!next_menu)
         assert("Missing next menu");
+
+    if (MC_Enabled(menu_data)) {
+        for (int i = 0; i < menu_data->root_menu->tab_num; ++i) {
+            if (menu_data->root_menu->tabs[i].menu == next_menu) {
+                MC_Tab(menu_data, i);
+                menu_data->selector = 0;
+                EventMenu_UpdateText(gobj);
+                return;
+            }
+        }
+        menu_data->selector = next_menu->page_num != 0;
+        menu_data->picker = 0;
+    }
 
     // Propogate shortcuts forward from the base menu. Kinda hacky for now.
     next_menu->shortcuts = menu_data->curr_menu->shortcuts;
@@ -177,6 +201,16 @@ void EventMenu_Update(GOBJ *gobj)
     menu_data->hide_menu = 0;
     HSD_Pad *pad = PadGetMaster(menu_data->controller_index);
 
+    if (TM_GetSetting(TM_SETTING_OSD_LAYOUT, 0) && (pad->down & (HSD_TRIGGER_L | HSD_TRIGGER_R))) {
+        unsigned pages = Message_LayoutPageCount();
+        unsigned page = TM_GetSetting(TM_SETTING_OSD_PAGE, 0);
+        page = (page + ((pad->down & HSD_TRIGGER_R) ? 1 : pages - 1)) % pages;
+        TM_SetSetting(TM_SETTING_OSD_PAGE, 0, page);
+        Message_LayoutUpdate();
+        SFX_PlayCommon(2);
+        return;
+    }
+
     if ((pad->held & HSD_BUTTON_Y) && menu_data->curr_menu->shortcuts) {
         ShortcutList *shortcuts = menu_data->curr_menu->shortcuts;
         for (int i = 0; i < shortcuts->count; ++i) {
@@ -206,6 +240,10 @@ void EventMenu_Update(GOBJ *gobj)
                 else if (option->kind == OPTKIND_MENU) {
                     if (menu_data->curr_menu == option->menu)
                         continue;
+                    if (MC_Enabled(menu_data) && MC_Jump(gobj, option->menu)) {
+                        SFX_PlayCommon(1);
+                        break;
+                    }
                     // rewind to top level menu before going to the next menu
                     while (menu_data->curr_menu->prev) {
                         EventMenu_PrevMenu(gobj);
@@ -252,6 +290,7 @@ void EventMenu_RunFuncOption(GOBJ *gobj, EventOption *func_option) {
 
 void EventMenu_MenuThink(GOBJ *gobj, EventMenu *curr_menu) {
     MenuData *menu_data = gobj->userdata;
+    if (MC_Enabled(menu_data)) { MC_Think(gobj); return; }
 
     HSD_Pad *pad = PadGetMaster(menu_data->controller_index);
     int inputs = pad->repeat;
@@ -375,6 +414,7 @@ void EventMenu_MenuThink(GOBJ *gobj, EventMenu *curr_menu) {
 void EventMenu_CreateModel(GOBJ *gobj)
 {
     MenuData *menu_data = gobj->userdata;
+    if (MC_Enabled(menu_data)) { MC_CreateModel(gobj); return; }
 
     // create options background
     evMenu *menu_assets = event_vars->menu_assets;
@@ -452,6 +492,7 @@ void EventMenu_CreateModel(GOBJ *gobj)
 void EventMenu_CreateText(GOBJ *gobj)
 {
     MenuData *menu_data = gobj->userdata;
+    if (MC_Enabled(menu_data)) { MC_CreateText(gobj); return; }
     Text *text;
     int canvas_index = menu_data->canvas_menu;
 
@@ -534,6 +575,7 @@ void EventMenu_CreateText(GOBJ *gobj)
 void EventMenu_UpdateText(GOBJ *gobj)
 {
     MenuData *menu_data = gobj->userdata;
+    if (MC_Enabled(menu_data)) { MC_UpdateText(gobj); return; }
     EventMenu *menu = menu_data->curr_menu;
     s32 cursor = menu->cursor;
     s32 scroll = menu->scroll;

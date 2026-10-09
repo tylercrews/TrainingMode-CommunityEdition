@@ -13,7 +13,7 @@
     # CHECK IF ENABLED
     li r0, OSD.Powershield
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -76,7 +76,7 @@ MissedPowershield_Type2:
     b Display
 
 Display:
-    Message_Display
+    Message_DisplayOSD 9, 0, 1, 0
 
     # Set top text white
     lwz r3, 0x2C(r3)

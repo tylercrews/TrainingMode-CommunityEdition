@@ -184,6 +184,19 @@
     ENTRY TM_GetJumpTableOffset
     ENTRY TM_GetEventCharList
     ENTRY TM_StartOSDs
+    ENTRY TM_SettingsGet
+    ENTRY TM_SettingsSet
+    ENTRY TM_MessageEndCombo
+    ENTRY TM_OSDEditorInit
+    ENTRY TM_OSDEditorInput
+    ENTRY TM_ActionCuesLCancel
+    ENTRY TM_OSDContextTick
+    ENTRY TM_ActOutWait
+    ENTRY TM_WavedashHopColor
+    ENTRY TM_ShineBeforeIASA
+    ENTRY TM_ShineAfterIASA
+    ENTRY TM_SettingsCommitPending
+    ENTRY TM_SettingsEventCharacters
 
     # TmDt Data Pointers
     .set TM_Data, TM_tmFunction - 0x4
@@ -937,9 +950,118 @@
     rtocbl r12, TM_MessageDisplay
     .endm
 
+    # Typed metadata, not text parsing. arg 1/2/3 means the first/second/third
+    # integer vararg already supplied by the caller (r7/r8/r9 in these hooks).
+    .macro Message_DisplayOSD id, arg=0, line=1, inline=0, best=1
+        rlwinm r3, r3, 0, 24, 31
+        ori r3, r3, (\id << 8)
+        oris r3, r3, (0x4000 | \arg | (\line << 3) | (\inline << 5) | ((\best - 1) << 7))
+        Message_Display
+    .endm
+
     .set MsgData_Text, 0x0
 
     .set MSGCOLOR_WHITE, 0
     .set MSGCOLOR_GREEN, 1
     .set MSGCOLOR_RED, 2
     .set MSGCOLOR_YELLOW, 3
+
+# Shared serialized-settings ABI. Keep field numbers aligned with src/settings.h.
+.set SettingsField_OSDMask, 0
+.set SettingsField_Position, 1
+.set SettingsField_Page, 2
+.set SettingsField_Recommended, 3
+.set SettingsField_Enabled, 15
+.set SettingsField_Row, 16
+.set SettingsField_EditorRow, 17
+.set SettingsField_Ledgedash, 18
+.set SettingsField_Eggs, 19
+.set SettingsField_EventReset, 20
+.set SettingsField_Layout, 21
+.set SettingsField_Display, 22
+.set SettingsField_OSDPage, 23
+.set SettingsField_Character, 24
+.set SettingsField_SweetspotLines, 25
+.set SettingsField_EventSelection, 26
+
+# Preserve the native hook's entire register context, including volatile FPRs,
+# r0, CR, CTR and XER. Leave ABI linkage/argument space below the saves.
+.macro SettingsBackup
+    stwu r1, -0x140(r1)
+    stmw r3, 0x30(r1)
+    stw r0, 0xa4(r1)
+    mflr r0
+    stw r0, 0xa8(r1)
+    mfctr r0
+    stw r0, 0xac(r1)
+    mfcr r0
+    stw r0, 0xb0(r1)
+    mfxer r0
+    stw r0, 0xb8(r1)
+    .irp num,0,1,2,3,4,5,6,7,8,9,10,11,12,13
+        stfd f\num, (0xc0 + 8 * \num)(r1)
+    .endr
+.endm
+.macro SettingsRestore
+    .irp num,0,1,2,3,4,5,6,7,8,9,10,11,12,13
+        lfd f\num, (0xc0 + 8 * \num)(r1)
+    .endr
+    lwz r0, 0xb8(r1)
+    mtxer r0
+    lwz r0, 0xb0(r1)
+    mtcrf 255, r0
+    lwz r0, 0xac(r1)
+    mtctr r0
+    lwz r0, 0xa8(r1)
+    mtlr r0
+    lwz r0, 0xa4(r1)
+    lmw r3, 0x30(r1)
+    addi r1, r1, 0x140
+.endm
+.macro SettingsSavedLoad dest, source
+    .if \source == 0
+        lwz \dest, 0xa4(r1)
+    .else
+        lwz \dest, (0x30 + (\source - 3) * 4)(r1)
+    .endif
+.endm
+.macro SettingsRead field, dest
+    SettingsBackup
+    li r3, \field
+    li r4, 0
+    rtocbl r12, TM_SettingsGet
+    .if \dest == 0
+        stw r3, 0xa4(r1)
+    .else
+        stw r3, (0x30 + (\dest - 3) * 4)(r1)
+    .endif
+    SettingsRestore
+.endm
+.macro SettingsWrite field, value
+    SettingsBackup
+    SettingsSavedLoad r5, \value
+    li r3, \field
+    li r4, 0
+    rtocbl r12, TM_SettingsSet
+    SettingsRestore
+.endm
+.macro SettingsReadIndexed field, index, dest
+    SettingsBackup
+    SettingsSavedLoad r4, \index
+    li r3, \field
+    rtocbl r12, TM_SettingsGet
+    .if \dest == 0
+        stw r3, 0xa4(r1)
+    .else
+        stw r3, (0x30 + (\dest - 3) * 4)(r1)
+    .endif
+    SettingsRestore
+.endm
+.macro SettingsToggle id, value, field=SettingsField_Row
+    SettingsBackup
+    SettingsSavedLoad r4, \id
+    SettingsSavedLoad r5, \value
+    li r3, \field
+    rtocbl r12, TM_SettingsSet
+    SettingsRestore
+.endm

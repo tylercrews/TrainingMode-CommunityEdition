@@ -11,6 +11,20 @@
 
     backup
 
+    # A compact arrow run uses relative 75% scale in both native parsers.
+    # FFFF/FFFF is private: the ordinary native scale opcode is absolute.
+    cmpwi r10, 0x2D
+    bne CheckInlineColor
+    lbz r11, 1(r6)
+    cmpwi r11, 0x3E
+    beq SmallArrow
+CheckInlineColor:
+
+    # ESC + eight hexadecimal digits: RGBA input, native RGB text command.
+    # Native 0x0C consumes THREE color bytes; alpha is not a fourth payload byte.
+    cmpwi r10, 0x1B
+    beq InlineColor
+SearchCustomSymbols:
     # Search custom symbol table
     bl CustomSymbolDictionary
     mflr Dictionary
@@ -43,6 +57,28 @@ CharacterFound:
     restore
     branch r12, 0x803a6b70
 
+SmallArrow:
+    bl SmallArrowBytes
+    mflr r28
+    li r29, 0
+SmallArrow_Copy:
+    lbzx r11, r28, r29
+    stbx r11, r3, r9
+    addi r9, r9, 1
+    addi r29, r29, 1
+    cmpwi r29, 11
+    blt SmallArrow_Copy
+    addi r5, r5, 1
+    addi r6, r6, 1
+    restore
+    branch r12, 0x803a6b70
+SmallArrowBytes:
+    blrl
+    .byte 0x0E, 0xFF, 0xFF, 0xFF, 0xFF
+    .byte 0x0B, 0x20, 0xFC, 0x21, 0x00  # Native '-' and '>' from the original converter.
+    .byte 0x0F                          # Restore the enclosing row scale.
+    .align 2
+
 CharacterFound_Resume:
     lbz r10, 0x1(CurrentDictOffset) # Load Override Character
     lbz r12, 0x2(CurrentDictOffset) # Load Override Character
@@ -50,6 +86,46 @@ CharacterFound_Resume:
     mr r31, r12
     load r0, 0x8040c8c0
     branch r12, 0x803a6b08
+
+InlineColor:
+    li r28, 1
+    li r29, 0
+InlineColor_Read:
+    lbzx r11, r6, r28
+    cmpwi r11, 0x30
+    blt SearchCustomSymbols
+    cmpwi r11, 0x39
+    ble InlineColor_Digit
+    cmpwi r11, 0x41
+    blt SearchCustomSymbols
+    cmpwi r11, 0x46
+    bgt SearchCustomSymbols
+    subi r11, r11, 0x37
+    b InlineColor_Accumulate
+InlineColor_Digit:
+    subi r11, r11, 0x30
+InlineColor_Accumulate:
+    slwi r29, r29, 4
+    or r29, r29, r11
+    addi r28, r28, 1
+    cmpwi r28, 9
+    blt InlineColor_Read
+    li r11, 0x0C
+    stbx r11, r3, r9
+    addi r9, r9, 1
+    srwi r11, r29, 24
+    stbx r11, r3, r9
+    addi r9, r9, 1
+    srwi r11, r29, 16
+    stbx r11, r3, r9
+    addi r9, r9, 1
+    srwi r11, r29, 8
+    stbx r11, r3, r9
+    addi r9, r9, 1
+    addi r5, r5, 8
+    addi r6, r6, 8
+    restore
+    branch r12, 0x803a6b70
 
 CustomSymbolDictionary:
     blrl

@@ -20,11 +20,17 @@
     backupall
     lwz REG_FighterData, 0x2c(player)
 
+    # Record the landing result even when the text category is disabled.
+    SettingsBackup
+    mr r3, player
+    rtocbl r12, TM_ActionCuesLCancel
+    SettingsRestore
+
     # CHECK IF ENABLED
     li r0, OSD.LCancel              # wavedash ID
     # lwz r4, -0xdbc(rtoc) #get frame data toggle bits
     lwz r4, MemcardData(r13)
-    lwz r4, 0x1F24(r4)
+    SettingsRead SettingsField_OSDMask, 4
     li r3, 1
     slw r0, r3, r0
     and. r0, r0, r4
@@ -75,7 +81,23 @@ PrintMessage:
     mr r6, REG_String
     lbz r8, 0x67F(REG_FighterData)  # get decimal to print
     addi r8, r8, 1
-    Message_Display
+    # Keep the actual cancel outcome separate from its input-timing color.
+    cmpwi REG_TextColor, MSGCOLOR_GREEN
+    bne LCancel_OutcomeMissed
+    bl LCancel_SuccessText
+    mflr r9
+    b LCancel_OutcomeReady
+LCancel_OutcomeMissed:
+    bl LCancel_MissedText
+    mflr r9
+LCancel_OutcomeReady:
+    cmpwi r8, 41
+    bgt LCancel_DisplayNoTiming
+    Message_DisplayOSD 1, 2, 1, 0
+    b LCancel_EndDisplay
+LCancel_DisplayNoTiming:
+    Message_DisplayOSD 1, 0, 1, 0
+LCancel_EndDisplay:
 
     # Make Top Line White
     lwz r3, 0x2C(r3)
@@ -164,12 +186,21 @@ GetLCRate:
 
 LCancel_Press:
     blrl
-    .string "L-Cancel %d%%\nFrame %d/7"
+    .string "L-Cancel %d%%\n%df/7f\n%s"
     .align 2
 
 LCancel_NoPress:
     blrl
-    .string "L-Cancel %d%%\nNo Press"
+    .string "L-Cancel %d%%\nNo Press\nMissed"
+    .align 2
+
+LCancel_SuccessText:
+    blrl
+    .string "Success"
+    .align 2
+LCancel_MissedText:
+    blrl
+    .string "Missed"
     .align 2
 
 Color_White:

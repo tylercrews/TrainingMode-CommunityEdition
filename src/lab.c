@@ -1,7 +1,12 @@
 #include "lab.h"
 #include "recovery.c"
+#include "lab_menu.h"
 
 #include <stddef.h>
+
+typedef char settings_overlay_capacity[(OVERLAY_COUNT <= TM_SETTINGS_OVERLAYS) ? 1 : -1];
+typedef char settings_overlay_effects[(countof(LabValues_OverlayColours) == TM_SETTINGS_OVERLAY_CHOICES) ? 1 : -1];
+typedef char settings_osd_capacity[(countof(LabOSD_ID) == TM_SETTINGS_OSDS) ? 1 : -1];
 
 // Static Variables
 static DIDraw didraws[6];
@@ -10,6 +15,22 @@ static GOBJ *infodisp_gobj_hmn;
 static GOBJ *infodisp_gobj_cpu;
 static RecData rec_data;
 static Savestate_v1 *rec_state;
+static const char *Lab_MenuUnavailable(EventOption *option)
+{
+    if (!option || !option->disable) return 0;
+    for (unsigned i = 0; i < countof(LabOptions_Record); ++i) {
+        if (option != &LabOptions_Record[i]) continue;
+        if (!rec_state || !rec_state->is_exist) return "Save Positions first to unlock recording controls.";
+        if (i == OPTREC_HMNMODE || i == OPTREC_CPUMODE) return "Set Mirrored Playback to Off before changing modes.";
+        if (i == OPTREC_LOOP || i == OPTREC_AUTORESTORE) return "Disabled while either actor is in Record or Re-Record.";
+        if (i == OPTREC_MIRRORED_PLAYBACK) return "Needs CPU Playback; neither actor may be recording.";
+        return "Unavailable in the current recording mode.";
+    }
+    for (int i = 0; i < REC_SLOTS; ++i)
+        if (option == &LabOptions_SlotChancesHMN[i] || option == &LabOptions_SlotChancesCPU[i])
+            return "Record inputs into this slot before assigning a chance.";
+    return 0;
+}
 static _HSD_ImageDesc snap_image = {0};
 static _HSD_ImageDesc resized_image = {
     .format = 4,
@@ -206,7 +227,7 @@ void Lab_AddCustomOSD(GOBJ *menu_gobj) {
 }
 
 void Lab_RemoveCustomOSD(GOBJ *menu_gobj) {
-    int remove_idx = LabMenu_CustomOSDs.cursor;
+    int remove_idx = LabMenu_CustomOSDs.scroll + LabMenu_CustomOSDs.cursor;
     int osd_idx = remove_idx - OPTCUSTOMOSD_FIRST_CUSTOM;
     HSD_Free(LabOptions_CustomOSDs[remove_idx].name);
     int move_count = OPTCUSTOMOSD_MAX_COUNT - remove_idx - 1;
@@ -233,7 +254,7 @@ void Lab_CustomOSDsThink(void) {
 
             event_vars->Message_Display(
                 15, hmn_data->ply, 0, 
-                "%s:\n%i Frames", state_buf, hmn_data->TM.state_frame
+                "%s:\n%if", state_buf, hmn_data->TM.state_frame
             );
 
             break;
@@ -267,7 +288,7 @@ void Lab_ChangeStadiumTransformation(GOBJ *menu_gobj, int value) {
 }
 
 void Lab_ChangeInputDisplay(GOBJ *menu_gobj, int value) {
-    stc_memcard->TM_LabCPUInputDisplay = value;
+    TM_SetSetting(TM_SETTING_INPUT_DISPLAY, 0, value);
 }
 
 void Lab_ChangeDPadOption(GOBJ *menu_gobj, int value) {
@@ -275,42 +296,93 @@ void Lab_ChangeDPadOption(GOBJ *menu_gobj, int value) {
     u8 d = LabOptions_Controls[OPTCTRL_DPAD_DOWN].val;
     u8 l = LabOptions_Controls[OPTCTRL_DPAD_LEFT].val;
     u8 r = LabOptions_Controls[OPTCTRL_DPAD_RIGHT].val;
-    stc_memcard->TM_LabDPadUD = u | (d << 4);
-    stc_memcard->TM_LabDPadLR = l | (r << 4);
+    TM_SetSetting(TM_SETTING_DPAD_UP, 0, u);
+    TM_SetSetting(TM_SETTING_DPAD_DOWN, 0, d);
+    TM_SetSetting(TM_SETTING_DPAD_LEFT, 0, l);
+    TM_SetSetting(TM_SETTING_DPAD_RIGHT, 0, r);
 }
 
 void Lab_ChangeOverlays(GOBJ *menu_gobj, int value) {
-    Memcard *memcard = stc_memcard;
-
-    memset(&memcard->TM_LabSavedOverlays_HMN, 0, sizeof(memcard->TM_LabSavedOverlays_HMN));
-    memset(&memcard->TM_LabSavedOverlays_CPU, 0, sizeof(memcard->TM_LabSavedOverlays_CPU));
-
-    int overlay_save_count = sizeof(memcard->TM_LabSavedOverlays_HMN) / sizeof(OverlaySave);
-    int overlay_save_idx_hmn = 0;
-    int overlay_save_idx_cpu = 0;
-    for (u8 group = 0; group < OVERLAY_COUNT; ++group) {
-        u8 overlay_hmn = LabOptions_OverlaysHMN[group].val;
-        u8 overlay_cpu = LabOptions_OverlaysCPU[group].val;
-
-        if (overlay_hmn != 0 && overlay_save_idx_hmn < overlay_save_count) {
-            memcard->TM_LabSavedOverlays_HMN[overlay_save_idx_hmn] = (OverlaySave) { group, overlay_hmn };
-            overlay_save_idx_hmn += 1;
-        }
-
-        if (overlay_cpu != 0 && overlay_save_idx_cpu < overlay_save_count) {
-            memcard->TM_LabSavedOverlays_CPU[overlay_save_idx_cpu] = (OverlaySave) { group, overlay_cpu };
-            overlay_save_idx_cpu += 1;
-        }
+    for (unsigned group = 0; group < OVERLAY_COUNT; ++group) {
+        TM_SetSetting(TM_SETTING_OVERLAY_HMN, group, LabOptions_OverlaysHMN[group].val);
+        TM_SetSetting(TM_SETTING_OVERLAY_CPU, group, LabOptions_OverlaysCPU[group].val);
     }
 }
 
-void Lab_ChangeOSDs(GOBJ *menu_gobj, int value) {
-    u32 enabled_osds = 0;
-    for (int i = 0; i < LabMenu_OSDs.option_num; i++)
-        enabled_osds |= (u32)LabOptions_OSDs[i].val << LabOSD_ID[i];
-    stc_memcard->TM_OSDEnabled = enabled_osds;
+void Lab_ChangeHitboxTrails(GOBJ *menu_gobj, int value) {
+    event_vars->trails->configure(LabOptions_HitboxTrails[OPTHITBOXTRAILS_ENABLED].val,
+                                  LabOptions_HitboxTrails[OPTHITBOXTRAILS_DECAY].val);
+    int vf = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
+    int instant = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
+    static char *names[] = { TM_GLOBAL_TRAIL_STATE_NAMES };
+    LabOptions_HitboxTrails[OPTHITBOXTRAILS_INFO].name = names[vf | (instant << 1)];
+}
+static void Lab_SetGlobalTrail(unsigned flag, int value) {
+    // Change only the selected preference; another editor may have changed its sibling.
+    TM_SetSetting(TM_SETTING_FLAG, flag, value);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 3].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 4].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
+    Lab_ChangeHitboxTrails(0, 0);
+    Memcard_SaveIfChanged();
+}
+void Lab_ChangeGlobalVeryFast(GOBJ *menu_gobj, int value) {
+    Lab_SetGlobalTrail(TM_FLAG_TRAILS_VERY_FAST, value);
+}
+void Lab_ChangeGlobalInstant(GOBJ *menu_gobj, int value) {
+    Lab_SetGlobalTrail(TM_FLAG_TRAILS_INSTANT, value);
+}
 
-    stc_memcard_state->memcard_changed = true;
+void Lab_ChangeOSDs(GOBJ *menu_gobj, int value) {
+    MenuData *menu = menu_gobj->userdata;
+    EventOption *selected = EventMenu_SelectedOption(menu);
+    unsigned row;
+    for (row = 0; row < countof(LabOSD_ID); ++row)
+        if (selected == &LabOptions_OSDs[row]) break;
+    if (row == countof(LabOSD_ID)) return;
+    // Only the selected category changes; other editors' choices remain authoritative.
+    TM_SetSetting(TM_SETTING_OSD_COLOR, LabOSD_ID[row], value);
+    for (unsigned i = 0; i < countof(LabOSD_ID); ++i)
+        LabOptions_OSDs[i].val = TM_GetSetting(TM_SETTING_OSD_COLOR, LabOSD_ID[i]);
+    Memcard_SaveIfChanged();
+}
+
+void Lab_ChangeOSDsOff(GOBJ *menu_gobj, int value) {
+    MenuData *menu = menu_gobj->userdata;
+    EventOption *selected = EventMenu_SelectedOption(menu);
+    if (selected != &LabOptions_OSDs[TM_SETTINGS_OSDS] && selected != &LabOptions_OSDs[TM_SETTINGS_OSDS + 1]) return;
+    unsigned flag = selected == &LabOptions_OSDs[TM_SETTINGS_OSDS] ? TM_FLAG_CPU_OSDS_OFF : TM_FLAG_OSDS_OFF;
+    TM_SetSetting(TM_SETTING_FLAG, flag, value);
+    LabOptions_OSDs[TM_SETTINGS_OSDS].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_CPU_OSDS_OFF);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF);
+    Memcard_SaveIfChanged();
+}
+static const unsigned global_cue_flags[] = {
+    TM_FLAG_MISSED_LCANCEL, TM_FLAG_RUN_TURNAROUND, TM_FLAG_LAST_BLOCKED_FRAME, TM_FLAG_INFINITE_SHIELDS,
+    TM_FLAG_INVINCIBILITY,
+};
+static void Lab_ChangeOSDDisplay(GOBJ *menu, int value) {
+    MenuData *data = menu->userdata;
+    unsigned row = data->curr_menu->scroll + data->curr_menu->cursor;
+    if (data->curr_menu != &LabMenu_OSDDisplay || row > 1) return;
+    TM_SetSetting(row == 0 ? TM_SETTING_OSD_LAYOUT : TM_SETTING_OSD_POSITION, 0, value);
+}
+static void Lab_RefreshShieldOverride(void) {
+    char *status = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_INFINITE_SHIELDS) ?
+        "Global Infinite Shields: On (full health overrides local)." : "Global Infinite Shields: Off.";
+    LabOptions_CPU[OPTCPU_SHIELD].desc[2] = status;
+    LabOptions_CPU[OPTCPU_SHIELDHEALTH].desc[2] = status;
+}
+void Lab_ChangeGlobalCue(GOBJ *menu_gobj, int value) {
+    MenuData *menu = menu_gobj->userdata;
+    EventOption *selected = EventMenu_SelectedOption(menu);
+    unsigned cue;
+    for (cue = 0; cue < countof(global_cue_flags); ++cue)
+        if (selected == &LabOptions_OSDs[TM_SETTINGS_OSDS + 5 + cue]) break;
+    if (cue == countof(global_cue_flags)) return;
+    TM_SetSetting(TM_SETTING_FLAG, global_cue_flags[cue], value);
+    for (unsigned i = 0; i < countof(global_cue_flags); ++i)
+        LabOptions_OSDs[TM_SETTINGS_OSDS + 5 + i].val = TM_GetSetting(TM_SETTING_FLAG, global_cue_flags[i]);
+    Lab_RefreshShieldOverride();
     Memcard_SaveIfChanged();
 }
 
@@ -384,13 +456,11 @@ void Lab_FreezeCPU(GOBJ *menu_gobj) {
 }
 
 void Lab_ChangeFrameAdvanceButton(GOBJ *menu_gobj, int value) {
-    stc_memcard->TM_LabFrameAdvanceButton &= 0xF0;
-    stc_memcard->TM_LabFrameAdvanceButton |= (u8)value;
+    TM_SetSetting(TM_SETTING_ADVANCE, 0, value);
 }
 
 void Lab_ChangeFrameDecrementButton(GOBJ *menu_gobj, int value) {
-    stc_memcard->TM_LabFrameAdvanceButton &= 0x0F;
-    stc_memcard->TM_LabFrameAdvanceButton |= (u8)value << 4;
+    TM_SetSetting(TM_SETTING_DECREMENT, 0, value);
 }
 
 void Lab_ChangeCPUPercent(GOBJ *menu_gobj, int value)
@@ -764,6 +834,13 @@ void InfoDisplay_Update(GOBJ *menu_gobj, EventOption menu[], GOBJ *fighter, GOBJ
 {
     InfoDisplayData *idData = menu_gobj->userdata;
     Text *text = idData->text;
+    FighterData *owner = fighter ? fighter->userdata : 0;
+    Playerblock *player = owner ? Fighter_GetPlayerblock((u8)owner->ply) : 0;
+    if (player && player->p_kind == 1 && TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_CPU_OSDS_OFF)) {
+        JOBJ_SetFlags(idData->menuModel, JOBJ_HIDDEN);
+        text->hidden = 1;
+        return;
+    }
     if (Pause_CheckStatus(1) != 2)
     {
         // get the last row enabled
@@ -835,7 +912,7 @@ void InfoDisplay_Update(GOBJ *menu_gobj, EventOption menu[], GOBJ *fighter, GOBJ
                         frameCurr = (animFrameCurr / animSpeed);
                     }
 
-                    Text_SetText(text, i, "State Frame: %d/%d", frameCurr, frameTotal);
+                    Text_SetText(text, i, "State %df/%df", frameCurr, frameTotal);
                     break;
                 }
                 case (INFDISP_SELFVEL):
@@ -4699,8 +4776,6 @@ void Record_Restart(Savestate_v1 *savestate, int flags) {
 
     CPUResetVars();
 
-    hitbox_trail_i = 0;
-    memset(hitbox_trails, 0, sizeof(hitbox_trails));
 
     stc_playback_cancelled_hmn = false;
     stc_playback_cancelled_cpu = false;
@@ -5994,19 +6069,19 @@ void Event_PostThink(GOBJ *gobj)
     UpdateOverlays(cpu, LabOptions_OverlaysCPU);
 
     ActionLog_Think();
-    HitboxTrails_Think();
     Stage_Think();
 }
 
 // Init Function
 void Event_Init(GOBJ *gobj)
 {
+    Lab_InitMenuUI();
     GOBJ *hmn = Fighter_GetGObj(0);
     FighterData *hmn_data = hmn->userdata;
     GOBJ *cpu = Fighter_GetGObj(1);
     FighterData *cpu_data = cpu->userdata;
     GObj_AddProc(gobj, Event_PostThink, 20);
-    GObj_AddGXLink(gobj, HitboxTrails_GX, 5, 0);
+    Lab_ChangeHitboxTrails(0, 0);
 
     // Init runtime options...
     
@@ -6056,105 +6131,31 @@ void Event_Init(GOBJ *gobj)
     LabOptions_InfoDisplayHMN[OPTINF_PRESET].OnChange = Lab_ChangeInfoPresetHMN;
     LabOptions_InfoDisplayCPU[OPTINF_PRESET].OnChange = Lab_ChangeInfoPresetCPU;
 
-    // saved options
-    Memcard *memcard = stc_memcard;
-
-    // load input display option, resetting if invalid
-    if (memcard->TM_LabCPUInputDisplay < LabOptions_General[OPTGEN_INPUT].value_num)
-        LabOptions_General[OPTGEN_INPUT].val = memcard->TM_LabCPUInputDisplay;
-    else
-        memcard->TM_LabCPUInputDisplay = LabOptions_General[OPTGEN_INPUT].val;
-
-    // load frame advance option, resetting if invalid
-    u8 advance_btn = memcard->TM_LabFrameAdvanceButton & 0xF;
-    u8 decrement_btn = memcard->TM_LabFrameAdvanceButton >> 4;
-    
-    if (advance_btn < LabOptions_Controls[OPTCTRL_FRAME_ADVANCE].value_num) {
-        LabOptions_Controls[OPTCTRL_FRAME_ADVANCE].val = advance_btn;
-    } else {
-        memcard->TM_LabFrameAdvanceButton &= 0xF0;
-        memcard->TM_LabFrameAdvanceButton |= LabOptions_Controls[OPTCTRL_FRAME_ADVANCE].val;
+    // The shared service validates/migrates before returning any preferences.
+    LabOptions_General[OPTGEN_INPUT].val = TM_GetSetting(TM_SETTING_INPUT_DISPLAY, 0);
+    LabOptions_Controls[OPTCTRL_FRAME_ADVANCE].val = TM_GetSetting(TM_SETTING_ADVANCE, 0);
+    LabOptions_Controls[OPTCTRL_FRAME_DECREMENT].val = TM_GetSetting(TM_SETTING_DECREMENT, 0);
+    LabOptions_Controls[OPTCTRL_DPAD_UP].val = TM_GetSetting(TM_SETTING_DPAD_UP, 0);
+    LabOptions_Controls[OPTCTRL_DPAD_DOWN].val = TM_GetSetting(TM_SETTING_DPAD_DOWN, 0);
+    LabOptions_Controls[OPTCTRL_DPAD_LEFT].val = TM_GetSetting(TM_SETTING_DPAD_LEFT, 0);
+    LabOptions_Controls[OPTCTRL_DPAD_RIGHT].val = TM_GetSetting(TM_SETTING_DPAD_RIGHT, 0);
+    for (unsigned group = 0; group < OVERLAY_COUNT; ++group) {
+        LabOptions_OverlaysHMN[group].val = TM_GetSetting(TM_SETTING_OVERLAY_HMN, group);
+        LabOptions_OverlaysCPU[group].val = TM_GetSetting(TM_SETTING_OVERLAY_CPU, group);
     }
+    for (int i = 0; i < (int)countof(LabOSD_ID); i++)
+        LabOptions_OSDs[i].val = TM_GetSetting(TM_SETTING_OSD_COLOR, LabOSD_ID[i]);
 
-    // load frame decrement option, resetting if invalid
-    if (decrement_btn < LabOptions_Controls[OPTCTRL_FRAME_DECREMENT].value_num) {
-        LabOptions_Controls[OPTCTRL_FRAME_DECREMENT].val = decrement_btn;
-    } else {
-        memcard->TM_LabFrameAdvanceButton &= 0x0F;
-        memcard->TM_LabFrameAdvanceButton |= LabOptions_Controls[OPTCTRL_FRAME_DECREMENT].val << 4;
-    }
-
-    u8 dpad_u = memcard->TM_LabDPadUD & 0xF;
-    u8 dpad_d = memcard->TM_LabDPadUD >> 4;
-
-    // load dpad up option, resetting if invalid
-    if (dpad_u < LabOptions_Controls[OPTCTRL_DPAD_UP].value_num) {
-        LabOptions_Controls[OPTCTRL_DPAD_UP].val = dpad_u;
-    } else {
-        memcard->TM_LabDPadUD &= 0xF0;
-        memcard->TM_LabDPadUD |= LabOptions_Controls[OPTCTRL_DPAD_UP].val;
-    }
-
-    // load dpad down option, resetting if invalid
-    if (dpad_d < LabOptions_Controls[OPTCTRL_DPAD_DOWN].value_num) {
-        LabOptions_Controls[OPTCTRL_DPAD_DOWN].val = dpad_d;
-    } else {
-        memcard->TM_LabDPadUD &= 0x0F;
-        memcard->TM_LabDPadUD |= LabOptions_Controls[OPTCTRL_DPAD_DOWN].val << 4;
-    }
-
-    u8 dpad_l = memcard->TM_LabDPadLR & 0xF;
-    u8 dpad_r = memcard->TM_LabDPadLR >> 4;
-
-    // load dpad left option, resetting if invalid
-    if (dpad_l < LabOptions_Controls[OPTCTRL_DPAD_LEFT].value_num) {
-        LabOptions_Controls[OPTCTRL_DPAD_LEFT].val = dpad_l;
-    } else {
-        memcard->TM_LabDPadLR &= 0xF0;
-        memcard->TM_LabDPadLR |= LabOptions_Controls[OPTCTRL_DPAD_LEFT].val;
-    }
-
-    // load dpad right option, resetting if invalid
-    if (dpad_r < LabOptions_Controls[OPTCTRL_DPAD_RIGHT].value_num) {
-        LabOptions_Controls[OPTCTRL_DPAD_RIGHT].val = dpad_r;
-    } else {
-        memcard->TM_LabDPadLR &= 0x0F;
-        memcard->TM_LabDPadLR |= LabOptions_Controls[OPTCTRL_DPAD_RIGHT].val << 4;
-    }
-
-    // load overlays, resetting if invalid
-    int overlay_save_count = sizeof(memcard->TM_LabSavedOverlays_HMN) / sizeof(OverlaySave);
-    for (int i = 0; i < overlay_save_count; ++i) {
-        OverlaySave save_hmn = memcard->TM_LabSavedOverlays_HMN[i];
-        if (save_hmn.overlay != 0) {
-            // ensure valid
-            if (
-                save_hmn.group < countof(LabOptions_OverlaysHMN)
-                && save_hmn.overlay < countof(LabValues_OverlayColours)
-            ) {
-                LabOptions_OverlaysHMN[save_hmn.group].val = save_hmn.overlay;
-            } else {
-                memcard->TM_LabSavedOverlays_HMN[i] = (OverlaySave){0};
-            }
-        }
-
-        OverlaySave save_cpu = memcard->TM_LabSavedOverlays_CPU[i];
-        if (save_cpu.overlay != 0) {
-            // ensure valid
-            if (
-                save_cpu.group < countof(LabOptions_OverlaysCPU)
-                && save_cpu.overlay < countof(LabValues_OverlayColours)
-            ) {
-                LabOptions_OverlaysCPU[save_cpu.group].val = save_cpu.overlay;
-            } else {
-                memcard->TM_LabSavedOverlays_CPU[i] = (OverlaySave){0};
-            }
-        }
-    }
-
-    u32 enabled_osds = memcard->TM_OSDEnabled;
-    for (int i = 0; i < LabMenu_OSDs.option_num; i++)
-        LabOptions_OSDs[i].val = (enabled_osds >> LabOSD_ID[i]) & 1;
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 3].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_VERY_FAST);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 4].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_TRAILS_INSTANT);
+    Lab_ChangeHitboxTrails(0, 0);
+    LabOptions_OSDs[TM_SETTINGS_OSDS + 1].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_OSDS_OFF);
+    LabOptions_OSDs[TM_SETTINGS_OSDS].val = TM_GetSetting(TM_SETTING_FLAG, TM_FLAG_CPU_OSDS_OFF);
+    for (unsigned i = 0; i < countof(global_cue_flags); ++i)
+        LabOptions_OSDs[TM_SETTINGS_OSDS + 5 + i].val = TM_GetSetting(TM_SETTING_FLAG, global_cue_flags[i]);
+    LabOptions_OSDDisplay[0].val = TM_GetSetting(TM_SETTING_OSD_LAYOUT, 0);
+    LabOptions_OSDDisplay[1].val = TM_GetSetting(TM_SETTING_OSD_POSITION, 0);
+    Lab_RefreshShieldOverride();
 
     // character rng options
     {
@@ -6816,99 +6817,6 @@ void ActionLog_GX(GOBJ *gobj, int pass) {
 
         event_vars->HUD_DrawActionLogBar(action_log, action_colors, countof(action_log));
         event_vars->HUD_DrawActionLogKey(key_names, key_colours, key_count);
-    }
-}
-
-static HitboxTrail *HitboxTrails_Add(void) {
-    HitboxTrail *trail = &hitbox_trails[hitbox_trail_i];
-    hitbox_trail_i = (hitbox_trail_i + 1) % countof(hitbox_trails);
-    return trail;
-}
-
-static GXColor HitboxTrails_Color(int dmg) {
-    u8 r = 255;
-    u8 g = 128 - (u8)(dmg * 10) / 2;
-    u8 b = g;
-    return (GXColor) { r, g, b, 200 };
-}
-
-void HitboxTrails_Think(void) {
-    if (!LabOptions_HitboxTrails[OPTHITBOXTRAILS_ENABLED].val)
-        return;
-
-    for (int ply = 0; ply < 4; ++ply) {
-        GOBJ *ft = Fighter_GetGObj(ply);
-        if (!ft) continue;
-
-        FighterData *ft_data = ft->userdata;
-        for (u32 hit_i = 0; hit_i < countof(ft_data->hitbox); ++hit_i) {
-            ftHit *hit = &ft_data->hitbox[hit_i];
-            if (!hit->active) continue;
-            
-            GXColor color = HitboxTrails_Color(hit->dmg);
-
-            int overlay_idx = stc_overlays_running[ply];
-            if (overlay_idx >= 0) {
-                if (ply == 0)
-                    color = LabValues_OverlayColours[LabOptions_OverlaysHMN[overlay_idx].val].color;
-                else if (ply == 1)
-                    color = LabValues_OverlayColours[LabOptions_OverlaysCPU[overlay_idx].val].color;
-            }
-
-            *HitboxTrails_Add() = (HitboxTrail) {
-                .a = hit->pos_prev,
-                .b = hit->pos,
-                .size = hit->size,
-                .color = color,
-                .frame_created = event_vars->game_timer,
-            };
-        }
-    }
-
-    for (GOBJ *gobj = (*stc_gobj_lookup)[MATCHPLINK_ITEM]; gobj; gobj = gobj->next) {
-        ItemData *item = gobj->userdata;
-
-        for (u32 hit_i = 0; hit_i < countof(item->hitbox); ++hit_i) {
-            itHit *hit = &item->hitbox[hit_i];
-            if (!hit->active) continue;
-
-            *HitboxTrails_Add() = (HitboxTrail) {
-                .a = hit->pos_prev,
-                .b = hit->pos,
-                .size = hit->size,
-                .color = HitboxTrails_Color(hit->dmg),
-                .frame_created = event_vars->game_timer,
-            };
-        }
-    }
-}
-
-void HitboxTrails_GX(GOBJ *gobj, int pass) {
-    if (!LabOptions_HitboxTrails[OPTHITBOXTRAILS_ENABLED].val)
-        return;
-
-    int decay_const = LabValues_HitboxTrailDecayConst[LabOptions_HitboxTrails[OPTHITBOXTRAILS_DECAY].val];
-    int decay_factor = LabValues_HitboxTrailDecayFactor[LabOptions_HitboxTrails[OPTHITBOXTRAILS_DECAY].val];
-
-    if (pass == 2) {
-        int game_timer = event_vars->game_timer;
-
-        for (u32 i = 0; i < countof(hitbox_trails); ++i) {
-            HitboxTrail *hit = &hitbox_trails[i];
-            if (hit->size == 0) continue;
-            if (hit->frame_created > event_vars->game_timer) continue;
-
-            static GXColor hit_ambient = {0, 0, 0, 0};
-            GXColor hit_diffuse = hit->color;
-
-            int elapsed = game_timer - hit->frame_created;
-            int fade = (elapsed - decay_const) * decay_factor;
-            if (fade < 0) fade = 0;
-            if (fade >= hit_diffuse.a) continue;
-            hit_diffuse.a -= fade;
-
-            Develop_DrawSphere(hit->size, &hit->a, &hit->b, &hit_diffuse, &hit_ambient);
-        }
     }
 }
 

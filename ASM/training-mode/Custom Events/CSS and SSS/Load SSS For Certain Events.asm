@@ -7,7 +7,7 @@
     # Get Event ID
     lwz r3, MemcardData(r13)
     lbz r4, 0x0535(r3)
-    lbz r3, CurrentEventPage(r3)
+    SettingsRead SettingsField_Page, 3
     # Check if this event has a SSS
     rtocbl r12, TM_GetIsSelectStage
     cmpwi r3, 0

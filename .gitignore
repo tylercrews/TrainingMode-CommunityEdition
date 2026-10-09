@@ -35,6 +35,7 @@ build/
 root/
 *.iso
 TM-CE.zip
+TM-Tyro-V*.zip
 TM-CE/
 
 # Mac files

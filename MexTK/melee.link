@@ -284,6 +284,7 @@
 80085FD4:Fighter_GetFtAction
 80085E50:Fighter_GetAnimData
 8001E8F8:Fighter_GetAnimLength
+8006F484:Fighter_GetCurrentAnimLength
 8003418C:Fighter_GetSubcharGObj
 8007DB24:Fighter_GFXRemoveAll
 8006CC7C:Fighter_GiveDamage
@@ -630,6 +631,7 @@
 8026E15C:Item_CollAir_Bounce
 8026E414:Item_CollAir_Land
 8026DAA8:Item_CollAir_NoCB
+80288E6C:Egg_EnterRest
 8026D62C:Item_CollGround_PassLedge
 8026D8A4:Item_CollGround_StopLedge
 80225DD8:Item_CopyDevelopState
