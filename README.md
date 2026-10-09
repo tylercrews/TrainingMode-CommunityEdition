@@ -6,10 +6,8 @@ Training Mode - Tyro Edition is an augmented version of Aitch's Training Mode - 
 
 I don't have my own community and I don't intend to spread this mod in a way to compete with community edition, I'm just going to continue making features that I think will be useful for myself.
 So if you would like to access Aitch's original repo and discord you can go here. It is a great community and Aitch is an incredible dev:
-
-To download the regular Community Edition ISO, click [here](https://github.com/AlexanderHarrison/TrainingMode-CommunityEdition/releases/latest).
-
-Join the Community Edition [discord](https://discord.gg/2Khb8CVP7A) to discuss changes, new features, or ask for assistance.
+* To download the regular Community Edition ISO, click [here](https://github.com/AlexanderHarrison/TrainingMode-CommunityEdition/releases/latest).
+* Join the Community Edition [discord](https://discord.gg/2Khb8CVP7A) to discuss changes, new features, or ask for assistance.
 
 ## Development
 Please read [DEVELOPMENT.md](DEVELOPMENT.md).
